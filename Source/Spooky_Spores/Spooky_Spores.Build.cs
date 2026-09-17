@@ -24,13 +24,7 @@ public class Spooky_Spores : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
 		PublicIncludePaths.AddRange(new string[] {
-			"Spooky_Spores",
-			"Spooky_Spores/Variant_Horror",
-			"Spooky_Spores/Variant_Horror/UI",
-			"Spooky_Spores/Variant_Shooter",
-			"Spooky_Spores/Variant_Shooter/AI",
-			"Spooky_Spores/Variant_Shooter/UI",
-			"Spooky_Spores/Variant_Shooter/Weapons"
+			"Spooky_Spores"
 		});
 
 		// Uncomment if you are using Slate UI
