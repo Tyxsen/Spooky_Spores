@@ -44,6 +44,12 @@ ASpooky_SporesCharacter::ASpooky_SporesCharacter()
 	GetCharacterMovement()->AirControl = 0.5f;
 }
 
+void ASpooky_SporesCharacter::GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const
+{
+	OutLocation = FirstPersonCameraComponent->GetComponentLocation();
+	OutRotation = FirstPersonCameraComponent->GetComponentRotation();
+}
+
 void ASpooky_SporesCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {	
 	// Set up action bindings
