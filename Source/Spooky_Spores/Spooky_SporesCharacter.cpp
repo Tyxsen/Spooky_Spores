@@ -9,6 +9,8 @@
 #include "InputActionValue.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Spooky_Spores.h"
+#include "Interaction/GrabComponent.h"
+#include "Interaction/InteractionComponent.h"
 
 ASpooky_SporesCharacter::ASpooky_SporesCharacter()
 {
@@ -65,6 +67,10 @@ void ASpooky_SporesCharacter::SetupPlayerInputComponent(UInputComponent* PlayerI
 		// Looking/Aiming
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ASpooky_SporesCharacter::LookInput);
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &ASpooky_SporesCharacter::LookInput);
+	
+		// Interacting/launching
+		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &ASpooky_SporesCharacter::DoInteractAction);
+		EnhancedInputComponent->BindAction(LaunchObjectsAction, ETriggerEvent::Started, this, &ASpooky_SporesCharacter::DoLaunchObjects);
 	}
 	else
 	{
@@ -123,4 +129,34 @@ void ASpooky_SporesCharacter::DoJumpEnd()
 {
 	// pass StopJumping to the character
 	StopJumping();
+}
+
+void ASpooky_SporesCharacter::DoInteractAction()
+{
+	UGrabComponent* Grab = FindComponentByClass<UGrabComponent>();
+	UInteractionComponent* Interaction = FindComponentByClass<UInteractionComponent>();
+	if (!Grab || !Interaction) return;
+	
+	if (Grab->IsHolding())
+	{
+		Grab->Release();
+		return;
+	}
+	
+	UPrimitiveComponent* TargetComponent = nullptr;
+	if (Interaction->IsGrabbableTarget(TargetComponent))
+	{
+		Grab->Grab(TargetComponent);
+		return;
+	}
+	
+	Interaction->TryInteract();
+}
+
+void ASpooky_SporesCharacter::DoLaunchObjects()
+{
+	if (UGrabComponent* Grab = FindComponentByClass<UGrabComponent>())
+	{
+		Grab->Launch();
+	}
 }

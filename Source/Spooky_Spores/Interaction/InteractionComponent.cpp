@@ -3,27 +3,14 @@
 
 #include "Interaction/InteractionComponent.h"
 #include "CollisionChannels.h"
-#include "Camera/CameraComponent.h"
 #include "GameFramework/Pawn.h"
+#include "Interaction/Grabbable.h"
+#include "Interaction/Interactable.h"
 
 // Sets default values for this component's properties
 UInteractionComponent::UInteractionComponent()
 {
-	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
-	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
-
-	// ...
-}
-
-
-// Called when the game starts
-void UInteractionComponent::BeginPlay()
-{
-	Super::BeginPlay();
-
-	// ...
-	
 }
 
 void UInteractionComponent::UpdateInteractionTrace()
@@ -85,5 +72,32 @@ void UInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 	UpdateInteractionTrace();
+}
+
+bool UInteractionComponent::IsGrabbableTarget(UPrimitiveComponent*& OutComponent) const
+{
+	OutComponent = nullptr;
+
+	if (!ActualTarget.IsValid()) return false;
+	if (CurrentTargetDistance > GrabRange) return false;
+	if (!ActualTarget->Implements<UGrabbable>()) return false;
+
+	OutComponent = IGrabbable::Execute_GetGrabbableComponent(ActualTarget.Get());
+	return true;
+}
+
+bool UInteractionComponent::IsInteractableTarget() const
+{
+	if (!ActualTarget.IsValid()) return false;
+	if (CurrentTargetDistance > InteractRange) return false;
+
+	return ActualTarget->Implements<UInteractable>();
+}
+
+void UInteractionComponent::TryInteract()
+{
+	if (!IsInteractableTarget()) return;
+
+	IInteractable::Execute_OnInteract(ActualTarget.Get(), GetOwner());
 }
 
