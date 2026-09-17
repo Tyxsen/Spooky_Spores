@@ -1,0 +1,1 @@
+- Système de sauvegarde : Etat general des objets (déplacés et interactables) / Narration
