@@ -39,6 +39,7 @@ Le personnage est de taille moyenne (environ 1m80). Il peut se déplacer, courir
 
 **Interaction**
 - Portée d'interaction avec l'environnement : **2 à 3 mètres**, depuis la tête du personnage
+- Objet grab : Peut être lancé avec une impulsion définie (1000)
 
 **Combat**
 - Sorts infligeant des dégâts modérés, proportionnels au niveau du sort
@@ -61,6 +62,7 @@ Caméra en **première personne**, choisie pour maximiser l'immersion du joueur 
 | Ouvrir l'inventaire | Tab |
 | Interagir avec l'environnement / les objets | E |
 | Attaquer (sort sélectionné) | Clic gauche |
+| Lancer un objet actuellement grab | Clic droit |
 | Sélectionner un sort (roue des sorts) | Maintenir clic droit puis relâcher sur le sort voulu |
 | Barre de raccourcis (9 emplacements) | 1 à 9 (par défaut, remappable) |
 | Basculer vue joueur ↔ vue de gestion (top-down) | Touche à définir |
