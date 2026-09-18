@@ -5,7 +5,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 #include "InputMappingContext.h"
-#include "Spooky_SporesCameraManager.h"
+#include "Core/Character/Spooky_SporesCameraManager.h"
 #include "Blueprint/UserWidget.h"
 #include "Spooky_Spores.h"
 #include "Widgets/Input/SVirtualJoystick.h"
