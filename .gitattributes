@@ -1,0 +1,12 @@
+# Assets Unreal réels → suivis par Git LFS
+*.uasset filter=lfs diff=lfs merge=lfs -text
+*.umap filter=lfs diff=lfs merge=lfs -text
+*.png filter=lfs diff=lfs merge=lfs -text
+*.jpg filter=lfs diff=lfs merge=lfs -text
+*.wav filter=lfs diff=lfs merge=lfs -text
+*.fbx filter=lfs diff=lfs merge=lfs -text
+*.psd filter=lfs diff=lfs merge=lfs -text
+
+# Documentation → suivi Git classique, pour un affichage fiable sur GitHub
+Documentation_Documents/** -filter -diff -merge -text
+Videos/** -filter -diff -merge -text
