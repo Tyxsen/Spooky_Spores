@@ -9,4 +9,3 @@
 
 # Documentation → suivi Git classique, pour un affichage fiable sur GitHub
 Documentation_Documents/** -filter -diff -merge -text
-Videos/** -filter -diff -merge -text
