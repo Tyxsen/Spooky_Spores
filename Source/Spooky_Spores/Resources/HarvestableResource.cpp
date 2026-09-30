@@ -28,13 +28,16 @@ void AHarvestableResource::OnInteract_Implementation(AActor* InteractingActor)
 			FVector RandomOffset(
 				FMath::FRandRange(-DropSpawnRadius, DropSpawnRadius),
 				FMath::FRandRange(-DropSpawnRadius, DropSpawnRadius),
-				0.0f);
-			
+				0.0f
+			);
 			FVector SpawnLocation = GetActorLocation() + RandomOffset + FVector(0, 0, 50.0f);
-			AResourceDrop* NewDrop = GetWorld()->SpawnActor<AResourceDrop>(Drop.DropClass, SpawnLocation, FRotator::ZeroRotator);
+			FTransform SpawnTransform(FRotator::ZeroRotator, SpawnLocation);
+			
+			AResourceDrop* NewDrop = GetWorld()->SpawnActorDeferred<AResourceDrop>(Drop.DropClass, SpawnTransform);
 			if (!NewDrop) continue;
 
 			NewDrop->InitializeDrop(Drop.Type, Drop.Amount);
+			NewDrop->FinishSpawning(SpawnTransform);
 		}
 	}
 	Destroy();

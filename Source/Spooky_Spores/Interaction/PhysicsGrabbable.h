@@ -18,7 +18,7 @@ public:
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Physics")
-	UStaticMeshComponent* MeshComponent;
+	TObjectPtr<UStaticMeshComponent> MeshComponent;
 	
 public:
 	virtual UPrimitiveComponent* GetGrabbableComponent_Implementation() const override;

@@ -37,7 +37,7 @@ public:
 
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "Resources")
-	UStaticMeshComponent* MeshComponent;
+	TObjectPtr<UStaticMeshComponent> MeshComponent;
 
 	UPROPERTY(EditAnywhere, Category = "Resources")
 	TArray<FResourceDropEntry> Drops;
