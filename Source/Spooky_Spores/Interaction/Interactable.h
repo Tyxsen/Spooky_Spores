@@ -23,5 +23,5 @@ class SPOOKY_SPORES_API IInteractable
 
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
-	void OnInteract(AActor* Instigator);
+	void OnInteract(AActor* InteractingActor);
 };
