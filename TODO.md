@@ -1,1 +1,100 @@
-- Système de sauvegarde : Etat general des objets (déplacés et interactables) / Narration
+# TODO — Spooky_Spores
+ 
+## Prochaine étape
+ 
+- [ ] Sprint et endurance (valeurs du 3C : marche 400, course 650, ~10 s d'endurance, recharge après 4 s) — branche `feature/sprint-stamina` créée depuis `dev`, à faire si du temps reste avant la semaine de cours
+
+## À terminer suite à la récolte de ressources
+ 
+- [ ] Section « Récolte de ressources » dans la documentation technique (classes, rôles, choix : spawn différé, canal `ResourceDrop`, délai de ramassage, atterrissage à plat)
+- [ ] `CLAUDE.md` : résoudre les points marqués « à vérifier »
+- [ ] `CLAUDE.md` : ajouter en section 1 la règle de mise à jour du fichier après validation
+- [ ] `CLAUDE.md` : mettre à jour la section 12 une fois la récolte fusionnée dans `dev`
+- [ ] `CLAUDE.md` : préciser quels projets de l'année doivent être rendus en anglais
+- [ ] Mettre à jour la version du moteur (5.8.3) dans le README et la documentation technique
+- [ ] Passer Unreal en 5.8.3 sur l'autre ordinateur
+
+## Planning jusqu'au Bloc 2
+ 
+Règles : une mécanique par semaine d'alternance, livrée entière et fusionnée dans `dev`. Les semaines de cours sont réservées au CDC. Si une semaine déborde, on coupe ou on repousse en fin de file.
+ 
+**Période 1**
+- [ ] Sprint et endurance + plantation et pousse des graines (Checkpoint B)
+- [ ] Chaudron : une recette qui transforme des ressources en une potion
+- [ ] Semaine de cours (Bloc 1, S2) : livrable du CDC
+
+**Période 2**
+- [ ] Composant de santé + frapper les arbres et les pierres + premier sort avec mana
+- [ ] Un soldat ennemi simple : se déplace, attaque, meurt, laisse du butin (réutilise les drops)
+- [ ] Semaine de cours (Bloc 1, S3) : livrable du CDC + oral de fin de Bloc 1
+
+**Période 3**
+- [ ] Résurrection : potion + cadavre = serviteur (le cadavre implémente `IInteractable`)
+- [ ] Serviteur qui récolte la ressource la plus proche
+- [ ] Semaine tampon : stabilisation, retard éventuel, documentation
+
+À chaque fin de période : tag et Release GitHub (`v0.2`, `v0.3`...).
+ 
+## Système de sauvegarde
+ 
+À concevoir avant les mécaniques de progression. Données à persister :
+
+- [ ] État des objets déplacés (position et rotation des objets saisissables, comme `BP_Rock`)
+- [ ] État des objets interactables (nœuds déjà récoltés, drops encore au sol)
+- [ ] Narration : `bHasTriggered` de chaque `AStoryTrigger`, pour qu'un texte déjà lu ne réapparaisse pas
+- [ ] Ressources du `UResourceCounterComponent`
+- [ ] Plus tard : plantations en cours de pousse, serviteurs, potions, état de la base
+
+## Idée validée pour la période 2 : frapper les ressources
+ 
+- [ ] Décider avec quoi le nécromancien frappe (bâton, mains, outils, sort)
+- [ ] Arbres et pierres avec le composant de santé, via le système de dégâts d'Unreal (`ApplyDamage` / `OnTakeAnyDamage`)
+- [ ] À zéro point de vie : apparition des drops avec la logique existante
+- [ ] Vibration de l'objet frappé
+- Les champs restent récoltés avec E. Ne pas coder de logique de coups spécifique aux arbres avant le composant de santé.
+
+## Dette technique
+ 
+- [ ] Déplacer la création de l'UI hors du personnage (PlayerController ou HUD) quand l'interface grossira
+- [ ] Faire disparaître les drops restés au sol après un délai (avant les serviteurs)
+- [ ] Vérifier / faire la factorisation du calcul de la cible dans `UGrabComponent` (`GetGrabTargetTransform`)
+- [ ] Adopter `TObjectPtr` pour les membres `UPROPERTY`, dans toutes les classes d'un coup (optionnel)
+- [ ] Nettoyage optionnel des assets inutilisés du template (animations `Pistol`...) : branche `chore/`, suppression via le Content Browser en vérifiant les références
+
+## Limites connues (acceptées pour l'instant)
+ 
+- Push n'est pas une action indépendante : fusionné dans le grab
+- Un objet tenu peut traverser des obstacles fins si le joueur bouge vite
+- Le redressement d'un drop à l'atterrissage est instantané
+- Sur une pente, un drop se pose droit et non aligné sur le terrain
+- Le champignon ne se fracture qu'en 2 morceaux
+- Les couleurs des morceaux du champignon ne s'affichent que dans l'éditeur
+
+## Bloc 2 : visuel et son
+ 
+- [ ] Matériaux réels : champignon, drops, nœuds récoltables
+- [ ] Apparence de l'UI (compteur de ressources, texte narratif)
+- [ ] Son et effet au ramassage d'un drop
+- [ ] Rotation ou flottement des drops au sol
+- [ ] Animation douce du redressement des drops à l'atterrissage
+- [ ] Particules d'impact en frappant les arbres et les pierres
+- [ ] Effets visuels des sorts (Niagara)
+- [ ] Plus de fragments sur le champignon si besoin
+
+## Idées de gameplay à rediscuter
+ 
+- [ ] Attraction des drops vers le joueur à proximité
+- [ ] Fusion des drops identiques proches
+- [ ] Repousse des arbres et des pierres (à réfléchir avec la plantation)
+
+## Repoussé après le Bloc 2
+ 
+- Les trois autres sorts et la roue de sélection
+- La barre de raccourcis à 9 emplacements et les objets équipables
+- La refonte des contrôles selon l'objet en main (Input Mapping Contexts), avec mise à jour du 3C
+- Un vrai système d'inventaire
+- La vue de gestion top-down
+- La construction de base
+- La conquête du village
+- Le menu de paramètres (son, touches, FOV)
+ 
