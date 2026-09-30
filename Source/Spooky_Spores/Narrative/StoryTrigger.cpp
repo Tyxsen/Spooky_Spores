@@ -9,7 +9,7 @@ AStoryTrigger::AStoryTrigger()
 	PrimaryActorTick.bCanEverTick = false;
 
 	TriggerVolume = CreateDefaultSubobject<UBoxComponent>(FName("TriggerVolume"));
-	RootComponent = TriggerVolume;
+	SetRootComponent(TriggerVolume);
 	TriggerVolume->SetCollisionProfileName(TEXT("Trigger"));
 }
 

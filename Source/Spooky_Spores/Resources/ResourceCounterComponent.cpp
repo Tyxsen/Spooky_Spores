@@ -7,8 +7,6 @@
 UResourceCounterComponent::UResourceCounterComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
-
-	// ...
 }
 
 void UResourceCounterComponent::AddResource(EResourceType Type, int32 Amount)
