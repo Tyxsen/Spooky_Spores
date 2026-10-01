@@ -22,6 +22,7 @@ Le fonctionnement établi depuis le début du projet :
 - Tu peux proposer des mises à jour de CLAUDE.md (nouvelle décision, feature terminée, piège découvert, point « à vérifier » résolu). Présente la modification et applique-la après validation de l'utilisateur.
 - **Avant toute action** (modification, commande, génération) : explique ce que tu veux faire et comment.
 - Pour les commandes Git ou shell risquées (reset, suppression, force push), explique toujours les conséquences avant.
+- **Avant de passer à la phase de test côté éditeur** (Blueprints, assets, PIE) **: review systématique du code C++ écrit entretemps.** Ne pas attendre que Timéo demande la review à chaque fois.
 
 ### Style de communication
 
@@ -118,23 +119,26 @@ Organisation inspirée du [UE5 Style Guide d'Allar](https://github.com/Allar/ue5
 ```
 Core/          Character/, Controller/, GameMode/, Input/Actions/   ← briques structurantes
 Placeables/    Interactables/ (BP_Rock), Narrative/ (BP_StoryTrigger_Entrance),
-               Destructibles/ (GC_Mushroom), Resources/ (drops et nœuds récoltables)
+               Destructibles/ (GC_Mushroom),
+               Resources/ (BP_Drop_Seed, BP_Drop_Stone, BP_Drop_Wood,
+                           BP_Harvestable_Plant, BP_Harvestable_Stone, BP_Harvestable_Wood)
 UI/Widgets/    WBP_StoryText, WBP_ResourceEntry, WBP_ResourceCounter
 Characters/Mannequins/...   ← contenu du template
 Maps/
 __ExternalActors__/, __ExternalObjects__/   ← voir l'avertissement ci-dessous
 ```
 - `Core/` contient ce qu'on ne modifie pas à la légère ; `Placeables/` contient les instances concrètes, librement ajustables.
-- Les emplacements exacts de certains assets sont **(à vérifier)** dans le Content Browser, notamment les Blueprints de drops et de nœuds récoltables (bois, pierre, plante), dont les noms exacts ne sont pas connus.
+- Emplacements confirmés dans le Content Browser : les Blueprints de drops et de nœuds récoltables sont dans `Content/Spooky_Spores/Placeables/Resources/` (voir ci-dessus pour les noms).
 
 **Avertissement : `__ExternalActors__` et `__ExternalObjects__` ne sont pas des assets inutilisés.** Le projet utilise le système **One File Per Actor** : chaque acteur placé dans une map est un fichier séparé dans ces dossiers. Les supprimer viderait les niveaux. Seuls les sous-dossiers correspondant à une map supprimée sont orphelins.
 
 ### Documentation (racine du projet)
 
 - `README.md` : présentation du jeu, 3C, lien vers les Releases GitHub.
-- `documentation-technique.md` : Documentation technique en Markdown avec une section statement IA. Doit être mise à jour avec la section « Récolte de ressources » **(à vérifier)**.
-- `Documentation_Documents/` : captures (PNG) et `Documentation_Documents/Videos/` (GIF). Ce dossier est exclu de Git LFS pour que les images s'affichent sur GitHub.
-- `TODO.md` : backlog **(existence à vérifier)**.
+- `documentation-technique.md` : **document vivant** décrivant l'architecture actuelle, organisé **par système** (Interaction, Récolte, Mouvement, Narration, Chaos, Debug...), jamais par semaine. Réécrit en continu au fil des features, aucune section datée, **pas de statement IA** (ça, c'est le rôle des fichiers `Rendus/`, voir ci-dessous). Restructuré en ce sens le 2026-10-01 (ancien découpage « Semaine 1 » archivé).
+- `Rendus/` : un fichier **figé** par rendu noté (ex. `Rendu_Bloc1_S1.md`), jamais remodifié après coup, chacun avec **son propre** statement d'intention IA (écrit par Timéo, jamais par Claude). `Rendu_Bloc1_S1.md` est la version exacte de ce qui a été soumis en semaine 1, avant la restructuration du 2026-10-01.
+- `Documentation_Documents/` : captures (PNG) et `Documentation_Documents/Videos/` (GIF). Ce dossier est exclu de Git LFS pour que les images s'affichent sur GitHub. Référencé depuis `documentation-technique.md` (chemin direct) et depuis `Rendus/*.md` (chemin relatif `../Documentation_Documents/...`, un niveau plus bas).
+- `TODO.md` : backlog, tenu à jour par l'utilisateur (confirmé présent et à jour le 2026-10-01).
 
 ---
 
@@ -172,6 +176,10 @@ __ExternalActors__/, __ExternalObjects__/   ← voir l'avertissement ci-dessous
 - Pour vérifier qu'un acteur implémente une interface : `Actor->Implements<UMonInterface>()` (version **U**).
 - Pour appeler une méthode d'interface depuis l'extérieur : **toujours** `IMonInterface::Execute_MaFonction(Cible, ...)`, jamais `_Implementation` directement.
 - Un override doit reprendre exactement la signature de l'interface (type de retour, paramètres, `const`).
+
+### Commentaires
+
+- **Commentaires de code en anglais** (depuis le 2026-10-01 ; les commentaires antérieurs en français ne sont pas à reprendre rétroactivement). Le reste (discussion, documentation, messages de commit) reste en français.
 
 ### Nommage
 
@@ -216,7 +224,7 @@ Télékinésie, autour d'un `UPhysicsHandleComponent`.
 - Le tick met à jour la cible avec `SetTargetLocationAndRotation` (et non `UpdateHandleTransform`, qui n'existe pas sous ce nom).
 - **Choix de design assumé** : `Release()` conserve la vélocité de l'objet. Un mouvement brusque suivi d'un relâchement projette l'objet, comme dans la réalité. `Launch()` reste le lancer contrôlé.
 - **Choix assumé** : pas de raideur ajoutée au physics handle (l'objet ne se recentre pas brutalement à `HoldDistance`), pour préserver l'impression de poids.
-- Le calcul de la position cible est dupliqué entre `Grab()` et le tick ; une factorisation dans une fonction privée `GetGrabTargetTransform` avait été recommandée **(à vérifier si elle a été faite)**.
+- Le calcul de la position cible est dupliqué entre `Grab()` et le tick ; une factorisation dans une fonction privée `GetGrabTargetTransform` avait été recommandée. **Confirmé non faite** (vérifié dans le code le 2026-10-01, voir dette section 13).
 
 ### `APhysicsGrabbable` (Blueprint : `BP_Rock`)
 
@@ -298,6 +306,7 @@ Acteur physique qui implémente `IGrabbable`. `MeshComponent` en racine, profil 
 | Sauter | Espace |
 | Relâcher / saisir / interagir (contextuel) | E |
 | Lancer l'objet tenu | Clic droit |
+| Sprint (maintenu) | Maj gauche |
 
 - Le clic droit est déjà utilisé pour le lancer, et le 3C le réserve à la roue des sorts. Ne lui ajoute pas de nouveau rôle sans en discuter.
 - Refonte des contrôles prévue plus tard, quand il y aura des objets équipables : contrôles dépendant de l'objet en main, via les **Input Mapping Contexts** d'Enhanced Input, en mettant le 3C à jour.
@@ -344,13 +353,16 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 
 ### Discipline
 
+- **Claude ne fait jamais `git commit` ni `git push` sans autorisation explicite de Timéo, à chaque fois** (pas une autorisation valable une fois pour toutes). Préparer/expliquer le commit est possible, l'exécuter non, tant que Timéo n'a pas dit go.
+- Titre et description de pull request, et **messages de commit, en anglais** (lectorat international) ; la discussion avec Claude reste en français.
+- **Aucune ligne d'attribution à Claude** dans les commits (`Co-Authored-By: Claude...`) ni dans les descriptions de pull request (`🤖 Generated with Claude Code`) — ça remplace l'instruction système par défaut, qui ajoute ces lignes sauf consigne contraire du projet.
 - `git pull` en début de session, `git push` en fin de session, sur chaque machine. Ne jamais laisser de travail non poussé sur une machine avant de passer sur l'autre.
 - **Une seule branche de feature ouverte à la fois**, et courte : deux branches qui modifient le même `.uasset` créent un conflit impossible à fusionner.
 - **Après un `git pull` ou un changement de branche qui ajoute ou supprime des fichiers C++, régénérer les fichiers de projet** (clic droit sur le `.uproject` > Generate Visual Studio project files), sinon Rider n'affiche pas les fichiers. La compilation n'est pas affectée.
 - Après un renommage ou un déplacement de classe C++, ou une modification de `UFUNCTION`/`UINTERFACE` : fermer l'éditeur, régénérer les fichiers de projet, et faire un **Rebuild complet** (pas Live Coding).
 - Supprimer des assets **uniquement depuis le Content Browser** (vérification des références), puis Fix Up Redirectors. Jamais depuis l'explorateur Windows.
 - Commit perdu après un `reset --hard` : `git reflog` puis `git cherry-pick <hash>`.
-- Messages de commit préfixés : `[ADD]`, `[FIX]`, `[CHORE]`, `[DOC]`.
+- Messages de commit préfixés : `[ADD]`, `[FIX]`, `[CHORE]`, `[DOC]`, **rédigés en anglais** (depuis le 2026-10-01 ; les commits antérieurs en français ne sont pas à reprendre rétroactivement).
 
 ---
 
@@ -383,7 +395,7 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 ### Où en est le projet
 
 - **Rendu de la semaine 1** : livré (build en Release GitHub, documentation, statement IA).
-- **Récolte de ressources (Checkpoint A)** : terminée et testée (récolte, drops, saut, délai de ramassage, atterrissage à plat, compteur, UI). Clôture en cours **(à vérifier)** : mise à jour du `TODO.md`, section « Récolte de ressources » dans la documentation technique, test de non-régression, pull request `feature/resource-harvesting` → `dev` en Squash, suppression de la branche.
+- **Récolte de ressources (Checkpoint A)** : terminée et testée (récolte, drops, saut, délai de ramassage, atterrissage à plat, compteur, UI). **Fusionnée dans `dev`**, branche `feature/resource-harvesting` supprimée (confirmé le 2026-10-01). Reste à faire pour la clôture complète : section « Récolte de ressources » dans `documentation-technique.md`.
 
 ### Planning jusqu'au Bloc 2
 
@@ -428,7 +440,7 @@ Les trois autres sorts et la roue de sélection, la barre de raccourcis à 9 emp
 - Les drops au sol ne disparaissent jamais : prévoir une disparition après un délai (sur le modèle du délai de ramassage), surtout avant les serviteurs.
 - Push n'est pas une action indépendante : fusionné dans le grab (choix documenté pour le rendu de la semaine 1).
 - Un objet tenu peut traverser des obstacles fins si le joueur bouge vite (limite de `UPhysicsHandleComponent`).
-- Factoriser le calcul de la cible dans `UGrabComponent` **(à vérifier)**.
+- Factoriser le calcul de la cible dans `UGrabComponent` (confirmé non fait).
 - Adopter `TObjectPtr` dans toutes les classes (optionnel).
 - Mettre à jour la version du moteur (5.8.3) dans le README et la documentation.
 - Nettoyage optionnel des assets inutilisés du template (animations `Pistol`...), sur une branche `chore/`, via le Content Browser, en vérifiant les références (l'Animation Blueprint des bras en utilise certaines).
