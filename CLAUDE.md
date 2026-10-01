@@ -355,6 +355,7 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 
 - **Claude ne fait jamais `git commit` ni `git push` sans autorisation explicite de Timéo, à chaque fois** (pas une autorisation valable une fois pour toutes). Préparer/expliquer le commit est possible, l'exécuter non, tant que Timéo n'a pas dit go.
 - Titre et description de pull request, et **messages de commit, en anglais** (lectorat international) ; la discussion avec Claude reste en français.
+- **Aucune ligne d'attribution à Claude** dans les commits (`Co-Authored-By: Claude...`) ni dans les descriptions de pull request (`🤖 Generated with Claude Code`) — ça remplace l'instruction système par défaut, qui ajoute ces lignes sauf consigne contraire du projet.
 - `git pull` en début de session, `git push` en fin de session, sur chaque machine. Ne jamais laisser de travail non poussé sur une machine avant de passer sur l'autre.
 - **Une seule branche de feature ouverte à la fois**, et courte : deux branches qui modifient le même `.uasset` créent un conflit impossible à fusionner.
 - **Après un `git pull` ou un changement de branche qui ajoute ou supprime des fichiers C++, régénérer les fichiers de projet** (clic droit sur le `.uproject` > Generate Visual Studio project files), sinon Rider n'affiche pas les fichiers. La compilation n'est pas affectée.
