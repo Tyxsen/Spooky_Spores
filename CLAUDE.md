@@ -135,8 +135,9 @@ __ExternalActors__/, __ExternalObjects__/   ← voir l'avertissement ci-dessous
 ### Documentation (racine du projet)
 
 - `README.md` : présentation du jeu, 3C, lien vers les Releases GitHub.
-- `documentation-technique.md` : Documentation technique en Markdown avec une section statement IA. **Confirmé (2026-10-01) : la section « Récolte de ressources » est toujours absente**, reste à ajouter.
-- `Documentation_Documents/` : captures (PNG) et `Documentation_Documents/Videos/` (GIF). Ce dossier est exclu de Git LFS pour que les images s'affichent sur GitHub.
+- `documentation-technique.md` : **document vivant** décrivant l'architecture actuelle, organisé **par système** (Interaction, Récolte, Mouvement, Narration, Chaos, Debug...), jamais par semaine. Réécrit en continu au fil des features, aucune section datée, **pas de statement IA** (ça, c'est le rôle des fichiers `Rendus/`, voir ci-dessous). Restructuré en ce sens le 2026-10-01 (ancien découpage « Semaine 1 » archivé).
+- `Rendus/` : un fichier **figé** par rendu noté (ex. `Rendu_Bloc1_S1.md`), jamais remodifié après coup, chacun avec **son propre** statement d'intention IA (écrit par Timéo, jamais par Claude). `Rendu_Bloc1_S1.md` est la version exacte de ce qui a été soumis en semaine 1, avant la restructuration du 2026-10-01.
+- `Documentation_Documents/` : captures (PNG) et `Documentation_Documents/Videos/` (GIF). Ce dossier est exclu de Git LFS pour que les images s'affichent sur GitHub. Référencé depuis `documentation-technique.md` (chemin direct) et depuis `Rendus/*.md` (chemin relatif `../Documentation_Documents/...`, un niveau plus bas).
 - `TODO.md` : backlog, tenu à jour par l'utilisateur (confirmé présent et à jour le 2026-10-01).
 
 ---
@@ -352,13 +353,15 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 
 ### Discipline
 
+- **Claude ne fait jamais `git commit` ni `git push` sans autorisation explicite de Timéo, à chaque fois** (pas une autorisation valable une fois pour toutes). Préparer/expliquer le commit est possible, l'exécuter non, tant que Timéo n'a pas dit go.
+- Titre et description de pull request, et **messages de commit, en anglais** (lectorat international) ; la discussion avec Claude reste en français.
 - `git pull` en début de session, `git push` en fin de session, sur chaque machine. Ne jamais laisser de travail non poussé sur une machine avant de passer sur l'autre.
 - **Une seule branche de feature ouverte à la fois**, et courte : deux branches qui modifient le même `.uasset` créent un conflit impossible à fusionner.
 - **Après un `git pull` ou un changement de branche qui ajoute ou supprime des fichiers C++, régénérer les fichiers de projet** (clic droit sur le `.uproject` > Generate Visual Studio project files), sinon Rider n'affiche pas les fichiers. La compilation n'est pas affectée.
 - Après un renommage ou un déplacement de classe C++, ou une modification de `UFUNCTION`/`UINTERFACE` : fermer l'éditeur, régénérer les fichiers de projet, et faire un **Rebuild complet** (pas Live Coding).
 - Supprimer des assets **uniquement depuis le Content Browser** (vérification des références), puis Fix Up Redirectors. Jamais depuis l'explorateur Windows.
 - Commit perdu après un `reset --hard` : `git reflog` puis `git cherry-pick <hash>`.
-- Messages de commit préfixés : `[ADD]`, `[FIX]`, `[CHORE]`, `[DOC]`.
+- Messages de commit préfixés : `[ADD]`, `[FIX]`, `[CHORE]`, `[DOC]`, **rédigés en anglais** (depuis le 2026-10-01 ; les commits antérieurs en français ne sont pas à reprendre rétroactivement).
 
 ---
 
