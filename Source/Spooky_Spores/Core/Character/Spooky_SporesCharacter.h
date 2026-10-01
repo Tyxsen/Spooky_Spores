@@ -41,6 +41,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category ="Input")
 	UInputAction* MoveAction;
 
+	/** Sprint Input Action */
+	UPROPERTY(EditAnywhere, Category = "Input")
+	UInputAction* SprintAction;
+
 	/** Look Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")
 	class UInputAction* LookAction;
@@ -57,10 +61,19 @@ protected:
 	UPROPERTY(EditAnywhere, Category ="Input")
 	UInputAction* LaunchObjectsAction;
 	
+	/** MOVEMENT */
+	UPROPERTY(EditAnywhere, Category = "Movement")
+	float WalkSpeed = 400.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Movement")
+	float SprintSpeed = 650.0f;
+	
 public:
 	ASpooky_SporesCharacter();
 
 protected:
+
+	virtual void BeginPlay() override;
 
 	/** Called from Input Actions for movement input */
 	void MoveInput(const FInputActionValue& Value);
@@ -91,6 +104,17 @@ protected:
 	/** Handles launch while holding a grabbable object */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoLaunchObjects();
+
+	/** Handles sprint if stamina is above zero */
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoSprintStart();
+
+	/** Handles sprint end */
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoSprintStop();
+
+	UFUNCTION()
+	void HandleSprintStateChanged(bool bNewIsSprinting);
 
 protected:
 

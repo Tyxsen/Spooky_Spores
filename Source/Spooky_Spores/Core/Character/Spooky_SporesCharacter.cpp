@@ -11,6 +11,7 @@
 #include "Spooky_Spores.h"
 #include "Interaction/GrabComponent.h"
 #include "Interaction/InteractionComponent.h"
+#include "Movement/StaminaComponent.h"
 
 ASpooky_SporesCharacter::ASpooky_SporesCharacter()
 {
@@ -46,6 +47,16 @@ ASpooky_SporesCharacter::ASpooky_SporesCharacter()
 	GetCharacterMovement()->AirControl = 0.5f;
 }
 
+void ASpooky_SporesCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+
+	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+	
+	if (UStaminaComponent* StaminaComponent = FindComponentByClass<UStaminaComponent>())
+		StaminaComponent->OnSprintStateChanged.AddDynamic(this, &ASpooky_SporesCharacter::HandleSprintStateChanged);
+}
+
 void ASpooky_SporesCharacter::GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const
 {
 	OutLocation = FirstPersonCameraComponent->GetComponentLocation();
@@ -71,6 +82,10 @@ void ASpooky_SporesCharacter::SetupPlayerInputComponent(UInputComponent* PlayerI
 		// Interacting/launching
 		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &ASpooky_SporesCharacter::DoInteractAction);
 		EnhancedInputComponent->BindAction(LaunchObjectsAction, ETriggerEvent::Started, this, &ASpooky_SporesCharacter::DoLaunchObjects);
+
+		// Sprinting
+		EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Started, this, &ASpooky_SporesCharacter::DoSprintStart);
+		EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &ASpooky_SporesCharacter::DoSprintStop);
 	}
 	else
 	{
@@ -159,4 +174,25 @@ void ASpooky_SporesCharacter::DoLaunchObjects()
 	{
 		Grab->Launch();
 	}
+}
+
+void ASpooky_SporesCharacter::DoSprintStart()
+{
+	UStaminaComponent* StaminaComponent = FindComponentByClass<UStaminaComponent>();
+	if (!StaminaComponent) return;
+
+	StaminaComponent->TryStartSprint();
+}
+
+void ASpooky_SporesCharacter::DoSprintStop()
+{
+	UStaminaComponent* StaminaComponent = FindComponentByClass<UStaminaComponent>();
+	if (!StaminaComponent) return;
+
+	StaminaComponent->StopSprint();
+}
+
+void ASpooky_SporesCharacter::HandleSprintStateChanged(bool bNewIsSprinting)
+{
+	GetCharacterMovement()->MaxWalkSpeed = bNewIsSprinting ? SprintSpeed : WalkSpeed;
 }

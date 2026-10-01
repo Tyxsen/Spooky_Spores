@@ -2,16 +2,11 @@
  
 ## Prochaine étape
  
-- [ ] Sprint et endurance (valeurs du 3C : marche 400, course 650, ~10 s d'endurance, recharge après 4 s) — branche `feature/sprint-stamina` créée depuis `dev`, à faire si du temps reste avant la semaine de cours
+- [ ] Plantation et pousse des graines (Checkpoint B) — sur une nouvelle branche `feature/...` depuis `dev`, une fois `feature/sprint-stamina` fusionnée
 
-## À terminer suite à la récolte de ressources
+## Divers à régler
  
-- [ ] Section « Récolte de ressources » dans la documentation technique (classes, rôles, choix : spawn différé, canal `ResourceDrop`, délai de ramassage, atterrissage à plat)
-- [ ] `CLAUDE.md` : résoudre les points marqués « à vérifier »
-- [ ] `CLAUDE.md` : ajouter en section 1 la règle de mise à jour du fichier après validation
-- [ ] `CLAUDE.md` : mettre à jour la section 12 une fois la récolte fusionnée dans `dev`
-- [ ] `CLAUDE.md` : préciser quels projets de l'année doivent être rendus en anglais
-- [ ] Mettre à jour la version du moteur (5.8.3) dans le README et la documentation technique
+- [ ] `CLAUDE.md` : préciser quels projets de l'année doivent être rendus en anglais (dépend des CDC pas encore communiqués)
 - [ ] Passer Unreal en 5.8.3 sur l'autre ordinateur
 
 ## Planning jusqu'au Bloc 2
@@ -19,7 +14,8 @@
 Règles : une mécanique par semaine d'alternance, livrée entière et fusionnée dans `dev`. Les semaines de cours sont réservées au CDC. Si une semaine déborde, on coupe ou on repousse en fin de file.
  
 **Période 1**
-- [ ] Sprint et endurance + plantation et pousse des graines (Checkpoint B)
+- [x] Sprint et endurance (valeurs du 3C)
+- [ ] Plantation et pousse des graines (Checkpoint B)
 - [ ] Chaudron : une recette qui transforme des ressources en une potion
 - [ ] Semaine de cours (Bloc 1, S2) : livrable du CDC
 
