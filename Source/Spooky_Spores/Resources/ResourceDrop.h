@@ -12,13 +12,16 @@ class SPOOKY_SPORES_API AResourceDrop : public AActor
 {
 	GENERATED_BODY()
 
-// -----------FUNCTIONS-------------
+// -----------FUNCTIONS-----------
 public:	
 	// Sets default values for this actor's properties
 	AResourceDrop();
 
 	UFUNCTION(BlueprintCallable, Category = "Resources")
 	void InitializeDrop(EResourceType Type, int32 InAmount);
+
+	static void SpawnDrops(UWorld* World, const TArray<FResourceDropEntry>& Entries,
+						const FVector& Origin, float SpawnRadius);
 
 protected:
 	// Called when the game starts or when spawned
@@ -34,7 +37,7 @@ private:
 	void EnablePickup();
 	bool TryCollect(AActor* Actor);
 
-// -----------PROPERTIES-------------
+// -----------PROPERTIES-----------
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Resources")
 	TObjectPtr<UStaticMeshComponent> MeshComponent;

@@ -6,6 +6,7 @@
 #include "TimerManager.h"
 #include "Components/StaticMeshComponent.h"
 #include "Resources/ResourceCounterComponent.h"
+#include "Engine/World.h"
 
 // Sets default values
 AResourceDrop::AResourceDrop()
@@ -72,6 +73,32 @@ void AResourceDrop::InitializeDrop(EResourceType Type, int32 InAmount)
 {
 	DropType = Type;
 	Amount = InAmount;
+}
+
+void AResourceDrop::SpawnDrops(UWorld* World, const TArray<FResourceDropEntry>& Entries, const FVector& Origin,
+	float SpawnRadius)
+{	
+	for (const FResourceDropEntry& Drop : Entries)
+	{
+		if (!Drop.DropClass) continue;
+		
+		for (int32 i = 0; i < Drop.SpawnCount; ++i)
+		{
+			FVector RandomOffset(
+				FMath::FRandRange(-SpawnRadius, SpawnRadius),
+				FMath::FRandRange(-SpawnRadius, SpawnRadius),
+				0.0f
+			);
+			FVector SpawnLocation = Origin + RandomOffset + FVector(0, 0, 50.0f);
+			FTransform SpawnTransform(FRotator::ZeroRotator, SpawnLocation);
+			
+			AResourceDrop* NewDrop = World->SpawnActorDeferred<AResourceDrop>(Drop.DropClass, SpawnTransform);
+			if (!NewDrop) continue;
+
+			NewDrop->InitializeDrop(Drop.Type, Drop.Amount);
+			NewDrop->FinishSpawning(SpawnTransform);
+		}
+	}
 }
 
 void AResourceDrop::EnablePickup()

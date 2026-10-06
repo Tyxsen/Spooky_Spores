@@ -23,3 +23,13 @@ int32 UResourceCounterComponent::GetResourceCount(EResourceType Type) const
 	return 0;
 }
 
+bool UResourceCounterComponent::TrySpendResource(EResourceType Type, int32 Amount)
+{
+	int32* Found = ResourceCounts.Find(Type);
+	if (!Found || *Found < Amount) return false;
+
+	*Found -= Amount;
+	OnResourceChanged.Broadcast(Type, *Found);
+	return true;
+}
+

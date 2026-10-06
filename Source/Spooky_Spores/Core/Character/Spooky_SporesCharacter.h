@@ -47,11 +47,11 @@ protected:
 
 	/** Look Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")
-	class UInputAction* LookAction;
+	UInputAction* LookAction;
 
 	/** Mouse Look Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")
-	class UInputAction* MouseLookAction;
+	UInputAction* MouseLookAction;
 	
 	/** Interact Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")

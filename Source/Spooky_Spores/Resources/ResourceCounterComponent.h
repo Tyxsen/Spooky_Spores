@@ -15,22 +15,26 @@ class SPOOKY_SPORES_API UResourceCounterComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
-public:	
+// -----------FUNCTIONS-----------
+public:
 	// Sets default values for this component's properties
 	UResourceCounterComponent();
-	
-public:
+
 	UFUNCTION(BlueprintCallable, Category = "Resources")
 	void AddResource(EResourceType Type, int32 Amount);
 
 	UFUNCTION(BlueprintPure, Category = "Resources")
 	int32 GetResourceCount(EResourceType Type) const;
 
-public:	
+	UFUNCTION(BlueprintCallable, Category = "Resources")
+	bool TrySpendResource(EResourceType Type, int32 Amount);
+
+// -----------PROPERTIES-----------
+public:
 	UPROPERTY(BlueprintReadOnly, Category = "Resources")
 	TMap<EResourceType, int32> ResourceCounts;
 
 	UPROPERTY(BlueprintAssignable, Category = "Resources")
 	FOnResourceChanged OnResourceChanged;
-	
+
 };
