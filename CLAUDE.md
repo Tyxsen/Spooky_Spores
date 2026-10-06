@@ -396,7 +396,8 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 
 - **Rendu de la semaine 1** : livré (build en Release GitHub, documentation, statement IA).
 - **Récolte de ressources (Checkpoint A)** : terminée, testée, fusionnée dans `dev`, branche supprimée. Documentée dans `documentation-technique.md`.
-- **Sprint et endurance** : terminé et testé (vitesse 400/650, endurance ~10s, régénération après 4s, barre d'UI fonctionnelle). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-01). Documenté dans `documentation-technique.md`. Branche `feature/sprint-stamina` encore présente sur `origin` à ce stade — à supprimer.
+- **Sprint et endurance** : terminé, testé, fusionné dans `dev`, branche supprimée. Documenté dans `documentation-technique.md`.
+- **Plantation (Checkpoint B)** : terminée et testée (planter/pousser/récolter, champ réutilisable, debug visuel par couleur). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-06). Documenté dans `documentation-technique.md`. Branche `feature/plantation` encore présente sur `origin` à ce stade — à supprimer.
 
 ### Planning jusqu'au Bloc 2
 
@@ -405,9 +406,8 @@ Objectif : la **boucle de jeu principale** jouable de bout en bout, plutôt que 
 
 | Période | Semaine | Objectif de fin de semaine |
 |---|---|---|
-| Actuelle | Fin de semaine | Sprint et endurance terminé et fusionné |
-| Période 1 | Alternance | Plantation et pousse des graines (Checkpoint B) |
-| | Alternance | Chaudron : une recette qui transforme des ressources en une potion |
+| Actuelle | Fin de semaine | Plantation terminée et fusionnée |
+| Période 1 | Alternance | Chaudron : une recette qui transforme des ressources en une potion |
 | | Cours (Bloc 1, S2) | Livrable du CDC (prioritaire) |
 | Période 2 | Alternance | Composant de santé + frapper les arbres et pierres + premier sort avec mana |
 | | Alternance | Un soldat ennemi simple : se déplace, attaque, meurt, laisse du butin (réutilise les drops) |

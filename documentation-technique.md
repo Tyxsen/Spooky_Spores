@@ -173,7 +173,20 @@ UI : `WBP_ResourceEntry` (une ressource, filtrée par type via un nœud `Equal (
 
 ---
 
-## 6. Système narratif
+## 6. Plantation et récolte des champs
+
+`AFieldPlot` (`Resources/FieldPlot.h`) : emplacement plantable et **réutilisable**, à l'inverse de `AHarvestableResource` qui se détruit après récolte. Trois états (`EFieldState`) : `Empty` → `Growing` → `Grown`, pilotés uniquement par `OnInteract_Implementation` selon l'état courant — une seule touche contextuelle, comme partout ailleurs dans le projet.
+
+- **Planter** (état `Empty`) : dépense `SeedCost` graines via `UResourceCounterComponent::TrySpendResource` (utilise `Find`, pas `FindOrAdd` — dépenser une ressource jamais possédée doit échouer proprement, pas créer une entrée à 0), puis lance un `SetTimer` unique de `GrowthDuration` secondes. Pas de `Tick` nécessaire pour la pousse elle-même : une échéance simple, pas une valeur continue à faire évoluer (contraste avec `UStaminaComponent`).
+- **Récolter** (état `Grown`) : spawn les drops configurés (graines + une nouvelle ressource, `Wheat`), puis repasse à `Empty` — le champ reste en place, replantable à l'infini.
+
+**Choix technique — spawn de drops factorisé** : la boucle de spawn différé, dupliquée au départ entre `AHarvestableResource` et `AFieldPlot`, a été extraite dans une fonction statique partagée, `AResourceDrop::SpawnDrops`. `FResourceDropEntry` a été déplacée de `HarvestableResource.h` vers `ResourceTypes.h` pour éviter un include circulaire. Prête à être réutilisée pour le butin des ennemis (section 12 du `CLAUDE.md`).
+
+**Outil de debug** : une sphère colorée (`DrawDebugSphere`, non persistante, recalculée à chaque tick) au-dessus du champ — gris/rouge/vert selon l'état. Remplacera un vrai matériau au Bloc 2.
+
+---
+
+## 7. Système narratif
 
 `AStoryTrigger` (C++) : une `UBoxComponent` en zone de trigger (profil `Trigger`, pas de simulation physique), une propriété `StoryText` (`FText`) éditable par instance, une garde `bTriggerOnce` pour éviter un redéclenchement en boucle, et un event `BlueprintImplementableEvent OnStoryTriggered()` laissant le comportement concret au Blueprint enfant.
 
@@ -185,7 +198,7 @@ Ce système illustre la même architecture générique/réutilisable (base C++, 
 
 ---
 
-## 7. Expérimentation Chaos
+## 8. Expérimentation Chaos
 
 Un objet décoratif (**`GC_Mushroom`**, un champignon composé de deux primitives fusionnées) a été converti en Geometry Collection via la Fracture Mode (pattern Uniform Voronoi).
 
@@ -198,7 +211,7 @@ Le champignon se fracture aussi bien sous l'effet de la gravité (chute) que d'u
 
 ---
 
-## 8. Outils de debug
+## 9. Outils de debug
 
 - **Trace de détection** (`DrawDebugLine`) : ligne non persistante suivant la caméra, verte si une cible est détectée, rouge sinon, permet de vérifier en temps réel le fonctionnement du système d'interaction.
 - **Visualisation du volume de trigger** : le `UBoxComponent` de `AStoryTrigger` reste visible en wireframe dans l'éditeur pour vérifier son placement et ses dimensions.
@@ -208,6 +221,6 @@ Le champignon se fracture aussi bien sous l'effet de la gravité (chute) que d'u
 
 ---
 
-## 9. Limitations connues et dette technique
+## 10. Limitations connues et dette technique
 
 Centralisées dans [`TODO.md`](TODO.md), pour éviter une double liste qui diverge avec le temps.

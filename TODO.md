@@ -2,7 +2,7 @@
  
 ## Prochaine étape
  
-- [ ] Plantation et pousse des graines (Checkpoint B) — sur une nouvelle branche `feature/...` depuis `dev`, une fois `feature/sprint-stamina` fusionnée
+- [ ] Chaudron : une recette qui transforme des ressources en une potion — sur une nouvelle branche `feature/...` depuis `dev`, une fois `feature/plantation` fusionnée
 
 ## Divers à régler
  
@@ -15,7 +15,7 @@ Règles : une mécanique par semaine d'alternance, livrée entière et fusionné
  
 **Période 1**
 - [x] Sprint et endurance (valeurs du 3C)
-- [ ] Plantation et pousse des graines (Checkpoint B)
+- [x] Plantation et pousse des graines (Checkpoint B)
 - [ ] Chaudron : une recette qui transforme des ressources en une potion
 - [ ] Semaine de cours (Bloc 1, S2) : livrable du CDC
 
@@ -54,7 +54,7 @@ Règles : une mécanique par semaine d'alternance, livrée entière et fusionné
 - [ ] Déplacer la création de l'UI hors du personnage (PlayerController ou HUD) quand l'interface grossira
 - [ ] Faire disparaître les drops restés au sol après un délai (avant les serviteurs)
 - [ ] Vérifier / faire la factorisation du calcul de la cible dans `UGrabComponent` (`GetGrabTargetTransform`)
-- [ ] Adopter `TObjectPtr` pour les membres `UPROPERTY`, dans toutes les classes d'un coup (optionnel)
+- [ ] Adopter `TObjectPtr` pour les membres `UPROPERTY` dans `Interaction/` et `Core/Character/` (déjà fait dans tout `Resources/` ; adoption par domaine, pas une bascule globale — voir `CLAUDE.md` section 6)
 - [ ] Nettoyage optionnel des assets inutilisés du template (animations `Pistol`...) : branche `chore/`, suppression via le Content Browser en vérifiant les références
 
 ## Limites connues (acceptées pour l'instant)
@@ -76,6 +76,7 @@ Règles : une mécanique par semaine d'alternance, livrée entière et fusionné
 - [ ] Particules d'impact en frappant les arbres et les pierres
 - [ ] Effets visuels des sorts (Niagara)
 - [ ] Plus de fragments sur le champignon si besoin
+- [ ] Matériau réel pour `AFieldPlot` (remplace la sphère de debug colorée par état)
 
 ## Idées de gameplay à rediscuter
  
