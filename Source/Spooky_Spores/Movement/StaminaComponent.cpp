@@ -31,7 +31,9 @@ void UStaminaComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (bIsSprinting)
+	const bool bIsActuallyMoving = GetOwner() && GetOwner()->GetVelocity().SizeSquared() > KINDA_SMALL_NUMBER;
+	
+	if (bIsSprinting && bIsActuallyMoving)
 	{
 		CurrentStamina = FMath::Clamp(CurrentStamina - DeltaTime, 0.0f, MaxStamina);
 		if (CurrentStamina <= 0) StopSprint();

@@ -157,7 +157,7 @@ __ExternalActors__/, __ExternalObjects__/   ← voir l'avertissement ci-dessous
   - `protected` : nécessaire à une classe enfant (composant racine que les Blueprints enfants configurent, fonctions virtuelles).
   - `public` : l'API que d'autres systèmes appellent. Les `_Implementation` d'interface sont obligatoirement publiques.
 - Les callbacks liés avec `AddDynamic` (overlap, hit) sont des `UFUNCTION()` **privées** s'ils ne sont pas virtuels.
-- Organisation d'un header : trois blocs `public`, `protected`, `private`, dans cet ordre, fonctions puis variables.
+- Organisation d'un header : deux groupes séparés par des commentaires `// -----------FUNCTIONS-----------` et `// -----------PROPERTIES-----------` (exactement 11 `-` de chaque côté du mot). Dans chaque groupe, trois blocs `public`, `protected`, `private`, dans cet ordre. Fichier de référence : `ResourceDrop.h`. Pas encore généralisé à tous les fichiers existants (pas urgent), mais à suivre pour tout nouveau fichier ou toute réécriture.
 
 ### UPROPERTY
 
@@ -166,7 +166,7 @@ __ExternalActors__/, __ExternalObjects__/   ← voir l'avertissement ci-dessous
 - Membre `private` exposé à Blueprint : `meta = (AllowPrivateAccess = "true")`.
 - Valeur fixée au runtime et à inspecter en jeu : `VisibleInstanceOnly`.
 - Toujours donner une **valeur par défaut explicite** (y compris pour les enums).
-- Convention UE5 non encore appliquée : `TObjectPtr<T>` au lieu des pointeurs bruts pour les membres `UPROPERTY`. Si on l'adopte, le faire dans **toutes** les classes d'un coup.
+- `TObjectPtr<T>` au lieu des pointeurs bruts pour les membres `UPROPERTY` : adoption **progressive, par domaine**, pas une bascule globale d'un coup. Déjà en place dans tout `Resources/` (`ResourceDrop`, `HarvestableResource`, `FieldPlot`). `GrabComponent` et `Spooky_SporesCharacter` (`Interaction/`, `Core/Character/`) restent volontairement en pointeurs bruts, pas de rétro-conversion prévue. Règle simple : ne jamais mélanger les deux styles **à l'intérieur d'un même fichier**.
 
 ### Interfaces Unreal (piège important, vérifié sur ce projet)
 
@@ -395,7 +395,8 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 ### Où en est le projet
 
 - **Rendu de la semaine 1** : livré (build en Release GitHub, documentation, statement IA).
-- **Récolte de ressources (Checkpoint A)** : terminée et testée (récolte, drops, saut, délai de ramassage, atterrissage à plat, compteur, UI). **Fusionnée dans `dev`**, branche `feature/resource-harvesting` supprimée (confirmé le 2026-10-01). Reste à faire pour la clôture complète : section « Récolte de ressources » dans `documentation-technique.md`.
+- **Récolte de ressources (Checkpoint A)** : terminée, testée, fusionnée dans `dev`, branche supprimée. Documentée dans `documentation-technique.md`.
+- **Sprint et endurance** : terminé et testé (vitesse 400/650, endurance ~10s, régénération après 4s, barre d'UI fonctionnelle). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-01). Documenté dans `documentation-technique.md`. Branche `feature/sprint-stamina` encore présente sur `origin` à ce stade — à supprimer.
 
 ### Planning jusqu'au Bloc 2
 
@@ -404,8 +405,8 @@ Objectif : la **boucle de jeu principale** jouable de bout en bout, plutôt que 
 
 | Période | Semaine | Objectif de fin de semaine |
 |---|---|---|
-| Actuelle | Fin de semaine | Récolte terminée et fusionnée |
-| Période 1 | Alternance | Sprint et endurance (valeurs du 3C) + plantation et pousse des graines (Checkpoint B) |
+| Actuelle | Fin de semaine | Sprint et endurance terminé et fusionné |
+| Période 1 | Alternance | Plantation et pousse des graines (Checkpoint B) |
 | | Alternance | Chaudron : une recette qui transforme des ressources en une potion |
 | | Cours (Bloc 1, S2) | Livrable du CDC (prioritaire) |
 | Période 2 | Alternance | Composant de santé + frapper les arbres et pierres + premier sort avec mana |

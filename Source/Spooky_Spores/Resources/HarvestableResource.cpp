@@ -2,7 +2,7 @@
 
 
 #include "Resources/HarvestableResource.h"
-#include "Engine/World.h"
+#include "Resources/ResourceDrop.h"
 
 // Sets default values
 AHarvestableResource::AHarvestableResource()
@@ -19,26 +19,7 @@ void AHarvestableResource::OnInteract_Implementation(AActor* InteractingActor)
 {
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	
-	for (const FResourceDropEntry& Drop : Drops)
-	{
-		if (!Drop.DropClass) continue;
-		
-		for (int32 i = 0; i < Drop.SpawnCount; ++i)
-		{
-			FVector RandomOffset(
-				FMath::FRandRange(-DropSpawnRadius, DropSpawnRadius),
-				FMath::FRandRange(-DropSpawnRadius, DropSpawnRadius),
-				0.0f
-			);
-			FVector SpawnLocation = GetActorLocation() + RandomOffset + FVector(0, 0, 50.0f);
-			FTransform SpawnTransform(FRotator::ZeroRotator, SpawnLocation);
-			
-			AResourceDrop* NewDrop = GetWorld()->SpawnActorDeferred<AResourceDrop>(Drop.DropClass, SpawnTransform);
-			if (!NewDrop) continue;
-
-			NewDrop->InitializeDrop(Drop.Type, Drop.Amount);
-			NewDrop->FinishSpawning(SpawnTransform);
-		}
-	}
+	AResourceDrop::SpawnDrops(GetWorld(), Drops, GetActorLocation(), DropSpawnRadius);
+	
 	Destroy();
 }
