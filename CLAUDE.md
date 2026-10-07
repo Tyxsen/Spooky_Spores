@@ -397,7 +397,8 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 - **Rendu de la semaine 1** : livré (build en Release GitHub, documentation, statement IA).
 - **Récolte de ressources (Checkpoint A)** : terminée, testée, fusionnée dans `dev`, branche supprimée. Documentée dans `documentation-technique.md`.
 - **Sprint et endurance** : terminé, testé, fusionné dans `dev`, branche supprimée. Documenté dans `documentation-technique.md`.
-- **Plantation (Checkpoint B)** : terminée et testée (planter/pousser/récolter, champ réutilisable, debug visuel par couleur). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-06). Documenté dans `documentation-technique.md`. Branche `feature/plantation` encore présente sur `origin` à ce stade — à supprimer.
+- **Plantation (Checkpoint B)** : terminée et testée (planter/pousser/récolter, champ réutilisable, debug visuel par couleur). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-06). Documenté dans `documentation-technique.md`. Branche `feature/plantation` encore présente sur `origin` **(à vérifier, à supprimer si c'est le cas)**.
+- **Chaudron** : terminé et testé (recette 3 Bois + 1 Pierre + 2 Blé → 1 Potion, barre de progression fonctionnelle, potion créditée au compteur de ressources). Documenté dans `documentation-technique.md`. Branche `feature/cauldron` en cours de fermeture (commit, PR vers `dev`, fusion à venir).
 
 ### Planning jusqu'au Bloc 2
 
@@ -406,9 +407,8 @@ Objectif : la **boucle de jeu principale** jouable de bout en bout, plutôt que 
 
 | Période | Semaine | Objectif de fin de semaine |
 |---|---|---|
-| Actuelle | Fin de semaine | Plantation terminée et fusionnée |
-| Période 1 | Alternance | Chaudron : une recette qui transforme des ressources en une potion |
-| | Cours (Bloc 1, S2) | Livrable du CDC (prioritaire) |
+| Actuelle | Fin de semaine | Chaudron terminé, testé, en cours de fusion dans `dev` |
+| Période 1 | Cours (Bloc 1, S2) | Livrable du CDC (prioritaire) |
 | Période 2 | Alternance | Composant de santé + frapper les arbres et pierres + premier sort avec mana |
 | | Alternance | Un soldat ennemi simple : se déplace, attaque, meurt, laisse du butin (réutilise les drops) |
 | | Cours (Bloc 1, S3) | Livrable du CDC + oral de fin de Bloc 1 |
@@ -443,7 +443,6 @@ Les trois autres sorts et la roue de sélection, la barre de raccourcis à 9 emp
 - Un objet tenu peut traverser des obstacles fins si le joueur bouge vite (limite de `UPhysicsHandleComponent`).
 - Factoriser le calcul de la cible dans `UGrabComponent` (confirmé non fait).
 - Adopter `TObjectPtr` dans toutes les classes (optionnel).
-- Mettre à jour la version du moteur (5.8.3) dans le README et la documentation.
 - Nettoyage optionnel des assets inutilisés du template (animations `Pistol`...), sur une branche `chore/`, via le Content Browser, en vérifiant les références (l'Animation Blueprint des bras en utilise certaines).
 
 **Ressenti et visuel (Bloc 2)**
@@ -451,10 +450,13 @@ Les trois autres sorts et la roue de sélection, la barre de raccourcis à 9 emp
 - Matériaux réels (champignon, drops, nœuds), apparence de l'UI.
 - Particules d'impact sur les arbres et pierres.
 - Plus de fragments sur le champignon si besoin.
+- Matériau réel pour `AFieldPlot` (remplace la sphère de debug colorée par état).
 
 **Gameplay à rediscuter**
 - Attraction des drops vers le joueur à proximité, fusion des drops identiques proches.
 - Repousse des arbres et pierres (à réfléchir avec la plantation).
+- Interface de sélection de recette pour le chaudron, pertinente seulement à partir d'au moins deux recettes différentes.
+- Idée initiale du chaudron (UI drag-and-drop avec inventaire à droite, cases de recette à gauche) mise de côté pour l'instant : dépend d'un vrai système d'inventaire, repoussé après le Bloc 2 (voir section 12). À reprendre à ce moment-là.
 
 ---
 

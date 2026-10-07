@@ -186,7 +186,27 @@ UI : `WBP_ResourceEntry` (une ressource, filtrée par type via un nœud `Equal (
 
 ---
 
-## 7. Système narratif
+## 7. Préparation de potions (Chaudron)
+
+`ACauldron` (`Resources/Cauldron.h`) : acteur implémentant `IInteractable`, trois états (`ECauldronState`) pilotés, comme `AFieldPlot`, par un seul point d'entrée, `OnInteract_Implementation`, selon l'état courant.
+
+- **Idle** : vérifie que l'acteur qui interagit possède chaque ressource de `RequiredIngredients` (`TMap<EResourceType, int32>`) en quantité suffisante, **avant** d'en dépenser la moindre — une première boucle ne fait que vérifier, une seconde dépense réellement via `TrySpendResource`. Cette vérification en deux passes évite de consommer une partie de la recette puis d'échouer sur un ingrédient manquant (transaction atomique). Lance ensuite un `FTimerHandle` unique de `BrewDuration` secondes.
+- **Brewing** : aucune action : le joueur ne peut rien faire tant que la préparation n'est pas terminée.
+- **Ready** : crédite directement `OutputAmount` unités de `OutputPotionType` via `UResourceCounterComponent::AddResource`, puis repasse à `Idle` — le chaudron, comme `AFieldPlot`, reste en place et réutilisable.
+
+**Choix technique — potion créditée directement, sans objet physique au sol** : contrairement aux ressources récoltées (`AHarvestableResource`, `AFieldPlot`), la potion ne fait pas apparaître de `AResourceDrop` à ramasser. Le résultat est crédité instantanément au compteur du joueur. Simplification assumée en l'absence d'un vrai système d'inventaire (repoussé après le Bloc 2, voir `CLAUDE.md` section 12) : fabriquer un pickup physique pour un objet qui finira de toute façon dans un inventaire structuré aurait été du travail jetable.
+
+**Choix technique — progression par temps écoulé, pas par décompte au tick** : `GetBrewProgress()` (`BlueprintPure`) ne décrémente pas une valeur à chaque frame comme `UStaminaComponent`. Elle calcule un ratio à partir de `GetWorld()->GetTimeSeconds() - BrewStartTime`, sur le même principe que la pousse d'un `AFieldPlot` (section 6) : une échéance fixe à surveiller, pas une valeur qui évolue en continu indépendamment de toute interrogation.
+
+`WBP_CauldronProgress` interroge `GetBrewProgress()` dans son propre `Event Tick` (modèle *pull*, comme `WBP_StaminaBar`) pour afficher une barre de progression pendant le Brewing.
+
+**Recette actuelle** : 3 Bois + 1 Pierre + 2 Blé → 1 Potion (`EResourceType::Potion`, ajouté en fin d'énumération pour ne pas décaler les valeurs existantes — voir le piège correspondant section 11 du `CLAUDE.md`).
+
+**Limite assumée** : une seule recette par chaudron (`RequiredIngredients` réglé une fois dans l'éditeur). Une interface de sélection de recette n'a de sens qu'à partir d'au moins deux recettes différentes — reporté dans `TODO.md`.
+
+---
+
+## 8. Système narratif
 
 `AStoryTrigger` (C++) : une `UBoxComponent` en zone de trigger (profil `Trigger`, pas de simulation physique), une propriété `StoryText` (`FText`) éditable par instance, une garde `bTriggerOnce` pour éviter un redéclenchement en boucle, et un event `BlueprintImplementableEvent OnStoryTriggered()` laissant le comportement concret au Blueprint enfant.
 
@@ -198,7 +218,7 @@ Ce système illustre la même architecture générique/réutilisable (base C++, 
 
 ---
 
-## 8. Expérimentation Chaos
+## 9. Expérimentation Chaos
 
 Un objet décoratif (**`GC_Mushroom`**, un champignon composé de deux primitives fusionnées) a été converti en Geometry Collection via la Fracture Mode (pattern Uniform Voronoi).
 
@@ -211,7 +231,7 @@ Le champignon se fracture aussi bien sous l'effet de la gravité (chute) que d'u
 
 ---
 
-## 9. Outils de debug
+## 10. Outils de debug
 
 - **Trace de détection** (`DrawDebugLine`) : ligne non persistante suivant la caméra, verte si une cible est détectée, rouge sinon, permet de vérifier en temps réel le fonctionnement du système d'interaction.
 - **Visualisation du volume de trigger** : le `UBoxComponent` de `AStoryTrigger` reste visible en wireframe dans l'éditeur pour vérifier son placement et ses dimensions.
@@ -221,6 +241,6 @@ Le champignon se fracture aussi bien sous l'effet de la gravité (chute) que d'u
 
 ---
 
-## 10. Limitations connues et dette technique
+## 11. Limitations connues et dette technique
 
 Centralisées dans [`TODO.md`](TODO.md), pour éviter une double liste qui diverge avec le temps.
