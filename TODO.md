@@ -2,12 +2,13 @@
  
 ## Prochaine étape
  
-- [ ] Chaudron : une recette qui transforme des ressources en une potion — sur une nouvelle branche `feature/...` depuis `dev`, une fois `feature/plantation` fusionnée
+- [ ] Composant de santé + frapper les arbres et pierres + premier sort avec mana — sur une nouvelle branche `feature/...` depuis `dev`, une fois `feature/cauldron` fusionnée
 
 ## Divers à régler
  
 - [ ] `CLAUDE.md` : préciser quels projets de l'année doivent être rendus en anglais (dépend des CDC pas encore communiqués)
 - [ ] Passer Unreal en 5.8.3 sur l'autre ordinateur
+- [ ] Supprimer la branche `feature/plantation` sur `origin` (déjà fusionnée dans `dev`)
 
 ## Planning jusqu'au Bloc 2
  
@@ -16,7 +17,7 @@ Règles : une mécanique par semaine d'alternance, livrée entière et fusionné
 **Période 1**
 - [x] Sprint et endurance (valeurs du 3C)
 - [x] Plantation et pousse des graines (Checkpoint B)
-- [ ] Chaudron : une recette qui transforme des ressources en une potion
+- [x] Chaudron : une recette qui transforme des ressources en une potion
 - [ ] Semaine de cours (Bloc 1, S2) : livrable du CDC
 
 **Période 2**
@@ -83,6 +84,8 @@ Règles : une mécanique par semaine d'alternance, livrée entière et fusionné
 - [ ] Attraction des drops vers le joueur à proximité
 - [ ] Fusion des drops identiques proches
 - [ ] Repousse des arbres et des pierres (à réfléchir avec la plantation)
+- [ ] Interface de sélection de recette pour le chaudron (pertinente à partir d'au moins deux recettes)
+- [ ] Idée initiale du chaudron (UI drag-and-drop, inventaire à droite / cases de recette à gauche) mise de côté : dépend d'un vrai système d'inventaire, repoussé après le Bloc 2
 
 ## Repoussé après le Bloc 2
  
