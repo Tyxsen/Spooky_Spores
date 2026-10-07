@@ -2,13 +2,13 @@
  
 ## Prochaine étape
  
-- [ ] Composant de santé + frapper les arbres et pierres + premier sort avec mana — sur une nouvelle branche `feature/...` depuis `dev`, une fois `feature/cauldron` fusionnée
+- [ ] Composant de santé + frapper les arbres et pierres + premier sort avec mana — sur une nouvelle branche `feature/...` depuis `dev`
 
 ## Divers à régler
  
 - [ ] `CLAUDE.md` : préciser quels projets de l'année doivent être rendus en anglais (dépend des CDC pas encore communiqués)
 - [ ] Passer Unreal en 5.8.3 sur l'autre ordinateur
-- [ ] Supprimer la branche `feature/plantation` sur `origin` (déjà fusionnée dans `dev`)
+- [x] Supprimer la branche `feature/plantation` sur `origin` (déjà fusionnée dans `dev`)
 
 ## Planning jusqu'au Bloc 2
  

@@ -397,8 +397,8 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 - **Rendu de la semaine 1** : livré (build en Release GitHub, documentation, statement IA).
 - **Récolte de ressources (Checkpoint A)** : terminée, testée, fusionnée dans `dev`, branche supprimée. Documentée dans `documentation-technique.md`.
 - **Sprint et endurance** : terminé, testé, fusionné dans `dev`, branche supprimée. Documenté dans `documentation-technique.md`.
-- **Plantation (Checkpoint B)** : terminée et testée (planter/pousser/récolter, champ réutilisable, debug visuel par couleur). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-06). Documenté dans `documentation-technique.md`. Branche `feature/plantation` encore présente sur `origin` **(à vérifier, à supprimer si c'est le cas)**.
-- **Chaudron** : terminé et testé (recette 3 Bois + 1 Pierre + 2 Blé → 1 Potion, barre de progression fonctionnelle, potion créditée au compteur de ressources). Documenté dans `documentation-technique.md`. Branche `feature/cauldron` en cours de fermeture (commit, PR vers `dev`, fusion à venir).
+- **Plantation (Checkpoint B)** : terminée et testée (planter/pousser/récolter, champ réutilisable, debug visuel par couleur). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-06). Documenté dans `documentation-technique.md`. Branche `feature/plantation` supprimée.
+- **Chaudron** : terminé et testé (recette 3 Bois + 1 Pierre + 2 Blé → 1 Potion, barre de progression fonctionnelle, potion créditée au compteur de ressources). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-07). Documenté dans `documentation-technique.md`. Branche `feature/cauldron` supprimée.
 
 ### Planning jusqu'au Bloc 2
 
@@ -407,7 +407,7 @@ Objectif : la **boucle de jeu principale** jouable de bout en bout, plutôt que 
 
 | Période | Semaine | Objectif de fin de semaine |
 |---|---|---|
-| Actuelle | Fin de semaine | Chaudron terminé, testé, en cours de fusion dans `dev` |
+| Actuelle | Fin de semaine | Chaudron terminé et fusionné |
 | Période 1 | Cours (Bloc 1, S2) | Livrable du CDC (prioritaire) |
 | Période 2 | Alternance | Composant de santé + frapper les arbres et pierres + premier sort avec mana |
 | | Alternance | Un soldat ennemi simple : se déplace, attaque, meurt, laisse du butin (réutilise les drops) |
