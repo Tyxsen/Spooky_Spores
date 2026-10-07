@@ -3,6 +3,7 @@
 ## Prochaine étape
  
 - [ ] Composant de santé + frapper les arbres et pierres + premier sort avec mana — sur une nouvelle branche `feature/...` depuis `dev`
+- [ ] Panneau de contrôles en lecture seule (affichage des touches actuelles, pas de remappage pour l'instant) — à finir avant la semaine de cours S2 (~10 jours), pour que les intervenants qui testent le jeu puissent consulter les touches
 
 ## Divers à régler
  
@@ -10,27 +11,41 @@
 - [ ] Passer Unreal en 5.8.3 sur l'autre ordinateur
 - [x] Supprimer la branche `feature/plantation` sur `origin` (déjà fusionnée dans `dev`)
 
-## Planning jusqu'au Bloc 2
- 
-Règles : une mécanique par semaine d'alternance, livrée entière et fusionnée dans `dev`. Les semaines de cours sont réservées au CDC. Si une semaine déborde, on coupe ou on repousse en fin de file.
- 
-**Période 1**
+## Planning du Bloc 1
+
+Refait le 2026-10-07 (ancien découpage par « périodes » abandonné). Détail du raisonnement dans `CLAUDE.md` section 12. Règles : une mécanique par tâche, livrée entière et fusionnée dans `dev` ; les semaines de cours sont réservées au CDC ; si une tâche déborde, on coupe ou on repousse en fin de file ; **tout est visé pour le Bloc 1**, pas de report présumé vers le Bloc 2.
+
+**Déjà fait**
 - [x] Sprint et endurance (valeurs du 3C)
 - [x] Plantation et pousse des graines (Checkpoint B)
 - [x] Chaudron : une recette qui transforme des ressources en une potion
-- [ ] Semaine de cours (Bloc 1, S2) : livrable du CDC
 
-**Période 2**
-- [ ] Composant de santé + frapper les arbres et les pierres + premier sort avec mana
-- [ ] Un soldat ennemi simple : se déplace, attaque, meurt, laisse du butin (réutilise les drops)
-- [ ] Semaine de cours (Bloc 1, S3) : livrable du CDC + oral de fin de Bloc 1
+**Chunk immédiat (~10 jours, avant S2)** — voir « Prochaine étape » ci-dessus
 
-**Période 3**
-- [ ] Résurrection : potion + cadavre = serviteur (le cadavre implémente `IInteractable`)
-- [ ] Serviteur qui récolte la ressource la plus proche
-- [ ] Semaine tampon : stabilisation, retard éventuel, documentation
+**Semaine de cours (Bloc 1, S2)** : livrable du CDC
 
-À chaque fin de période : tag et Release GitHub (`v0.2`, `v0.3`...).
+**File d'attente après S2, dans l'ordre**
+1. [ ] Un soldat ennemi simple : se déplace, attaque, meurt, laisse du butin (réutilise les drops)
+2. [ ] Résurrection : potion + cadavre = serviteur (le cadavre implémente `IInteractable`)
+3. [ ] Serviteur qui récolte la ressource la plus proche — ferme la boucle de jeu principale
+4. [ ] Menu de paramètres complet : son, FOV, remappage réel des touches (Enhanced Input, Player Mappable Keys)
+5. [ ] Système de sauvegarde (détail ci-dessous)
+6. [ ] UI hors du Character (PlayerController/HUD) + despawn des drops au sol après délai
+7. [ ] Vrai inventaire (modèle de données : stacks, slots ; UI liste simple)
+8. [ ] UI drag-and-drop sur l'inventaire + barre de raccourcis (9 emplacements)
+9. [ ] Objets équipables + contrôles contextuels selon l'objet en main
+10. [ ] Roue de sorts (clic droit maintenu) + mana généralisé (4 emplacements, recharge ~5s)
+11. [ ] Sort 2 + Sort 3
+12. [ ] Sort 4
+13. [ ] Vue de gestion top-down
+14. [ ] Construction de base (placement, snapping)
+15. [ ] Construction ↔ ressources (coût, effets des bâtiments)
+16. [ ] Village : disposition + patrouilles de soldats
+17. [ ] Village : condition de victoire + clôture narrative
+
+**Semaine de cours (Bloc 1, S3)** : livrable du CDC + oral de fin de Bloc 1 — position exacte dans la file inconnue pour l'instant (nombre de semaines d'alternance restantes non précisé).
+
+À chaque étape significative : tag et Release GitHub (`v0.2`, `v0.3`...).
  
 ## Système de sauvegarde
  
@@ -42,7 +57,7 @@ Règles : une mécanique par semaine d'alternance, livrée entière et fusionné
 - [ ] Ressources du `UResourceCounterComponent`
 - [ ] Plus tard : plantations en cours de pousse, serviteurs, potions, état de la base
 
-## Idée validée pour la période 2 : frapper les ressources
+## Idée validée : frapper les ressources
  
 - [ ] Décider avec quoi le nécromancien frappe (bâton, mains, outils, sort)
 - [ ] Arbres et pierres avec le composant de santé, via le système de dégâts d'Unreal (`ApplyDamage` / `OnTakeAnyDamage`)
@@ -85,16 +100,5 @@ Règles : une mécanique par semaine d'alternance, livrée entière et fusionné
 - [ ] Fusion des drops identiques proches
 - [ ] Repousse des arbres et des pierres (à réfléchir avec la plantation)
 - [ ] Interface de sélection de recette pour le chaudron (pertinente à partir d'au moins deux recettes)
-- [ ] Idée initiale du chaudron (UI drag-and-drop, inventaire à droite / cases de recette à gauche) mise de côté : dépend d'un vrai système d'inventaire, repoussé après le Bloc 2
-
-## Repoussé après le Bloc 2
- 
-- Les trois autres sorts et la roue de sélection
-- La barre de raccourcis à 9 emplacements et les objets équipables
-- La refonte des contrôles selon l'objet en main (Input Mapping Contexts), avec mise à jour du 3C
-- Un vrai système d'inventaire
-- La vue de gestion top-down
-- La construction de base
-- La conquête du village
-- Le menu de paramètres (son, touches, FOV)
+- [ ] Idée initiale du chaudron (UI drag-and-drop, inventaire à droite / cases de recette à gauche) mise de côté : dépend d'un vrai système d'inventaire (voir file d'attente, point 7-8)
  

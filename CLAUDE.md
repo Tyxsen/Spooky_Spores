@@ -400,36 +400,53 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 - **Plantation (Checkpoint B)** : terminée et testée (planter/pousser/récolter, champ réutilisable, debug visuel par couleur). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-06). Documenté dans `documentation-technique.md`. Branche `feature/plantation` supprimée.
 - **Chaudron** : terminé et testé (recette 3 Bois + 1 Pierre + 2 Blé → 1 Potion, barre de progression fonctionnelle, potion créditée au compteur de ressources). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-07). Documenté dans `documentation-technique.md`. Branche `feature/cauldron` supprimée.
 
-### Planning jusqu'au Bloc 2
+### Planning du Bloc 1
 
-Objectif : la **boucle de jeu principale** jouable de bout en bout, plutôt que le maximum de mécaniques :
+Refait entièrement le 2026-10-07, après avoir fini Chaudron plus tôt que prévu (découpage précédent abandonné, pas de référence à conserver). **Principe : tout ce qui suit est planifié pour tenir dans le Bloc 1, sans report présumé vers le Bloc 2.** C'est une file d'attente unique par priorité, pas des « périodes » figées : on la déroule dans l'ordre, et on ne la replanifie que si le Bloc 2 démarre réellement avant qu'elle soit épuisée — pas avant.
+
+Objectif de fond, qui pilote les premiers rangs de la file : la **boucle de jeu principale** jouable de bout en bout, plutôt que le maximum de mécaniques annexes :
 > récolter → planter → fabriquer une potion → combattre → récupérer des os → ressusciter un serviteur → le serviteur récolte
 
-| Période | Semaine | Objectif de fin de semaine |
+**Chunk immédiat (~10 jours, avant la semaine de cours S2)** :
+- Composant de santé + frapper les arbres et pierres + premier sort avec mana (voir détail ci-dessous)
+- Panneau de contrôles **en lecture seule** (texte, pas encore de remappage) accessible en jeu — pour que les intervenants qui testent le jeu pendant S2 puissent consulter les touches actuelles sans dépendre de la documentation externe
+
+*Semaine de cours S2 : livrable du CDC, zéro dev gameplay.*
+
+**File d'attente après S2** (ordre de priorité) :
+
+| # | Contenu | Pourquoi ce rang |
 |---|---|---|
-| Actuelle | Fin de semaine | Chaudron terminé et fusionné |
-| Période 1 | Cours (Bloc 1, S2) | Livrable du CDC (prioritaire) |
-| Période 2 | Alternance | Composant de santé + frapper les arbres et pierres + premier sort avec mana |
-| | Alternance | Un soldat ennemi simple : se déplace, attaque, meurt, laisse du butin (réutilise les drops) |
-| | Cours (Bloc 1, S3) | Livrable du CDC + oral de fin de Bloc 1 |
-| Période 3 | Alternance | Résurrection : potion + cadavre = serviteur (le cadavre implémente `IInteractable`) |
-| | Alternance | Serviteur qui récolte la ressource la plus proche |
-| | Alternance | Semaine tampon : stabilisation, retard, documentation |
+| 1 | Un soldat ennemi simple : se déplace, attaque, meurt, laisse du butin (réutilise les drops) | Complète la boucle « combattre » |
+| 2 | Résurrection : potion + cadavre = serviteur (le cadavre implémente `IInteractable`) | Complète la boucle « ressusciter » |
+| 3 | Serviteur qui récolte la ressource la plus proche | Ferme la boucle de jeu principale — à ce stade le jeu est jouable de bout en bout |
+| 4 | Menu de paramètres complet : son, FOV, et **remappage réel des touches** (Enhanced Input, Player Mappable Keys) | La vraie complexité API (nouvelle pour ce projet, à vérifier dans la doc officielle 5.8) — mieux vaut la caler avec de la marge plutôt que sous pression des 10 jours du chunk immédiat |
+| 5 | Système de sauvegarde (triggers, objets déplacés, ressources, plantations en cours) | Plus on avance, plus il y a d'état accumulé (serviteurs, potions, plantations) à rattraper d'un coup si on attend |
+| 6 | UI hors du Character (PlayerController/HUD) + despawn des drops au sol après délai | Dette technique légère, semaine « respiration » |
+| 7 | Vrai inventaire (modèle de données : stacks, slots ; UI liste simple) | Fondation pour tout ce qui suit |
+| 8 | UI drag-and-drop sur l'inventaire + barre de raccourcis (9 emplacements) | Reprend l'idée initiale du chaudron, pertinente maintenant qu'un inventaire existe |
+| 9 | Objets équipables + contrôles contextuels selon l'objet en main (Input Mapping Contexts) | Dépend de 7 et 8 |
+| 10 | Roue de sorts (clic droit maintenu) + mana généralisé (4 emplacements, recharge ~5s) | Généralise le sort unique du chunk immédiat |
+| 11 | Sort 2 + Sort 3 (regroupés si ce sont de simples debuffs, sinon séparés) | |
+| 12 | Sort 4 (dégâts dans le temps / feu, interaction possible avec le Chaos du champignon) | |
+| 13 | Vue de gestion top-down | |
+| 14 | Construction de base (placement, snapping) | |
+| 15 | Construction ↔ ressources (coût, effets des bâtiments) | |
+| 16 | Village : disposition + patrouilles de soldats | Quête optionnelle de fin |
+| 17 | Village : condition de victoire + clôture narrative | |
+
+*Semaine de cours S3 : livrable du CDC + oral, fin du Bloc 1 — position exacte dans la file inconnue pour l'instant (nombre de semaines d'alternance restantes non précisé). On s'adapte au fil de l'eau.*
 
 **Règles du planning :**
 - Les semaines de cours sont réservées au CDC. Quand un CDC arrive, recaler le planning dessus.
-- Une mécanique par semaine d'alternance, livrée entière (branche fusionnée dans `dev`). L'utilisateur n'a pas de volume horaire fixe : il finit la tâche de la semaine, puis prend de l'avance sur la suivante s'il a du temps, **seulement après avoir fusionné** la précédente, et sans anticiper le travail des semaines de cours.
-- Quand une semaine déborde, **on coupe ou on repousse en fin de file**, on ne décale pas tout le planning.
-- Les deux semaines d'IA (ennemi, serviteur) sont les plus optimistes : viser le strict minimum.
-- Les sorts arrivent avant le Bloc 2 pour que le Bloc 2 leur donne leurs effets visuels.
+- Une mécanique par semaine d'alternance, livrée entière (branche fusionnée dans `dev`). L'utilisateur n'a pas de volume horaire fixe : il finit la tâche en cours, puis prend de l'avance sur la suivante s'il a du temps, **seulement après avoir fusionné** la précédente.
+- Quand une tâche déborde, **on coupe ou on repousse en fin de file**, on ne décale pas tout le planning.
+- Les tâches d'IA (ennemi, serviteur) et la conquête du village sont les plus optimistes : viser le strict minimum, premiers candidats à la coupe si le temps manque.
+- Rien n'est pré-étiqueté « pour le Bloc 2 » : toute la file est visée pour le Bloc 1. On ne reverra ce principe que si le Bloc 2 démarre avant la fin de la file.
 
-### Idée validée pour la période 2 : frapper les ressources
+### Idée validée : frapper les ressources
 
 Frapper un arbre ou une pierre plusieurs fois (vibration de l'objet, particules d'impact au Bloc 2) plutôt que de les récolter avec E. Architecture prévue : les arbres et pierres reçoivent le **composant de santé**, et deviennent les premières cibles du système de dégâts, qui servira ensuite aux sorts et aux ennemis. Utiliser le système de dégâts intégré d'Unreal (`UGameplayStatics::ApplyDamage`, événement `OnTakeAnyDamage`) plutôt qu'un système maison. À zéro point de vie, le nœud fait apparaître ses drops avec la logique existante. **Ne pas coder de logique de coups spécifique aux arbres avant ça.** Question de design encore ouverte : avec quoi le nécromancien frappe-t-il (bâton, mains, outils, sort) ? Les champs restent récoltés avec E.
-
-### Repoussé après le Bloc 2
-
-Les trois autres sorts et la roue de sélection, la barre de raccourcis à 9 emplacements et les objets équipables, la refonte des contrôles, la vue de gestion top-down, la construction de base, la conquête du village, le menu de paramètres (son, touches, FOV), un vrai système d'inventaire.
 
 ---
 
