@@ -2,8 +2,8 @@
  
 ## Prochaine étape
  
-- [x] Panneau de contrôles en lecture seule (affichage des touches actuelles, toggle Entrée, pas de remappage pour l'instant) — terminé et testé sur `feature/controls-panel`, reste à fusionner
-- [ ] Composant de santé + frapper les arbres et pierres + premier sort avec mana — sur `feature/controls-panel` ou une nouvelle branche depuis `dev` une fois celle-ci fusionnée
+- [x] Panneau de contrôles en lecture seule (affichage des touches actuelles, toggle Entrée, pas de remappage pour l'instant) — terminé, testé, fusionné dans `dev`
+- [ ] Composant de santé + frapper les arbres et pierres + premier sort avec mana — sur une nouvelle branche `feature/...` depuis `dev`
 
 ## Divers à régler
  

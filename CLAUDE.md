@@ -402,7 +402,7 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 - **Sprint et endurance** : terminé, testé, fusionné dans `dev`, branche supprimée. Documenté dans `documentation-technique.md`.
 - **Plantation (Checkpoint B)** : terminée et testée (planter/pousser/récolter, champ réutilisable, debug visuel par couleur). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-06). Documenté dans `documentation-technique.md`. Branche `feature/plantation` supprimée.
 - **Chaudron** : terminé et testé (recette 3 Bois + 1 Pierre + 2 Blé → 1 Potion, barre de progression fonctionnelle, potion créditée au compteur de ressources). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-07). Documenté dans `documentation-technique.md`. Branche `feature/cauldron` supprimée.
-- **Panneau de contrôles** : terminé et testé (affichage statique des touches, toggle par Entrée, `WBP_ControlsPanel`). En cours de fermeture sur `feature/controls-panel`.
+- **Panneau de contrôles** : terminé et testé (affichage statique des touches, toggle par Entrée, `WBP_ControlsPanel`). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-08). Documenté dans `documentation-technique.md`. Branche `feature/controls-panel` supprimée.
 
 ### Planning du Bloc 1
 
@@ -412,7 +412,7 @@ Objectif de fond, qui pilote les premiers rangs de la file : la **boucle de jeu 
 > récolter → planter → fabriquer une potion → combattre → récupérer des os → ressusciter un serviteur → le serviteur récolte
 
 **Chunk immédiat (~10 jours, avant la semaine de cours S2)** :
-1. ~~Panneau de contrôles en lecture seule~~ — **terminé et testé** (texte statique, toggle par la touche Entrée, `WBP_ControlsPanel`). Reste à fusionner dans `dev`.
+1. ~~Panneau de contrôles en lecture seule~~ — terminé, testé, fusionné.
 2. Composant de santé + frapper les arbres et pierres + premier sort avec mana (voir détail ci-dessous) — prochaine tâche, avec le temps restant avant S2
 
 *Semaine de cours S2 : livrable du CDC, zéro dev gameplay.*
