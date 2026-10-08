@@ -60,6 +60,10 @@ protected:
 	/** Launch Objects Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")
 	UInputAction* LaunchObjectsAction;
+
+	/** Toggle controls panel Input Action */
+	UPROPERTY(EditAnywhere, Category ="Input")
+	UInputAction* ToggleControlsAction;
 	
 	/** MOVEMENT */
 	UPROPERTY(EditAnywhere, Category = "Movement")
@@ -105,6 +109,10 @@ protected:
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoLaunchObjects();
 
+	/** Handles UI interface for controls panel */
+	UFUNCTION(BlueprintImplementableEvent, Category="UI")
+	void OnToggleControlsPanel();
+
 	/** Handles sprint if stamina is above zero */
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	virtual void DoSprintStart();
@@ -116,11 +124,11 @@ protected:
 	UFUNCTION()
 	void HandleSprintStateChanged(bool bNewIsSprinting);
 
-protected:
-
 	/** Set up input action bindings */
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
-	
+
+private:
+	void DoToggleControlsPanel();
 
 public:
 

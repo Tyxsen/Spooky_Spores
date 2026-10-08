@@ -64,7 +64,7 @@ void ASpooky_SporesCharacter::GetActorEyesViewPoint(FVector& OutLocation, FRotat
 }
 
 void ASpooky_SporesCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{	
+{
 	// Set up action bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
@@ -86,13 +86,15 @@ void ASpooky_SporesCharacter::SetupPlayerInputComponent(UInputComponent* PlayerI
 		// Sprinting
 		EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Started, this, &ASpooky_SporesCharacter::DoSprintStart);
 		EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &ASpooky_SporesCharacter::DoSprintStop);
+
+		// Controls Panel
+		EnhancedInputComponent->BindAction(ToggleControlsAction, ETriggerEvent::Started, this, &ASpooky_SporesCharacter::DoToggleControlsPanel);
 	}
 	else
 	{
 		UE_LOG(LogSpooky_Spores, Error, TEXT("'%s' Failed to find an Enhanced Input Component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
 	}
 }
-
 
 void ASpooky_SporesCharacter::MoveInput(const FInputActionValue& Value)
 {
@@ -195,4 +197,9 @@ void ASpooky_SporesCharacter::DoSprintStop()
 void ASpooky_SporesCharacter::HandleSprintStateChanged(bool bNewIsSprinting)
 {
 	GetCharacterMovement()->MaxWalkSpeed = bNewIsSprinting ? SprintSpeed : WalkSpeed;
+}
+
+void ASpooky_SporesCharacter::DoToggleControlsPanel()
+{
+	OnToggleControlsPanel();
 }

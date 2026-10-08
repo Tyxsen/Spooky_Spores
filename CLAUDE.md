@@ -307,8 +307,10 @@ Acteur physique qui implémente `IGrabbable`. `MeshComponent` en racine, profil 
 | Relâcher / saisir / interagir (contextuel) | E |
 | Lancer l'objet tenu | Clic droit |
 | Sprint (maintenu) | Maj gauche |
+| Afficher/masquer le panneau de contrôles | Entrée |
 
 - Le clic droit est déjà utilisé pour le lancer, et le 3C le réserve à la roue des sorts. Ne lui ajoute pas de nouveau rôle sans en discuter.
+- **`²` (AZERTY) est réservée à la console Unreal** (équivalent du backtick/tilde en QWERTY) : ne jamais l'assigner à une Input Action, le binding console l'intercepte avant. De même, Échap ferme la fenêtre de viewport dans l'éditeur (PIE) : éviter de l'assigner à une action gameplay tant qu'on reste en PIE pour tester.
 - Refonte des contrôles prévue plus tard, quand il y aura des objets équipables : contrôles dépendant de l'objet en main, via les **Input Mapping Contexts** d'Enhanced Input, en mettant le 3C à jour.
 
 ---
@@ -387,6 +389,7 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 - `SpawnActor` exécute `BeginPlay` et les overlaps avant de rendre la main → spawn différé.
 - Damage Threshold par défaut trop élevé pour un petit objet.
 - Question systématique à se poser : **à quel moment cette ligne s'exécute-t-elle ?**
+- Touche assignée à une Input Action qui semblait libre mais ouvrait la console (`²` en AZERTY) → vérifier les bindings réservés par le moteur/l'éditeur avant d'assigner une touche à une nouvelle action.
 
 ---
 
@@ -399,6 +402,7 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 - **Sprint et endurance** : terminé, testé, fusionné dans `dev`, branche supprimée. Documenté dans `documentation-technique.md`.
 - **Plantation (Checkpoint B)** : terminée et testée (planter/pousser/récolter, champ réutilisable, debug visuel par couleur). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-06). Documenté dans `documentation-technique.md`. Branche `feature/plantation` supprimée.
 - **Chaudron** : terminé et testé (recette 3 Bois + 1 Pierre + 2 Blé → 1 Potion, barre de progression fonctionnelle, potion créditée au compteur de ressources). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-07). Documenté dans `documentation-technique.md`. Branche `feature/cauldron` supprimée.
+- **Panneau de contrôles** : terminé et testé (affichage statique des touches, toggle par Entrée, `WBP_ControlsPanel`). En cours de fermeture sur `feature/controls-panel`.
 
 ### Planning du Bloc 1
 
@@ -408,8 +412,8 @@ Objectif de fond, qui pilote les premiers rangs de la file : la **boucle de jeu 
 > récolter → planter → fabriquer une potion → combattre → récupérer des os → ressusciter un serviteur → le serviteur récolte
 
 **Chunk immédiat (~10 jours, avant la semaine de cours S2)** :
-- Composant de santé + frapper les arbres et pierres + premier sort avec mana (voir détail ci-dessous)
-- Panneau de contrôles **en lecture seule** (texte, pas encore de remappage) accessible en jeu — pour que les intervenants qui testent le jeu pendant S2 puissent consulter les touches actuelles sans dépendre de la documentation externe
+1. ~~Panneau de contrôles en lecture seule~~ — **terminé et testé** (texte statique, toggle par la touche Entrée, `WBP_ControlsPanel`). Reste à fusionner dans `dev`.
+2. Composant de santé + frapper les arbres et pierres + premier sort avec mana (voir détail ci-dessous) — prochaine tâche, avec le temps restant avant S2
 
 *Semaine de cours S2 : livrable du CDC, zéro dev gameplay.*
 
