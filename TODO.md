@@ -2,8 +2,8 @@
  
 ## Prochaine étape
  
-- [ ] Composant de santé + frapper les arbres et pierres + premier sort avec mana — sur une nouvelle branche `feature/...` depuis `dev`
-- [ ] Panneau de contrôles en lecture seule (affichage des touches actuelles, pas de remappage pour l'instant) — à finir avant la semaine de cours S2 (~10 jours), pour que les intervenants qui testent le jeu puissent consulter les touches
+- [x] Panneau de contrôles en lecture seule (affichage des touches actuelles, toggle Entrée, pas de remappage pour l'instant) — terminé et testé sur `feature/controls-panel`, reste à fusionner
+- [ ] Composant de santé + frapper les arbres et pierres + premier sort avec mana — sur `feature/controls-panel` ou une nouvelle branche depuis `dev` une fois celle-ci fusionnée
 
 ## Divers à régler
  

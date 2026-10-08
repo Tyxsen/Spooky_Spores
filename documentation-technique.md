@@ -239,6 +239,8 @@ Le champignon se fracture aussi bien sous l'effet de la gravité (chute) que d'u
 
 ![Présentation des 3 types de debug actuel du projet](Documentation_Documents/Debug.png)
 
+**Panneau de contrôles** (`WBP_ControlsPanel`) : distinct des outils ci-dessus, pas destiné au développement mais à la consultation en jeu — un texte statique listant les touches actuelles (section 9 ci-dessus), togglé par la touche Entrée (`ASpooky_SporesCharacter::DoToggleControlsPanel` → event Blueprint `OnToggleControlsPanel`, même principe que `AStoryTrigger::OnStoryTriggered` : le C++ déclenche, le Blueprint décide de l'affichage). Pensé pour que les intervenants qui testent le jeu puissent consulter les touches sans dépendre de la documentation externe.
+
 ---
 
 ## 11. Limitations connues et dette technique
