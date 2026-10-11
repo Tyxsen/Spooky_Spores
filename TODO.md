@@ -3,7 +3,8 @@
 ## Prochaine étape
  
 - [x] Panneau de contrôles en lecture seule (affichage des touches actuelles, toggle Entrée, pas de remappage pour l'instant) — terminé, testé, fusionné dans `dev`
-- [ ] Composant de santé + frapper les arbres et pierres + premier sort avec mana — sur une nouvelle branche `feature/...` depuis `dev`
+- [x] Composant de santé + frapper les arbres et pierres + premier sort avec mana — terminé et testé (non-régression comprise), sur `feature/health-and-combat`, prêt à fusionner dans `dev`
+- [ ] Prochaine étape après fusion : semaine de cours S2 (livrable CDC, zéro dev gameplay), puis file d'attente point 1 (soldat ennemi simple)
 
 ## Divers à régler
  
@@ -19,8 +20,10 @@ Refait le 2026-10-07 (ancien découpage par « périodes » abandonné). Détail
 - [x] Sprint et endurance (valeurs du 3C)
 - [x] Plantation et pousse des graines (Checkpoint B)
 - [x] Chaudron : une recette qui transforme des ressources en une potion
+- [x] Panneau de contrôles en lecture seule
+- [x] Composant de santé + frapper les arbres et pierres + premier sort avec mana
 
-**Chunk immédiat (~10 jours, avant S2)** — voir « Prochaine étape » ci-dessus
+**Chunk immédiat terminé** — voir « Prochaine étape » ci-dessus
 
 **Semaine de cours (Bloc 1, S2)** : livrable du CDC
 
@@ -57,14 +60,6 @@ Refait le 2026-10-07 (ancien découpage par « périodes » abandonné). Détail
 - [ ] Ressources du `UResourceCounterComponent`
 - [ ] Plus tard : plantations en cours de pousse, serviteurs, potions, état de la base
 
-## Idée validée : frapper les ressources
- 
-- [ ] Décider avec quoi le nécromancien frappe (bâton, mains, outils, sort)
-- [ ] Arbres et pierres avec le composant de santé, via le système de dégâts d'Unreal (`ApplyDamage` / `OnTakeAnyDamage`)
-- [ ] À zéro point de vie : apparition des drops avec la logique existante
-- [ ] Vibration de l'objet frappé
-- Les champs restent récoltés avec E. Ne pas coder de logique de coups spécifique aux arbres avant le composant de santé.
-
 ## Dette technique
  
 - [ ] Déplacer la création de l'UI hors du personnage (PlayerController ou HUD) quand l'interface grossira
@@ -90,8 +85,10 @@ Refait le 2026-10-07 (ancien découpage par « périodes » abandonné). Détail
 - [ ] Rotation ou flottement des drops au sol
 - [ ] Animation douce du redressement des drops à l'atterrissage
 - [ ] Particules d'impact en frappant les arbres et les pierres
+- [ ] Tremblement de l'objet frappé (évoqué pendant le développement du premier sort, reporté faute d'animation/VFX à ce stade)
 - [ ] Effets visuels des sorts (Niagara)
 - [ ] Plus de fragments sur le champignon si besoin
+- [ ] Remplacer le `DrawDebugLine` de `UInteractionComponent` par un vrai retour visuel joueur (surbrillance/réticule) pour indiquer une cible saisissable/interactable
 - [ ] Matériau réel pour `AFieldPlot` (remplace la sphère de debug colorée par état)
 
 ## Idées de gameplay à rediscuter

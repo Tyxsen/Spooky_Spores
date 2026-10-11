@@ -20,6 +20,15 @@ public:
 
 	virtual void OnInteract_Implementation(AActor* InteractingActor) override;
 
+protected:
+	virtual void BeginPlay() override;
+
+private:
+	UFUNCTION()
+	void HandleHealthDepleted();
+
+	void HarvestAndDestroy();
+	
 // -----------PROPERTIES-----------
 protected:
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Resources")
