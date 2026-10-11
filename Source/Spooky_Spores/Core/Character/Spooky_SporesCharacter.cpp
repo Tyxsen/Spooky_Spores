@@ -12,6 +12,7 @@
 #include "Interaction/GrabComponent.h"
 #include "Interaction/InteractionComponent.h"
 #include "Movement/StaminaComponent.h"
+#include "Spells/SpellCastingComponent.h"
 
 ASpooky_SporesCharacter::ASpooky_SporesCharacter()
 {
@@ -89,6 +90,9 @@ void ASpooky_SporesCharacter::SetupPlayerInputComponent(UInputComponent* PlayerI
 
 		// Controls Panel
 		EnhancedInputComponent->BindAction(ToggleControlsAction, ETriggerEvent::Started, this, &ASpooky_SporesCharacter::DoToggleControlsPanel);
+
+		// Cast Spell
+		EnhancedInputComponent->BindAction(CastSpellAction, ETriggerEvent::Started, this, &ASpooky_SporesCharacter::DoCastSpell);
 	}
 	else
 	{
@@ -192,6 +196,12 @@ void ASpooky_SporesCharacter::DoSprintStop()
 	if (!StaminaComponent) return;
 
 	StaminaComponent->StopSprint();
+}
+
+void ASpooky_SporesCharacter::DoCastSpell()
+{
+	if (USpellCastingComponent* SpellCasting = FindComponentByClass<USpellCastingComponent>())
+		SpellCasting->TryCastSpell();
 }
 
 void ASpooky_SporesCharacter::HandleSprintStateChanged(bool bNewIsSprinting)

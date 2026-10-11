@@ -243,6 +243,28 @@ Le champignon se fracture aussi bien sous l'effet de la gravité (chute) que d'u
 
 ---
 
-## 11. Limitations connues et dette technique
+## 11. Santé, récolte à coups et premier sort
+
+`UHealthComponent` (`Health/HealthComponent.h`) : composant générique et réutilisable, indépendant de tout contexte de combat — il s'appuie uniquement sur le système de dégâts intégré d'Unreal plutôt qu'une logique maison. Il s'abonne au délégué natif `AActor::OnTakeAnyDamage` de son `GetOwner()`, qui se déclenche sur tout appel à `UGameplayStatics::ApplyDamage`, d'où qu'il vienne (sort, futur ennemi). Diffuse deux délégués `BlueprintAssignable` : `OnHealthChanged` (à chaque coup) et `OnDeath` (une seule fois, à 0 point de vie).
+
+**Choix technique — composition optionnelle, pas un nouveau système de récolte** : `AHarvestableResource::BeginPlay` cherche un `UHealthComponent` via `FindComponentByClass`. S'il est présent, le nœud s'abonne à `OnDeath` et `OnInteract` ne fait plus rien (la récolte directe au `E` est désactivée) ; s'il est absent, le comportement d'origine (récolte en un coup au `E`) reste inchangé. Concrètement : `BP_Harvestable_Wood` et `BP_Harvestable_Stone` reçoivent le composant, `BP_Harvestable_Plant` ne le reçoit pas et continue de se récolter au `E`. Aucune ligne de C++ à ajouter pour décider qu'un futur nœud récoltable soit, ou non, « vivant » — l'intuition de départ (façon Minecraft) sans système dédié.
+
+`UManaComponent` (`Spells/ManaComponent.h`) : même principe que `UStaminaComponent` (section 5), régénération continue au tick, mais sans délai avant recharge — contrairement à l'endurance, qui doit décourager le spam de sprint, la mana doit rester disponible en continu. `TrySpendMana(Cost)` échoue sans effet de bord si la réserve est insuffisante.
+
+`USpellCastingComponent` (`Spells/SpellCastingComponent.h`) : point d'entrée unique pour le clic gauche (`IA_CastSpell`), toujours « lancer le sort actuellement équipé » — pour l'instant un unique sort, le coup de bâton.
+
+**Choix technique — un coup différé et cadencé, sans système d'animation** : `TryCastSpell()` vérifie la mana, puis pose deux `FTimerHandle` plutôt que d'appliquer les dégâts immédiatement :
+- `HitDelayTimerHandle` (`HitDelay`, 0.2 s) déclenche `ResolveHit()` — le moment où le bâton « touche » la cible, en attendant une vraie Animation Montage au Bloc 2.
+- `SwingCooldownTimerHandle` (`SwingCooldown`, 0.5 s) déclenche `EndSwing()`, qui lève la garde `bIsSwinging` — empêche de spammer le clic pour détruire une ressource instantanément.
+
+`ResolveHit()` réutilise la détection existante plutôt que de retracer : `UInteractionComponent::IsAttackableTarget(OutTarget)` (nouvelle méthode, même principe que `IsGrabbableTarget`/`IsInteractableTarget`, portée `AttackRange` = 200) renvoie la cible courante du trace unique déjà en place (section 3), puis `UGameplayStatics::ApplyDamage` est appelé dessus — c'est cet appel qui déclenche `OnTakeAnyDamage` sur le `UHealthComponent` de la cible, sans aucun couplage direct entre les deux systèmes.
+
+**Choix technique — pas de coût en mana pour ce coup, par la donnée et non par l'architecture** : le coup de bâton est un sort comme un autre dans le code (il passe par `TryCastSpell`/`TrySpendMana`), mais `SpellManaCost` est réglé à `0` sur cette instance précise, pour traduire qu'il s'agit d'un geste physique et non d'un sort « envoyé ». Aucune branche de code séparée entre « frapper » et « lancer un sort » : seule la donnée change, ce qui laisse la porte ouverte à un futur sort gratuit ou à un coup de bâton qui coûterait de la mana, sans retoucher le système.
+
+**Choix technique — hitscan, pas de projectile** : la résolution des dégâts est instantanée (même frame que `ResolveHit`, après le délai), comme un coup de corps à corps. Un vrai sort à distance (file d'attente, items 11-12 du `CLAUDE.md`) remplacera ce hitscan par un acteur projectile (`UProjectileMovementComponent`, dégâts à l'impact par overlap) pour les sorts élémentaires à venir, sans changer le reste du pipeline (mana, dégâts, santé).
+
+---
+
+## 12. Limitations connues et dette technique
 
 Centralisées dans [`TODO.md`](TODO.md), pour éviter une double liste qui diverge avec le temps.

@@ -64,6 +64,10 @@ protected:
 	/** Toggle controls panel Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")
 	UInputAction* ToggleControlsAction;
+
+	/** Cast a spell Input Action */
+	UPROPERTY(EditAnywhere, Category ="Input")
+	UInputAction* CastSpellAction;
 	
 	/** MOVEMENT */
 	UPROPERTY(EditAnywhere, Category = "Movement")
@@ -120,6 +124,9 @@ protected:
 	/** Handles sprint end */
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	virtual void DoSprintStop();
+
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoCastSpell();
 
 	UFUNCTION()
 	void HandleSprintStateChanged(bool bNewIsSprinting);

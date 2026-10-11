@@ -2,6 +2,7 @@
 
 
 #include "Resources/HarvestableResource.h"
+#include "Health/HealthComponent.h"
 #include "Resources/ResourceDrop.h"
 
 // Sets default values
@@ -15,11 +16,28 @@ AHarvestableResource::AHarvestableResource()
 	MeshComponent->SetCollisionProfileName(TEXT("PhysicsInteractable"));
 }
 
+void AHarvestableResource::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (UHealthComponent* Health = FindComponentByClass<UHealthComponent>())
+		Health->OnDeath.AddDynamic(this, &AHarvestableResource::HandleHealthDepleted);
+}
+
 void AHarvestableResource::OnInteract_Implementation(AActor* InteractingActor)
 {
+	if (FindComponentByClass<UHealthComponent>()) return;
+	HarvestAndDestroy();
+}
+
+void AHarvestableResource::HandleHealthDepleted()
+{
+	HarvestAndDestroy();
+}
+
+void AHarvestableResource::HarvestAndDestroy()
+{
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	
 	AResourceDrop::SpawnDrops(GetWorld(), Drops, GetActorLocation(), DropSpawnRadius);
-	
 	Destroy();
 }

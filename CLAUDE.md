@@ -403,6 +403,7 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 - **Plantation (Checkpoint B)** : terminée et testée (planter/pousser/récolter, champ réutilisable, debug visuel par couleur). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-06). Documenté dans `documentation-technique.md`. Branche `feature/plantation` supprimée.
 - **Chaudron** : terminé et testé (recette 3 Bois + 1 Pierre + 2 Blé → 1 Potion, barre de progression fonctionnelle, potion créditée au compteur de ressources). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-07). Documenté dans `documentation-technique.md`. Branche `feature/cauldron` supprimée.
 - **Panneau de contrôles** : terminé et testé (affichage statique des touches, toggle par Entrée, `WBP_ControlsPanel`). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-08). Documenté dans `documentation-technique.md`. Branche `feature/controls-panel` supprimée.
+- **Composant de santé + frappe des ressources + premier sort** : terminé et testé (non-régression comprise). `UHealthComponent` générique ajouté en composition optionnelle sur `BP_Harvestable_Wood`/`BP_Harvestable_Stone` ; `UManaComponent` + `USpellCastingComponent` gèrent un premier sort (clic gauche) avec coup différé et cadencé par timer. Documenté dans `documentation-technique.md`. Sur la branche `feature/health-and-combat`, **pas encore fusionné dans `dev`**.
 
 ### Planning du Bloc 1
 
@@ -413,7 +414,7 @@ Objectif de fond, qui pilote les premiers rangs de la file : la **boucle de jeu 
 
 **Chunk immédiat (~10 jours, avant la semaine de cours S2)** :
 1. ~~Panneau de contrôles en lecture seule~~ — terminé, testé, fusionné.
-2. Composant de santé + frapper les arbres et pierres + premier sort avec mana (voir détail ci-dessous) — prochaine tâche, avec le temps restant avant S2
+2. ~~Composant de santé + frapper les arbres et pierres + premier sort avec mana~~ — terminé, testé, prêt à fusionner
 
 *Semaine de cours S2 : livrable du CDC, zéro dev gameplay.*
 
@@ -447,10 +448,6 @@ Objectif de fond, qui pilote les premiers rangs de la file : la **boucle de jeu 
 - Quand une tâche déborde, **on coupe ou on repousse en fin de file**, on ne décale pas tout le planning.
 - Les tâches d'IA (ennemi, serviteur) et la conquête du village sont les plus optimistes : viser le strict minimum, premiers candidats à la coupe si le temps manque.
 - Rien n'est pré-étiqueté « pour le Bloc 2 » : toute la file est visée pour le Bloc 1. On ne reverra ce principe que si le Bloc 2 démarre avant la fin de la file.
-
-### Idée validée : frapper les ressources
-
-Frapper un arbre ou une pierre plusieurs fois (vibration de l'objet, particules d'impact au Bloc 2) plutôt que de les récolter avec E. Architecture prévue : les arbres et pierres reçoivent le **composant de santé**, et deviennent les premières cibles du système de dégâts, qui servira ensuite aux sorts et aux ennemis. Utiliser le système de dégâts intégré d'Unreal (`UGameplayStatics::ApplyDamage`, événement `OnTakeAnyDamage`) plutôt qu'un système maison. À zéro point de vie, le nœud fait apparaître ses drops avec la logique existante. **Ne pas coder de logique de coups spécifique aux arbres avant ça.** Question de design encore ouverte : avec quoi le nécromancien frappe-t-il (bâton, mains, outils, sort) ? Les champs restent récoltés avec E.
 
 ---
 

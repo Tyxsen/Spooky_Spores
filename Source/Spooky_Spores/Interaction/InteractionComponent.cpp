@@ -61,9 +61,6 @@ void UInteractionComponent::UpdateInteractionTrace()
 			1.0f
 		);
 	}
-		
-	
-	
 }
 
 // Called every frame
@@ -92,6 +89,17 @@ bool UInteractionComponent::IsInteractableTarget() const
 	if (CurrentTargetDistance > InteractRange) return false;
 
 	return ActualTarget->Implements<UInteractable>();
+}
+
+bool UInteractionComponent::IsAttackableTarget(AActor*& OutTarget) const
+{
+	if (!ActualTarget.IsValid() || CurrentTargetDistance > AttackRange)
+	{
+		OutTarget = nullptr;
+		return false;
+	}
+	OutTarget = ActualTarget.Get();
+	return true;
 }
 
 void UInteractionComponent::TryInteract()

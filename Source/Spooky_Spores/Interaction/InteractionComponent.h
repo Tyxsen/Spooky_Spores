@@ -16,10 +16,6 @@ public:
 	// Sets default values for this component's properties
 	UInteractionComponent();
 
-private:	
-	void UpdateInteractionTrace();
-	
-public:	
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	
@@ -29,14 +25,25 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	bool IsInteractableTarget() const;
 
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	bool IsAttackableTarget(AActor*& OutTarget) const;
+
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void TryInteract();
+
+private:	
+	void UpdateInteractionTrace();
 	
+// -----------PROPERTIES-----------
+public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction")
 	float GrabRange = 400.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction")
-	float InteractRange = 200.0f;		
+	float InteractRange = 200.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction")
+	float AttackRange = 200.0f;
 	
 private:
 	UPROPERTY(BlueprintReadOnly, Category = "Interaction", meta = (AllowPrivateAccess = "true"))
