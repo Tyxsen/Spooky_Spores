@@ -265,6 +265,26 @@ Le champignon se fracture aussi bien sous l'effet de la gravité (chute) que d'u
 
 ---
 
-## 12. Limitations connues et dette technique
+## 12. Environnement — colline et cabane du joueur
+
+Remplace `Lvl_FirstPerson` comme niveau principal du projet (`EditorStartupMap` et `GameDefaultMap` pointent désormais vers `Lvl_Principal`, voir `Config/DefaultEngine.ini`). `Lvl_FirstPerson` reste disponible comme niveau de test.
+
+Le terrain est un unique **Landscape** sculpté en colline, plutôt qu'un sol plat avec une zone surélevée isolée : la cabane du joueur est posée au sommet, un chemin descend vers ce qui deviendra l'accès au village (file d'attente, item 16).
+
+**Choix technique — hauteur et domination visuelle** : poser la cabane au point le plus haut du niveau donne au joueur une vue dégagée sur le chemin d'arrivée du village, en prévision de la mécanique de défense de base (file d'attente, items 1 et 16). Choix inspiré de la lecture *An Architectural Approach to Level Design* (C. Totten) : la hauteur joue sur l'instinct de survie du joueur (vue dégagée rassurante, « prospect »).
+
+**Cabane** : géométrie simple construite directement dans le niveau (pas un Blueprint réutilisable, contrairement aux ressources — elle est unique), avec sol, murs, toit en pignon, une fenêtre, et une lumière intérieure contrastant avec l'obscurité extérieure.
+
+**Clôture** (`BP_Fences`) délimitant le territoire immédiat du joueur autour de la cabane.
+
+**Éléments de gameplay placés** : `BP_StoryTrigger_Entrance` à la porte, `BP_Cauldron`, plusieurs `BP_FieldPlot`, `BP_Rock` (démonstration du grab, dans l'axe de la porte), trois `GC_Mushroom`.
+
+**Choix technique — Foliage Mode avec un type Actor, pas Static Mesh** : les nœuds de ressources (`BP_Harvestable_Wood/Stone/Plant`) sont dispersés en forêt via le Foliage Mode, avec un Foliage Type de type **Actor** plutôt que Static Mesh — nécessaire pour conserver la logique de gameplay de chaque instance (interaction, santé). Contrairement au Foliage Static Mesh, ce type n'apporte aucun gain de performance par instanciation : chaque exemplaire reste un acteur à part entière, au même coût qu'un placement manuel. Le bénéfice ici est uniquement le confort de placement.
+
+**Éclairage** : scène volontairement sombre (Post Process Volume, Exposure Compensation négative, Directional Light à faible intensité), cohérent avec le ton nécromancien/abandonné du jeu.
+
+---
+
+## 13. Limitations connues et dette technique
 
 Centralisées dans [`TODO.md`](TODO.md), pour éviter une double liste qui diverge avec le temps.

@@ -37,7 +37,7 @@ void UInteractionComponent::UpdateInteractionTrace()
 	{
 		ActualTarget = HitResult.GetActor();
 		CurrentTargetDistance = FVector::Dist(EyeLocation, HitResult.Location);
-		DrawDebugLine(
+		/** DrawDebugLine(
 			GetWorld(),
 			EyeLocation,
 			HitResult.Location,
@@ -46,11 +46,11 @@ void UInteractionComponent::UpdateInteractionTrace()
 			0.0f,
 			0,
 			1.0f
-		);
+		); */
 	} else {
 		ActualTarget = nullptr;
 		CurrentTargetDistance = TNumericLimits<float>::Max();
-		DrawDebugLine(
+		/** DrawDebugLine(
 			GetWorld(),
 			EyeLocation,
 			TraceEnd,
@@ -59,7 +59,7 @@ void UInteractionComponent::UpdateInteractionTrace()
 			0.0f,
 			0,
 			1.0f
-		);
+		); */
 	}
 }
 
