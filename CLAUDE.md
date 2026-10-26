@@ -91,7 +91,7 @@ Le joueur est un **nécromancien** qui apparaît dans une cabane abandonnée. Il
 - **IDE** : JetBrains Rider.
 - **Deux ordinateurs** : l'utilisateur alterne entre deux machines. Git LFS doit être installé sur chacune (`git lfs install`, une fois par machine, avant le clone).
 - **Répartition C++ / Blueprint** : la logique et les systèmes en C++, les Blueprints pour utiliser et configurer ces systèmes, et pour le polish.
-- **Base** : template **First Person**. Map de travail : **`Lvl_FirstPerson`**.
+- **Base** : template **First Person**. Map principale : **`Lvl_Principal`** (remplace `Lvl_FirstPerson` comme carte par défaut depuis l'environnement de Semaine 2 — voir section 12). `Lvl_FirstPerson` reste disponible comme niveau de test.
 - **Module** : `Spooky_Spores`, macro d'export `SPOOKY_SPORES_API`.
 
 ---
@@ -135,6 +135,7 @@ __ExternalActors__/, __ExternalObjects__/   ← voir l'avertissement ci-dessous
 ### Documentation (racine du projet)
 
 - `README.md` : présentation du jeu, 3C, lien vers les Releases GitHub.
+- `GDD.md` : document de conception complet (boucle de jeu, monde/factions, piliers de level design, mécaniques et leurs dépendances, direction artistique). En cours de rédaction depuis le 2026-10-26, avant reprise de tout nouveau développement de mécanique (voir section 12).
 - `documentation-technique.md` : **document vivant** décrivant l'architecture actuelle, organisé **par système** (Interaction, Récolte, Mouvement, Narration, Chaos, Debug...), jamais par semaine. Réécrit en continu au fil des features, aucune section datée, **pas de statement IA** (ça, c'est le rôle des fichiers `Rendus/`, voir ci-dessous). Restructuré en ce sens le 2026-10-01 (ancien découpage « Semaine 1 » archivé).
 - `Rendus/` : un fichier **figé** par rendu noté (ex. `Rendu_Bloc1_S1.md`), jamais remodifié après coup, chacun avec **son propre** statement d'intention IA (écrit par Timéo, jamais par Claude). `Rendu_Bloc1_S1.md` est la version exacte de ce qui a été soumis en semaine 1, avant la restructuration du 2026-10-01.
 - `Documentation_Documents/` : captures (PNG) et `Documentation_Documents/Videos/` (GIF). Ce dossier est exclu de Git LFS pour que les images s'affichent sur GitHub. Référencé depuis `documentation-technique.md` (chemin direct) et depuis `Rendus/*.md` (chemin relatif `../Documentation_Documents/...`, un niveau plus bas).
@@ -404,6 +405,8 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 - **Chaudron** : terminé et testé (recette 3 Bois + 1 Pierre + 2 Blé → 1 Potion, barre de progression fonctionnelle, potion créditée au compteur de ressources). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-07). Documenté dans `documentation-technique.md`. Branche `feature/cauldron` supprimée.
 - **Panneau de contrôles** : terminé et testé (affichage statique des touches, toggle par Entrée, `WBP_ControlsPanel`). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-08). Documenté dans `documentation-technique.md`. Branche `feature/controls-panel` supprimée.
 - **Composant de santé + frappe des ressources + premier sort** : terminé et testé (non-régression comprise). `UHealthComponent` générique ajouté en composition optionnelle sur `BP_Harvestable_Wood`/`BP_Harvestable_Stone` ; `UManaComponent` + `USpellCastingComponent` gèrent un premier sort (clic gauche) avec coup différé et cadencé par timer. **Fusionné dans `dev`** en Squash (confirmé le 2026-10-11). Documenté dans `documentation-technique.md`. Branche `feature/health-and-combat` supprimée.
+- **Environnement du joueur (colline, cabane, clôture, forêt)** : terminé et testé. Niveau `Lvl_Principal` (Landscape sculpté en colline, cabane avec sol/toit/fenêtre/lumière intérieure, clôture, chaudron, champs, rocher de démo, champignons, ressources dispersées via Foliage Mode) remplaçant `Lvl_FirstPerson` comme carte par défaut du projet. **Fusionné dans `dev`** en Squash (confirmé le 2026-10-23). Documenté dans `documentation-technique.md`. Publié en Release GitHub (`V1.0.1`). Branche `feature/environment-blockout` supprimée.
+- **Dette connue laissée par cette feature** : bug de logique inversée dans `AStoryTrigger::OnBoxOverlap` (`bTriggerOnce`/`bHasTriggered`, voir section 11), debug `DrawDebugLine` de `UInteractionComponent` commenté en dur (pas un interrupteur), dossier `Content/RockEnv_Pack/Meshes/Small_Rocks/` gardant 7 meshes au lieu des 3 réellement utilisés. À vérifier si toujours d'actualité.
 
 ### Planning du Bloc 1
 
@@ -416,7 +419,9 @@ Objectif de fond, qui pilote les premiers rangs de la file : la **boucle de jeu 
 1. ~~Panneau de contrôles en lecture seule~~ — terminé, testé, fusionné.
 2. ~~Composant de santé + frapper les arbres et pierres + premier sort avec mana~~ — terminé, testé, prêt à fusionner
 
-*Semaine de cours S2 : livrable du CDC, zéro dev gameplay.*
+*Semaine de cours S2 : livrable du CDC, zéro dev gameplay.* Terminé et livré (environnement + Release `V1.0.1`, voir ci-dessus).
+
+**Avant de reprendre quoi que ce soit dans la file ci-dessous** : décision prise le 2026-10-23, une session de définition complète du GDD doit avoir lieu en premier — boucle de jeu et sa progression, monde/factions (pourquoi le village attaque, ce que signifie concrètement le conquérir), piliers de level design, liste des mécaniques et leurs dépendances, direction artistique minimale. Rédaction en cours dans `GDD.md`. **Ne pas proposer l'item 1 ci-dessous ou tout autre nouveau développement de mécanique tant que ce travail n'est pas fait.**
 
 **File d'attente après S2** (ordre de priorité) :
 
