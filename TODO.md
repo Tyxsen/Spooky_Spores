@@ -4,7 +4,8 @@
  
 - [x] Panneau de contrôles en lecture seule (affichage des touches actuelles, toggle Entrée, pas de remappage pour l'instant) — terminé, testé, fusionné dans `dev`
 - [x] Composant de santé + frapper les arbres et pierres + premier sort avec mana — terminé et testé (non-régression comprise), sur `feature/health-and-combat`, prêt à fusionner dans `dev`
-- [ ] Prochaine étape après fusion : semaine de cours S2 (livrable CDC, zéro dev gameplay), puis file d'attente point 1 (soldat ennemi simple)
+- [x] Semaine de cours S2 : environnement du joueur (colline, cabane) livré, Release `V1.0.1` — fusionné dans `dev`
+- [ ] Session GDD en cours (voir `GDD.md`) avant toute reprise de la file d'attente (`CLAUDE.md` section 12) : section 1 (boucle de jeu et progression) terminée. Prochaine étape : section 2 (monde et factions) — background du nécromancien, pourquoi le village attaque, sens de « conquérir le village »
 
 ## Divers à régler
  
