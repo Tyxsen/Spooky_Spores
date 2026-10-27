@@ -5,7 +5,8 @@
 - [x] Panneau de contrôles en lecture seule (affichage des touches actuelles, toggle Entrée, pas de remappage pour l'instant) — terminé, testé, fusionné dans `dev`
 - [x] Composant de santé + frapper les arbres et pierres + premier sort avec mana — terminé et testé (non-régression comprise), sur `feature/health-and-combat`, prêt à fusionner dans `dev`
 - [x] Semaine de cours S2 : environnement du joueur (colline, cabane) livré, Release `V1.0.1` — fusionné dans `dev`
-- [ ] Session GDD en cours (voir `GDD.md`) avant toute reprise de la file d'attente (`CLAUDE.md` section 12) : section 1 (boucle de jeu et progression) terminée. Prochaine étape : section 2 (monde et factions) — background du nécromancien, pourquoi le village attaque, sens de « conquérir le village »
+- [ ] Session GDD en cours (voir `GDD.md`) avant toute reprise de la file d'attente (`CLAUDE.md` section 12) : sections 1 (boucle de jeu et progression) et 2 (monde et factions) terminées. Prochaine étape : section 3 (piliers de level design)
+- [ ] À revoir une fois la section 4 du GDD traitée : items 16-17 de la file d'attente (village jouable + patrouilles, condition de victoire) probablement très simplifiés — pas de village jouable, juste une zone de déclenchement + cinématique de fin (voir `GDD.md` section 2)
 
 ## Divers à régler
  
