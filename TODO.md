@@ -5,7 +5,7 @@
 - [x] Panneau de contrôles en lecture seule (affichage des touches actuelles, toggle Entrée, pas de remappage pour l'instant) — terminé, testé, fusionné dans `dev`
 - [x] Composant de santé + frapper les arbres et pierres + premier sort avec mana — terminé et testé (non-régression comprise), sur `feature/health-and-combat`, prêt à fusionner dans `dev`
 - [x] Semaine de cours S2 : environnement du joueur (colline, cabane) livré, Release `V1.0.1` — fusionné dans `dev`
-- [ ] Session GDD en cours (voir `GDD.md`) avant toute reprise de la file d'attente (`CLAUDE.md` section 12) : sections 1 (boucle de jeu et progression) et 2 (monde et factions) terminées. Prochaine étape : section 3 (piliers de level design)
+- [ ] Session GDD en cours (voir `GDD.md`) avant toute reprise de la file d'attente (`CLAUDE.md` section 12) : sections 1 (boucle de jeu et progression), 2 (monde et factions) et 3 (piliers de level design) terminées. Prochaine étape : section 4 (mécaniques et leurs dépendances)
 - [ ] À revoir une fois la section 4 du GDD traitée : items 16-17 de la file d'attente (village jouable + patrouilles, condition de victoire) probablement très simplifiés — pas de village jouable, juste une zone de déclenchement + cinématique de fin (voir `GDD.md` section 2)
 
 ## Divers à régler
@@ -92,6 +92,7 @@ Refait le 2026-10-07 (ancien découpage par « périodes » abandonné). Détail
 - [ ] Plus de fragments sur le champignon si besoin
 - [ ] Remplacer le `DrawDebugLine` de `UInteractionComponent` par un vrai retour visuel joueur (surbrillance/réticule) pour indiquer une cible saisissable/interactable
 - [ ] Matériau réel pour `AFieldPlot` (remplace la sphère de debug colorée par état)
+- [ ] Habiller les abords au-delà de la zone jouable (colline + abords immédiats, voir `GDD.md` section 3) pour éviter un vide visuel : forêt dense, brouillard de distance, ou relief fermant la vue
 
 ## Idées de gameplay à rediscuter
  

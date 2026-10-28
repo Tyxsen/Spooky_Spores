@@ -98,7 +98,23 @@ S'il choisit de terminer, une cinématique montre le joueur et son armée conqu�
 
 3 à 4 règles simples qui doivent guider chaque espace construit, pour pouvoir juger une décision de level design sans avoir à repartir des principes à chaque fois.
 
-*(à rédiger)*
+### Le retour a un coût, pas l'éloignement en lui-même
+
+Les ressources sont réparties de façon globalement uniforme sur toute la carte (hors chemin d'accès, voir pilier suivant) — pas de densité volontairement décroissante avec la distance à la base. Le risque ne vient donc pas d'une carte conçue pour punir l'éloignement, mais d'un mécanisme déjà posé en section 1 : les ressources sauvages proches de la cabane s'épuisent avec le temps, ce qui pousse naturellement le joueur à s'aventurer plus loin — où le vrai risque devient le temps nécessaire pour revenir défendre la base en cas de vague, pas une menace directe sur place.
+
+**Conséquence concrète pour le placement** : un nœud de ressource peut être placé n'importe où sur la carte tant que ça reste cohérent avec l'environnement (pas d'arbre planté en plein milieu du chemin praticable) — y compris loin de la base. Pas de zone « riche » artificiellement réservée aux abords immédiats de la cabane.
+
+### Le chemin d'accès reste toujours praticable
+
+Il n'existe qu'un seul chemin reliant la cabane au village (celui déjà sculpté dans le Landscape, voir `documentation-technique.md` section 12), et ça restera le cas — pas de pluralité de fronts à défendre prévue. Ce chemin doit rester **impossible à bloquer entièrement** par une construction du joueur : le murer reviendrait à neutraliser toutes les vagues sans effort, ce qui viderait le combat de son enjeu.
+
+**Choix de conception — système de construction en grille** : le futur système de construction (vue top-down, `TODO.md` items 14-15) reposera sur une grille de cases virtuelles, comme dans un city-builder. Les cases correspondant au chemin seront marquées non constructibles en permanence (affichées en rouge dans l'interface de placement) — pas de règle de « largeur minimale à préserver » à vérifier au cas par cas : la contrainte est déjà résolue par la grille elle-même, une case est soit constructible, soit non, sans dégradé possible. **Dépendance à reporter en section 4** : ce choix de grille doit être répercuté dans la description de l'item 14 (construction de base) quand cette section sera rédigée.
+
+### Une colline, pas un monde ouvert
+
+L'espace explorable reste borné à la colline et ses abords immédiats — assez pour une vraie variété de ressources et un aller-retour qui a un coût réel (pilier précédent), mais pas une carte ouverte étendue à explorer. Toute extension de l'espace construit doit être justifiée par un besoin mécanique concret (une ressource de plus à placer, par exemple), pas par du remplissage.
+
+**Point ouvert, pas bloquant pour ce document** : une zone jouable bornée s'arrête quelque part — reste à décider comment habiller ce qui se trouve au-delà pour éviter un vide visuel (forêt dense formant un horizon naturel, brouillard de distance, relief qui ferme la vue...). Détail à trancher au moment de construire concrètement ces abords, pas maintenant.
 
 ---
 
