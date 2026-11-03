@@ -5,8 +5,8 @@
 - [x] Panneau de contrôles en lecture seule (affichage des touches actuelles, toggle Entrée, pas de remappage pour l'instant) — terminé, testé, fusionné dans `dev`
 - [x] Composant de santé + frapper les arbres et pierres + premier sort avec mana — terminé et testé (non-régression comprise), sur `feature/health-and-combat`, prêt à fusionner dans `dev`
 - [x] Semaine de cours S2 : environnement du joueur (colline, cabane) livré, Release `V1.0.1` — fusionné dans `dev`
-- [ ] Session GDD en cours (voir `GDD.md`) avant toute reprise de la file d'attente (`CLAUDE.md` section 12) : sections 1 (boucle de jeu et progression), 2 (monde et factions) et 3 (piliers de level design) terminées. Prochaine étape : section 4 (mécaniques et leurs dépendances)
-- [ ] À revoir une fois la section 4 du GDD traitée : items 16-17 de la file d'attente (village jouable + patrouilles, condition de victoire) probablement très simplifiés — pas de village jouable, juste une zone de déclenchement + cinématique de fin (voir `GDD.md` section 2)
+- [x] GDD complet (`GDD.md`, 5 sections) — rédigé du 2026-10-26 au 2026-11-03. La file d'attente ci-dessous a été réorganisée en conséquence (items 1, 2, 3, 13, 14, 16, 17 mis à jour). Le point de passage obligatoire (`CLAUDE.md` section 12) est levé.
+- [ ] Prochaine étape réelle : reprendre la file d'attente à l'item 1 (soldat ennemi simple)
 
 ## Divers à régler
  
@@ -30,9 +30,9 @@ Refait le 2026-10-07 (ancien découpage par « périodes » abandonné). Détail
 **Semaine de cours (Bloc 1, S2)** : livrable du CDC
 
 **File d'attente après S2, dans l'ordre**
-1. [ ] Un soldat ennemi simple : se déplace, attaque, meurt, laisse du butin (réutilise les drops)
-2. [ ] Résurrection : potion + cadavre = serviteur (le cadavre implémente `IInteractable`)
-3. [ ] Serviteur qui récolte la ressource la plus proche — ferme la boucle de jeu principale
+1. [ ] Un soldat ennemi simple : se déplace, attaque, meurt, laisse tomber des os au sol (nouvelle ressource `EResourceType::Bone`, paliers de rareté selon la force de l'ennemi — réutilise l'architecture `AResourceDrop`)
+2. [ ] Résurrection : nouvelle recette au chaudron (os + potion) → objet posable ajouté à l'inventaire (comme un œuf de monstre) → posé librement depuis le personnage, n'importe où → serviteur qui apparaît et erre sans tâche dans la zone de la base jusqu'à assignation (item 3) ; revient automatiquement dans la zone s'il est posé en dehors. Dépend d'un nouveau concept technique : la « zone de base » (volume délimité, probablement calé sur `BP_Fences`). À livrer avec l'item 3 comme un seul bloc
+3. [ ] Assignation des tâches aux serviteurs : menu dédié (touche à définir), deux colonnes — serviteurs non assignés à gauche, catégories de tâche à droite (« attaque/défense », « récolte de champ »...). La récolte automatique devient une conséquence de l'assignation à « récolte de champ », pas un comportement indépendant. Ferme la boucle de jeu principale, combiné à l'item 2
 4. [ ] Menu de paramètres complet : son, FOV, remappage réel des touches (Enhanced Input, Player Mappable Keys)
 5. [ ] Système de sauvegarde (détail ci-dessous)
 6. [ ] UI hors du Character (PlayerController/HUD) + despawn des drops au sol après délai
@@ -42,11 +42,11 @@ Refait le 2026-10-07 (ancien découpage par « périodes » abandonné). Détail
 10. [ ] Roue de sorts (clic droit maintenu) + mana généralisé (4 emplacements, recharge ~5s)
 11. [ ] Sort 2 + Sort 3
 12. [ ] Sort 4
-13. [ ] Vue de gestion top-down
-14. [ ] Construction de base (placement, snapping)
+13. [ ] Vue de gestion top-down : mise en pause du jeu à l'entrée. Indissociable de l'item 14, à livrer avec lui
+14. [ ] Construction de base façon city-builder (grille de cases virtuelles, placement, rotation, déplacement d'un bâtiment déjà posé, aperçu vert/rouge selon la validité de la case). Les cases du chemin unique vers le village sont verrouillées non constructibles en permanence (`GDD.md` section 3, pilier B). Indissociable de l'item 13
 15. [ ] Construction ↔ ressources (coût, effets des bâtiments)
-16. [ ] Village : disposition + patrouilles de soldats
-17. [ ] Village : condition de victoire + clôture narrative
+16. [ ] Zone de fin : trigger box le long du chemin existant, accessible une fois un seuil de vagues survécues atteint (valeur à déterminer par playtest), avec indicateur visuel quand la condition est remplie. Remplace l'idée initiale de village jouable + patrouilles (`GDD.md` section 2)
+17. [ ] Condition de victoire + clôture narrative : en entrant dans la zone de fin (item 16), choix binaire (terminer la run / continuer à jouer). Si le joueur termine : cinématique à variantes (petite/moyenne/grande armée, choisie par le nombre de serviteurs au moment du déclenchement) montrant la conquête du village — victoire teintée, le joueur reste l'antagoniste (`GDD.md` section 2)
 
 **Semaine de cours (Bloc 1, S3)** : livrable du CDC + oral de fin de Bloc 1 — position exacte dans la file inconnue pour l'instant (nombre de semaines d'alternance restantes non précisé).
 

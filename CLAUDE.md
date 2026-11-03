@@ -135,7 +135,7 @@ __ExternalActors__/, __ExternalObjects__/   ← voir l'avertissement ci-dessous
 ### Documentation (racine du projet)
 
 - `README.md` : présentation du jeu, 3C, lien vers les Releases GitHub.
-- `GDD.md` : document de conception complet (boucle de jeu, monde/factions, piliers de level design, mécaniques et leurs dépendances, direction artistique). En cours de rédaction depuis le 2026-10-26, avant reprise de tout nouveau développement de mécanique (voir section 12).
+- `GDD.md` : document de conception complet (boucle de jeu, monde/factions, piliers de level design, mécaniques et leurs dépendances, direction artistique). Rédaction terminée (2026-10-26 → 2026-11-03).
 - `documentation-technique.md` : **document vivant** décrivant l'architecture actuelle, organisé **par système** (Interaction, Récolte, Mouvement, Narration, Chaos, Debug...), jamais par semaine. Réécrit en continu au fil des features, aucune section datée, **pas de statement IA** (ça, c'est le rôle des fichiers `Rendus/`, voir ci-dessous). Restructuré en ce sens le 2026-10-01 (ancien découpage « Semaine 1 » archivé).
 - `Rendus/` : un fichier **figé** par rendu noté (ex. `Rendu_Bloc1_S1.md`), jamais remodifié après coup, chacun avec **son propre** statement d'intention IA (écrit par Timéo, jamais par Claude). `Rendu_Bloc1_S1.md` est la version exacte de ce qui a été soumis en semaine 1, avant la restructuration du 2026-10-01.
 - `Documentation_Documents/` : captures (PNG) et `Documentation_Documents/Videos/` (GIF). Ce dossier est exclu de Git LFS pour que les images s'affichent sur GitHub. Référencé depuis `documentation-technique.md` (chemin direct) et depuis `Rendus/*.md` (chemin relatif `../Documentation_Documents/...`, un niveau plus bas).
@@ -421,15 +421,15 @@ Objectif de fond, qui pilote les premiers rangs de la file : la **boucle de jeu 
 
 *Semaine de cours S2 : livrable du CDC, zéro dev gameplay.* Terminé et livré (environnement + Release `V1.0.1`, voir ci-dessus).
 
-**Avant de reprendre quoi que ce soit dans la file ci-dessous** : décision prise le 2026-10-23, une session de définition complète du GDD doit avoir lieu en premier — boucle de jeu et sa progression, monde/factions (pourquoi le village attaque, ce que signifie concrètement le conquérir), piliers de level design, liste des mécaniques et leurs dépendances, direction artistique minimale. Rédaction en cours dans `GDD.md`. **Ne pas proposer l'item 1 ci-dessous ou tout autre nouveau développement de mécanique tant que ce travail n'est pas fait.**
+**GDD terminé** (décision prise le 2026-10-23, rédaction close le 2026-11-03, voir `GDD.md`) : boucle de jeu et sa progression, monde/factions, piliers de level design, mécaniques et leurs dépendances, direction artistique minimale sont désormais tranchés. Le point de passage est levé — la file d'attente ci-dessous reflète déjà les décisions du GDD (items 1, 2, 3, 13, 14, 16, 17 mis à jour le 2026-11-03).
 
 **File d'attente après S2** (ordre de priorité) :
 
 | # | Contenu | Pourquoi ce rang |
 |---|---|---|
-| 1 | Un soldat ennemi simple : se déplace, attaque, meurt, laisse du butin (réutilise les drops) | Complète la boucle « combattre » |
-| 2 | Résurrection : potion + cadavre = serviteur (le cadavre implémente `IInteractable`) | Complète la boucle « ressusciter » |
-| 3 | Serviteur qui récolte la ressource la plus proche | Ferme la boucle de jeu principale — à ce stade le jeu est jouable de bout en bout |
+| 1 | Un soldat ennemi simple : se déplace, attaque, meurt, laisse tomber des os (nouvelle ressource `EResourceType::Bone`, réutilise `AResourceDrop`) | Complète la boucle « combattre » |
+| 2 | Résurrection : recette chaudron (os + potion) → objet posable (inventaire) → serviteur errant dans la zone de base jusqu'à assignation (item 3) | Complète la boucle « ressusciter » — à livrer avec l'item 3 |
+| 3 | Assignation des tâches aux serviteurs (menu deux colonnes : non assignés / catégories de tâche, dont « récolte de champ ») | Ferme la boucle de jeu principale, combiné à l'item 2 — à ce stade le jeu est jouable de bout en bout |
 | 4 | Menu de paramètres complet : son, FOV, et **remappage réel des touches** (Enhanced Input, Player Mappable Keys) | La vraie complexité API (nouvelle pour ce projet, à vérifier dans la doc officielle 5.8) — mieux vaut la caler avec de la marge plutôt que sous pression des 10 jours du chunk immédiat |
 | 5 | Système de sauvegarde (triggers, objets déplacés, ressources, plantations en cours) | Plus on avance, plus il y a d'état accumulé (serviteurs, potions, plantations) à rattraper d'un coup si on attend |
 | 6 | UI hors du Character (PlayerController/HUD) + despawn des drops au sol après délai | Dette technique légère, semaine « respiration » |
@@ -439,11 +439,11 @@ Objectif de fond, qui pilote les premiers rangs de la file : la **boucle de jeu 
 | 10 | Roue de sorts (clic droit maintenu) + mana généralisé (4 emplacements, recharge ~5s) | Généralise le sort unique du chunk immédiat |
 | 11 | Sort 2 + Sort 3 (regroupés si ce sont de simples debuffs, sinon séparés) | |
 | 12 | Sort 4 (dégâts dans le temps / feu, interaction possible avec le Chaos du champignon) | |
-| 13 | Vue de gestion top-down | |
-| 14 | Construction de base (placement, snapping) | |
+| 13 | Vue de gestion top-down (pause à l'entrée) | Indissociable de l'item 14 |
+| 14 | Construction de base façon city-builder (grille, rotation, déplacement, chemin verrouillé non constructible) | Indissociable de l'item 13 |
 | 15 | Construction ↔ ressources (coût, effets des bâtiments) | |
-| 16 | Village : disposition + patrouilles de soldats | Quête optionnelle de fin |
-| 17 | Village : condition de victoire + clôture narrative | |
+| 16 | Zone de fin : trigger box + seuil de vagues survécues (valeur à playtester) | Remplace le village jouable (pas de patrouilles) |
+| 17 | Condition de victoire + clôture narrative (choix binaire, cinématique à variantes) | |
 
 *Semaine de cours S3 : livrable du CDC + oral, fin du Bloc 1 — position exacte dans la file inconnue pour l'instant (nombre de semaines d'alternance restantes non précisé). On s'adapte au fil de l'eau.*
 

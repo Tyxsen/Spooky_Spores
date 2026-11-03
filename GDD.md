@@ -4,7 +4,7 @@ Document de conception complet du jeu : pourquoi chaque mécanique existe, comme
 
 Contrairement à [`documentation-technique.md`](documentation-technique.md), qui décrit le code et les systèmes **tels qu'ils existent**, ce document décrit **l'intention** derrière le jeu — la fiction, le monde, la progression du joueur, et les règles qui doivent trancher une décision de conception sans avoir à improviser à chaque fois.
 
-**Statut** : en cours de rédaction, démarré le 2026-10-26. Point de passage obligatoire avant toute reprise de développement de mécanique (voir [`CLAUDE.md`](CLAUDE.md) section 12).
+**Statut** : rédaction terminée (démarrée le 2026-10-26, close le 2026-11-03). Le point de passage obligatoire défini dans [`CLAUDE.md`](CLAUDE.md) section 12 est donc levé — la file d'attente des mécaniques peut reprendre, après réorganisation (voir `TODO.md`).
 
 **Document complet et autonome** : ce GDD doit pouvoir se lire seul, sans avoir à ouvrir d'autres fichiers pour comprendre le jeu. Le 3C ([`README.md`](README.md)) et l'architecture technique actuelle ([`documentation-technique.md`](documentation-technique.md)) sont donc recopiés ici quand ils sont nécessaires à une section, même si l'information existe déjà ailleurs. Ces deux fichiers restent les sources canoniques de leurs propres domaines : en cas de changement d'une valeur (vitesse, FOV, implémentation...), il faut répercuter la mise à jour dans les documents concernés.
 
@@ -120,9 +120,49 @@ L'espace explorable reste borné à la colline et ses abords immédiats — asse
 
 ## 4. Mécaniques et leurs dépendances
 
-Liste des mécaniques déjà en place (voir `CLAUDE.md` section 7) et à venir (section 12), et comment elles dépendent les unes des autres.
+Liste des mécaniques déjà en place et à venir, et comment elles dépendent les unes des autres. Cette section tranche aussi les deux points laissés ouverts en sections 1 et 2 (lieu du rituel de résurrection, seuil de déblocage de la fin), et corrige une incohérence repérée avec la file d'attente existante.
 
-*(à rédiger)*
+### Déjà en place (détail complet : `CLAUDE.md` section 7 et `documentation-technique.md`)
+
+Interaction et manipulation physique (grab/lancer), récolte de ressources (nœuds → drops), plantation (`AFieldPlot`), chaudron (une recette : ressources → potion), composant de santé générique, mana et premier sort, panneau de contrôles, environnement de base (colline, cabane, clôture délimitant le territoire).
+
+### De la mort du soldat au serviteur assigné
+
+**Incohérence corrigée par rapport à la file d'attente (`TODO.md`, item 2)** : l'idée initiale (« potion + cadavre = serviteur », interaction directe sur le cadavre) ne tient plus depuis que la section 1 fait des os une ressource à paliers de rareté, stockable et convertible — une ressource qu'on stocke ne peut pas aussi être une interaction instantanée. Chaîne retenue :
+
+1. Un soldat ennemi vaincu (file d'attente, item 1) laisse tomber des **os** au sol : une nouvelle entrée dans `EResourceType` (aux côtés de Seed, Wood, Stone), qui réutilise telle quelle l'architecture de récolte déjà en place (`AResourceDrop`) — aucun nouveau système, juste un type de plus.
+2. Au chaudron, une **recette dédiée** transforme des os + une potion en un objet de résurrection. Le palier exact de serviteur obtenu selon la quantité/qualité des os utilisés est un détail d'équilibrage à définir au moment de l'implémentation, pas maintenant.
+3. Le résultat de la recette est un **objet ajouté à l'inventaire du joueur** (comme un œuf de monstre dans Minecraft) — pas un serviteur qui apparaît directement dans le monde.
+4. Le joueur le pose librement, n'importe où, directement depuis le personnage — pas via la grille de construction des bâtiments (vue top-down, voir plus bas) : un serviteur se déplace tout seul une fois posé, une grille rigide n'a pas de sens pour lui.
+5. À la pose, le serviteur apparaît et erre sans tâche dans la zone de la base, jusqu'à être assigné (voir ci-dessous). S'il est posé en dehors de cette zone, il y retourne automatiquement.
+
+**Dépendance technique à prévoir** : la « zone de base » n'existe pas encore comme concept — il faudra un volume qui la délimite (probablement calé sur la clôture `BP_Fences` déjà posée, avec le même type de composant que les triggers narratifs existants, `UBoxComponent`). Ce volume sert à la fois de limite pour les serviteurs errants et de périmètre pour la vue de gestion top-down (voir plus bas).
+
+### Assignation des tâches aux serviteurs
+
+Menu dédié (touche à définir), deux colonnes : à gauche les serviteurs non assignés, à droite une section par catégorie de tâche (« attaque/défense », « récolte de champ », d'autres à ajouter au fil des besoins), chacune listant les serviteurs qui lui sont actuellement affectés. Glisser-déposer un serviteur d'une colonne à l'autre change son affectation.
+
+**Conséquence sur la file d'attente** : l'item 3 (« serviteur qui récolte la ressource la plus proche ») doit être reformulé — le comportement de récolte automatique devient une conséquence de l'assignation à la catégorie « récolte de champ », pas un comportement indépendant sans supervision du joueur. Les items 2 et 3 se recouvrent maintenant largement et devront être réorganisés en un seul bloc de travail une fois le GDD complet.
+
+### Vue de gestion top-down et construction de base
+
+À l'entrée dans cette vue, **le jeu se met en pause** — la gestion de la base (construction, assignation des tâches) ne se fait jamais sous la pression d'une vague en cours.
+
+**Choix de conception — construction façon city-builder (Planet Coaster)** : complète le pilier B de la section 3 (grille de cases, chemin verrouillé en non constructible). Depuis cette vue, le joueur place un bâtiment avec un aperçu de validité (vert/rouge selon la case), peut le faire pivoter, et peut déplacer ou retirer un bâtiment déjà posé. Les items 13 (vue top-down) et 14 (construction de base) de la file d'attente sont donc indissociables : la vue top-down n'a de sens qu'avec ce système de construction, et inversement — à traiter comme un seul bloc.
+
+### Déblocage de la zone de fin
+
+Condition de déblocage : un **nombre de vagues survécues** (valeur exacte non fixée ici, à régler par playtest une fois le rythme des vagues calibré). Le nombre de serviteurs au moment du déclenchement ne conditionne pas ce déblocage, il sert uniquement à choisir la variante de cinématique (petite/moyenne/grande armée, voir section 2) — un seul levier à équilibrer plutôt que deux à combiner.
+
+---
+
+**Résumé des conséquences à reporter dans `TODO.md`** (la file d'attente elle-même n'est pas encore réécrite, ce sera fait une fois le GDD complet, voir `CLAUDE.md` section 12) :
+- Nouvelle ressource `EResourceType::Bone` (os), avec paliers de rareté.
+- Item 2 à réécrire entièrement selon la chaîne ci-dessus (chaudron → objet posable → serviteur errant).
+- Item 3 à fusionner avec l'item 2 et le système d'assignation de tâches.
+- Items 13 et 14 à traiter comme un seul bloc de travail.
+- Nouveau concept technique à prévoir : la zone de base (volume englobant la clôture).
+- Seuil de déblocage de fin (item 17) : valeur à déterminer par playtest, pas par design a priori.
 
 ---
 
@@ -130,4 +170,26 @@ Liste des mécaniques déjà en place (voir `CLAUDE.md` section 7) et à venir (
 
 Ton, ambiance, références. Assez pour trancher si un choix (asset, couleur, son) colle au jeu ou pas, sans y repenser à chaque fois.
 
-*(à rédiger)*
+### Ton général
+
+Pas de référence externe précise à citer ici (contrairement au level design, qui s'appuie sur Totten, section 3) — la direction reste volontairement simple : un jeu **sombre**, cohérent avec le ton nécromancien/abandonné déjà posé par l'éclairage actuel du niveau (Post Process Volume, Exposure Compensation négative, Directional Light faible, voir `documentation-technique.md` section 12). Un choix (asset, couleur, musique) qui alourdit ou édulcore ce ton sombre ne colle pas au jeu.
+
+### Le contraste lumière comme principe récurrent
+
+**Choix de conception** : le contraste déjà en place pour la cabane (lumière intérieure chaude tranchant avec l'extérieur sombre) devient une règle générale, pas un choix local isolé — la lumière sert de signal de sécurité, pas seulement de décor :
+- **Zones sûres / proches de la base** : lumière chaude, contrôlée (feux, lanternes, lumière intérieure).
+- **Zones sauvages / éloignées** : teintes froides, sombres, peu éclairées.
+
+Ça donne une traduction visuelle directe au pilier de level design « le risque vient de l'éloignement » (section 3) — sans texte ni UI, la lumière seule doit déjà faire sentir au joueur qu'il s'éloigne de la sécurité.
+
+### Progression visuelle des ennemis
+
+Au début d'une run, les soldats envoyés par le village sont peu équipés (armure légère ou absente, armement rudimentaire) — cohérent avec des gens ordinaires sans armée organisée (section 2). Au fil des vagues, leur équipement devient progressivement plus complet et plus menaçant. Cette progression visuelle traduit concrètement l'escalade déjà décidée en section 1 (quantité d'abord, puissance ensuite) : le joueur doit pouvoir *voir* la difficulté monter, pas seulement la ressentir dans les chiffres.
+
+### Identité visuelle des serviteurs — point ouvert, non bloquant
+
+Pas encore tranché (squelette, cadavre réanimé, autre forme) — à décider au moment de sourcer les assets, probablement en réutilisant la même logique que la cabane (géométrie simple + assets d'environnement achetés, voir section 3). Pas bloquant pour ce document.
+
+### Son
+
+Direction minimale, à affiner plus tard (en discussion avec un musicien) : ambiance sonore discrète en exploration/gestion, montée de tension (musique et/ou son) pendant les vagues, pour marquer clairement la bascule entre les deux états du jeu.
