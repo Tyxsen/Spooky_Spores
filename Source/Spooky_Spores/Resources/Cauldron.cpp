@@ -21,33 +21,13 @@ void ACauldron::OnInteract_Implementation(AActor* InteractingActor)
 {
 	switch (CurrentState)
 	{
-	case ECauldronState::Idle:
-		{
-			UResourceCounterComponent* Counter = InteractingActor->FindComponentByClass<UResourceCounterComponent>();
-			if (!Counter) return;
-
-			for (const auto& Ingredient : RequiredIngredients)
-			{
-				if (Counter->GetResourceCount(Ingredient.Key) < Ingredient.Value) return;
-			}
-			for (const auto& Ingredient : RequiredIngredients)
-			{
-				Counter->TrySpendResource(Ingredient.Key, Ingredient.Value);
-			}
-
-			CurrentState = ECauldronState::Brewing;
-			BrewStartTime = GetWorld()->GetTimeSeconds();
-			GetWorldTimerManager().SetTimer(BrewTimerHandle, this, &ACauldron::OnBrewComplete, BrewDuration, false);
+		case ECauldronState::Idle:
+			TryStartBrewing(InteractingActor);
 			break;
-		}
 		case ECauldronState::Brewing:
 			break;
 		case ECauldronState::Ready:
-			if (UResourceCounterComponent* Counter = InteractingActor->FindComponentByClass<UResourceCounterComponent>())
-			{
-					Counter->AddResource(OutputPotionType, OutputAmount);
-					CurrentState = ECauldronState::Idle;
-			}
+			CollectPotion(InteractingActor);
 			break;
 	}
 }
@@ -55,6 +35,34 @@ void ACauldron::OnInteract_Implementation(AActor* InteractingActor)
 void ACauldron::OnBrewComplete()
 {
 	CurrentState = ECauldronState::Ready;
+}
+
+void ACauldron::TryStartBrewing(AActor* InteractingActor)
+{
+	UResourceCounterComponent* Counter = InteractingActor->FindComponentByClass<UResourceCounterComponent>();
+	if (!Counter) return;
+
+	for (const auto& Ingredient : RequiredIngredients)
+	{
+		if (Counter->GetResourceCount(Ingredient.Key) < Ingredient.Value) return;
+	}
+	for (const auto& Ingredient : RequiredIngredients)
+	{
+		Counter->TrySpendResource(Ingredient.Key, Ingredient.Value);
+	}
+
+	CurrentState = ECauldronState::Brewing;
+	BrewStartTime = GetWorld()->GetTimeSeconds();
+	GetWorldTimerManager().SetTimer(BrewTimerHandle, this, &ACauldron::OnBrewComplete, BrewDuration, false);
+}
+
+void ACauldron::CollectPotion(AActor* InteractingActor)
+{
+	if (UResourceCounterComponent* Counter = InteractingActor->FindComponentByClass<UResourceCounterComponent>())
+	{
+		Counter->AddResource(OutputPotionType, OutputAmount);
+		CurrentState = ECauldronState::Idle;
+	}
 }
 
 float ACauldron::GetBrewProgress() const
