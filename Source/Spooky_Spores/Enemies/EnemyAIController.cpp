@@ -80,7 +80,16 @@ void AEnemyAIController::TickEngage(float DeltaSeconds)
 
 	if (Distance > Soldier->GetAttackRange())
 	{
-		MoveToActor(CurrentTarget.Get(), Soldier->GetAttackRange() * 0.9f);
+		MoveToLocation(CurrentTarget->GetActorLocation(), Soldier->GetAttackRange() * 0.9f);
+
+		EPathFollowingRequestResult::Type MoveResult = MoveToLocation(CurrentTarget->GetActorLocation(), Soldier->GetAttackRange() * 0.9f);
+		UE_LOG(LogTemp, Warning, TEXT("MoveToActor result: %d"), (int32)MoveResult);
+		
+		/** UE_LOG(LogTemp, Warning, TEXT("Pawn: %s | Target: %s | Distance: %f | AcceptRadius: %f"),
+		*ControlledPawn->GetActorLocation().ToString(),
+		*CurrentTarget->GetActorLocation().ToString(),
+		Distance,
+		Soldier->GetAttackRange() * 0.9f); */
 	}
 	else
 	{
@@ -107,6 +116,8 @@ AActor* AEnemyAIController::FindNearestDestructible() const
 		AActor* Candidate = *It;
 		if (!Candidate->Implements<UDestructible>()) continue;
 
+		UE_LOG(LogTemp, Warning, TEXT("Destructible candidate found: %s"), *Candidate->GetName());
+
 		UHealthComponent* Health = IDestructible::Execute_GetHealthComponent(Candidate);
 		if (!Health || Health->IsDead()) continue;
 
@@ -117,7 +128,7 @@ AActor* AEnemyAIController::FindNearestDestructible() const
 			BestTarget = Candidate;
 		}
 	}
-
+	
 	return BestTarget;
 }
 
