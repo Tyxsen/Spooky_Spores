@@ -14,7 +14,8 @@ enum class EResourceType : uint8
 	Wheat,
 	Wood,
 	Stone,
-	Potion
+	Potion,
+	Bone
 };
 
 USTRUCT(BlueprintType)

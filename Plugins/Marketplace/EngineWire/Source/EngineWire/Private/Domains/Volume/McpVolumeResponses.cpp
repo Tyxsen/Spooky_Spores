@@ -1,0 +1,31 @@
+// Copyright (c) 2026 ChiR24. All rights reserved.
+
+#include "Domains/Volume/McpVolumeResponses.h"
+
+#include "Dom/JsonObject.h"
+#include "GameFramework/Actor.h"
+#include "Foundation/HandlerUtils/McpHandlerUtils.h"
+
+namespace VolumeHelpers
+{
+TSharedPtr<FJsonObject> CreateVectorObject(const FVector& Value)
+{
+    TSharedPtr<FJsonObject> Json = McpHandlerUtils::CreateResultObject();
+    Json->SetNumberField(TEXT("x"), Value.X);
+    Json->SetNumberField(TEXT("y"), Value.Y);
+    Json->SetNumberField(TEXT("z"), Value.Z);
+    return Json;
+}
+
+TSharedPtr<FJsonObject> CreateVolumeResponse(AActor* Volume, const FString& VolumeClass)
+{
+    TSharedPtr<FJsonObject> ResponseJson = McpHandlerUtils::CreateResultObject();
+    ResponseJson->SetStringField(TEXT("volumeName"), Volume ? Volume->GetActorLabel() : TEXT(""));
+    ResponseJson->SetStringField(TEXT("volumeClass"), VolumeClass);
+    if (Volume)
+    {
+        McpHandlerUtils::AddVerification(ResponseJson, Volume);
+    }
+    return ResponseJson;
+}
+}

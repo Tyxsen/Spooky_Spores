@@ -33,6 +33,8 @@ public:
 
 private:
 	void OnBrewComplete();
+	void TryStartBrewing(AActor* InteractingActor);
+	void CollectPotion(AActor* InteractingActor);
 
 // -----------PROPERTIES-----------
 protected:

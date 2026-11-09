@@ -1,0 +1,19 @@
+// Copyright (c) 2026 ChiR24. All rights reserved.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Foundation/HandlerUtils/McpHandlerUtils.h"
+
+class AActor;
+class FMcpBridgeWebSocket;
+class UEngineWireSubsystem;
+class UWorld;
+
+namespace VolumeHelpers
+{
+using McpHandlerUtils::GetEditorWorld;
+AActor* FindVolumeByName(UWorld* World, const FString& VolumeName);
+AActor* FindActorByPathOrName(UWorld* World, const FString& ActorPath);
+bool ResolveEditorWorld(UEngineWireSubsystem* Subsystem, const FString& RequestId, TSharedPtr<FMcpBridgeWebSocket> Socket, UWorld*& OutWorld);
+}
