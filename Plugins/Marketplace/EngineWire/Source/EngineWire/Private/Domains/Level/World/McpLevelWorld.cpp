@@ -1,0 +1,29 @@
+// Copyright (c) 2026 ChiR24. All rights reserved.
+
+#include "Domains/Level/World/McpLevelWorldAccess.h"
+
+#include "Engine/LevelStreaming.h"
+#include "Engine/World.h"
+
+namespace McpLevelHandlers {
+TArray<ULevel*> GetAllLevelsFromWorld(UWorld* World) {
+  TArray<ULevel*> Levels;
+  if (!World) {
+    return Levels;
+  }
+
+  if (World->PersistentLevel) {
+    Levels.Add(World->PersistentLevel);
+  }
+
+  for (const ULevelStreaming* StreamingLevel : World->GetStreamingLevels()) {
+    if (StreamingLevel) {
+      ULevel* LoadedLevel = StreamingLevel->GetLoadedLevel();
+      if (LoadedLevel) {
+        Levels.Add(LoadedLevel);
+      }
+    }
+  }
+  return Levels;
+}
+} // namespace McpLevelHandlers

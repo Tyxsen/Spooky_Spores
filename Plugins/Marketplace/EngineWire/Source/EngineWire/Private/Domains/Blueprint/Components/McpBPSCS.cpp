@@ -1,0 +1,36 @@
+// Copyright (c) 2026 ChiR24. All rights reserved.
+
+#include "Domains/Blueprint/McpBPActionContext.h"
+
+bool UEngineWireSubsystem::HandleSCSAction(
+    const FString &RequestId, const FString &Action,
+    const TSharedPtr<FJsonObject> &Payload,
+    TSharedPtr<FMcpBridgeWebSocket> RequestingSocket) {
+  if (!Payload.IsValid()) {
+    SendAutomationResponse(RequestingSocket, RequestId, false,
+                           TEXT("SCS operations require valid payload"),
+                           nullptr, TEXT("INVALID_PAYLOAD"));
+    return true;
+  }
+
+  McpBlueprintHandlers::FBlueprintActionContext Context =
+      McpBlueprintHandlers::BuildScsActionContext(
+          *this, RequestId, Action, Payload, RequestingSocket);
+  using FScsRoute = bool (*)(const McpBlueprintHandlers::FBlueprintActionContext &);
+  static const FScsRoute Routes[] = {
+      McpBlueprintHandlers::HandleScsAddComponent,
+      McpBlueprintHandlers::HandleScsGet,
+  };
+
+  for (FScsRoute Route : Routes) {
+    if (Route(Context)) {
+      return true;
+    }
+  }
+
+  SendAutomationError(
+      RequestingSocket, RequestId,
+      FString::Printf(TEXT("Unknown blueprint action: %s"), *Context.CleanAction),
+      TEXT("UNKNOWN_ACTION"));
+  return true;
+}
