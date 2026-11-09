@@ -1,6 +1,6 @@
 #include "Enemies/EnemyAIController.h"
-#include "EnemyPathSpline.h"
-#include "EnemySoldier.h"
+#include "Enemies/EnemyPathSpline.h"
+#include "Enemies/EnemySoldier.h"
 #include "EngineUtils.h"
 #include "Components/SplineComponent.h"
 #include "Components/PrimitiveComponent.h"
