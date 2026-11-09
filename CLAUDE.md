@@ -413,7 +413,12 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 - **Composant de santé + frappe des ressources + premier sort** : terminé et testé (non-régression comprise). `UHealthComponent` générique ajouté en composition optionnelle sur `BP_Harvestable_Wood`/`BP_Harvestable_Stone` ; `UManaComponent` + `USpellCastingComponent` gèrent un premier sort (clic gauche) avec coup différé et cadencé par timer. **Fusionné dans `dev`** en Squash (confirmé le 2026-10-11). Documenté dans `documentation-technique.md`. Branche `feature/health-and-combat` supprimée.
 - **Environnement du joueur (colline, cabane, clôture, forêt)** : terminé et testé. Niveau `Lvl_Principal` (Landscape sculpté en colline, cabane avec sol/toit/fenêtre/lumière intérieure, clôture, chaudron, champs, rocher de démo, champignons, ressources dispersées via Foliage Mode) remplaçant `Lvl_FirstPerson` comme carte par défaut du projet. **Fusionné dans `dev`** en Squash (confirmé le 2026-10-23). Documenté dans `documentation-technique.md`. Publié en Release GitHub (`V1.0.1`). Branche `feature/environment-blockout` supprimée.
 - **Dette connue laissée par cette feature** : bug de logique inversée dans `AStoryTrigger::OnBoxOverlap` (`bTriggerOnce`/`bHasTriggered`, voir section 11), debug `DrawDebugLine` de `UInteractionComponent` commenté en dur (pas un interrupteur), dossier `Content/RockEnv_Pack/Meshes/Small_Rocks/` gardant 7 meshes au lieu des 3 réellement utilisés. À vérifier si toujours d'actualité.
-- **Soldat ennemi simple (file d'attente, item 1)** : terminé et testé en PIE sur `feature/enemy-soldier` (suivi de spline, détection/approche du destructible le plus proche, attaque, mort, drop d'os via `AResourceDrop`). Documenté dans `documentation-technique.md` section 13. **Pas encore fusionné dans `dev`.** Dette laissée : `AEnemySoldier::PathSplineActor` est `EditInstanceOnly`, assignable seulement sur une instance déjà placée dans le niveau — un futur spawner de vagues devra l'assigner par code (`SetPathSplineActor`, pas encore écrite, voir `TODO.md`).
+- **Soldat ennemi simple (file d'attente, item 1)** : terminé et testé en PIE sur `feature/enemy-soldier` (suivi de spline, détection/approche du destructible le plus proche, attaque, mort, drop d'os via `AResourceDrop`). Documenté dans `documentation-technique.md` section 13. **Fusionné dans `dev`** (PR #7, confirmé le 2026-11-09). Dette laissée : `AEnemySoldier::PathSplineActor` est `EditInstanceOnly`, assignable seulement sur une instance déjà placée dans le niveau — un futur spawner de vagues devra l'assigner par code, **en spawn différé** car `AEnemyAIController::OnPossess` lit la spline pendant `SpawnActor` (voir `TODO.md`, item 3b). Includes courts à corriger dans `EnemyAIController.cpp`.
+- **Résurrection (item 2)** : décidé le 2026-11-09 — l'objet de résurrection est stocké provisoirement comme ressource comptée dans `UResourceCounterComponent` (pas d'inventaire avant l'item 7). L'accès à ce stockage doit rester isolé à un seul endroit du code de pose, pour que le passage à l'inventaire soit local. Items 2 et 3 découpés en sous-étapes fusionnables séparément (voir `TODO.md`).
+
+### Rythme de travail (depuis le 2026-11-09)
+
+**Plus de découpage par semaines.** On avance à notre rythme dans la file d'attente ci-dessous. Timéo signale lui-même chaque deadline (rendu, oral, CDC) quand elle se présente ; c'est seulement à ce moment qu'on recale la file. Ne pas raisonner en « semaine N » ni supposer une échéance non annoncée. Le planning historique ci-dessous reste valable pour l'**ordre** de la file, pas pour ses dates.
 
 ### Planning du Bloc 1
 
@@ -434,9 +439,10 @@ Objectif de fond, qui pilote les premiers rangs de la file : la **boucle de jeu 
 
 | # | Contenu | Pourquoi ce rang |
 |---|---|---|
-| 1 | Un soldat ennemi simple : se déplace, attaque, meurt, laisse tomber des os (nouvelle ressource `EResourceType::Bone`, réutilise `AResourceDrop`) | Complète la boucle « combattre » |
+| 1 | ~~Un soldat ennemi simple : se déplace, attaque, meurt, laisse tomber des os (nouvelle ressource `EResourceType::Bone`, réutilise `AResourceDrop`)~~ — fusionné | Complète la boucle « combattre » |
 | 2 | Résurrection : recette chaudron (os + potion) → objet posable (inventaire) → serviteur errant dans la zone de base jusqu'à assignation (item 3) | Complète la boucle « ressusciter » — à livrer avec l'item 3 |
 | 3 | Assignation des tâches aux serviteurs (menu deux colonnes : non assignés / catégories de tâche, dont « récolte de champ ») | Ferme la boucle de jeu principale, combiné à l'item 2 — à ce stade le jeu est jouable de bout en bout |
+| 3b | Spawner de vagues d'ennemis (ajouté le 2026-11-09 : manquait, prérequis de l'item 16 et du rôle « attaque/défense ») | Sans lui, les soldats ne sont que placés à la main |
 | 4 | Menu de paramètres complet : son, FOV, et **remappage réel des touches** (Enhanced Input, Player Mappable Keys) | La vraie complexité API (nouvelle pour ce projet, à vérifier dans la doc officielle 5.8) — mieux vaut la caler avec de la marge plutôt que sous pression des 10 jours du chunk immédiat |
 | 5 | Système de sauvegarde (triggers, objets déplacés, ressources, plantations en cours) | Plus on avance, plus il y a d'état accumulé (serviteurs, potions, plantations) à rattraper d'un coup si on attend |
 | 6 | UI hors du Character (PlayerController/HUD) + despawn des drops au sol après délai | Dette technique légère, semaine « respiration » |
@@ -452,11 +458,9 @@ Objectif de fond, qui pilote les premiers rangs de la file : la **boucle de jeu 
 | 16 | Zone de fin : trigger box + seuil de vagues survécues (valeur à playtester) | Remplace le village jouable (pas de patrouilles) |
 | 17 | Condition de victoire + clôture narrative (choix binaire, cinématique à variantes) | |
 
-*Semaine de cours S3 : livrable du CDC + oral, fin du Bloc 1 — position exacte dans la file inconnue pour l'instant (nombre de semaines d'alternance restantes non précisé). On s'adapte au fil de l'eau.*
-
 **Règles du planning :**
-- Les semaines de cours sont réservées au CDC. Quand un CDC arrive, recaler le planning dessus.
-- Une mécanique par semaine d'alternance, livrée entière (branche fusionnée dans `dev`). L'utilisateur n'a pas de volume horaire fixe : il finit la tâche en cours, puis prend de l'avance sur la suivante s'il a du temps, **seulement après avoir fusionné** la précédente.
+- Quand Timéo annonce une deadline (CDC, rendu, oral), recaler la file dessus.
+- Une mécanique par tâche, livrée entière (branche fusionnée dans `dev`). Pas de volume horaire fixe : on finit la tâche en cours, puis on passe à la suivante **seulement après avoir fusionné** la précédente.
 - Quand une tâche déborde, **on coupe ou on repousse en fin de file**, on ne décale pas tout le planning.
 - Les tâches d'IA (ennemi, serviteur) et la conquête du village sont les plus optimistes : viser le strict minimum, premiers candidats à la coupe si le temps manque.
 - Rien n'est pré-étiqueté « pour le Bloc 2 » : toute la file est visée pour le Bloc 1. On ne reverra ce principe que si le Bloc 2 démarre avant la fin de la file.

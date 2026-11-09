@@ -6,8 +6,9 @@
 - [x] Composant de santé + frapper les arbres et pierres + premier sort avec mana — terminé et testé (non-régression comprise), sur `feature/health-and-combat`, prêt à fusionner dans `dev`
 - [x] Semaine de cours S2 : environnement du joueur (colline, cabane) livré, Release `V1.0.1` — fusionné dans `dev`
 - [x] GDD complet (`GDD.md`, 5 sections) — rédigé du 2026-10-26 au 2026-11-03. La file d'attente ci-dessous a été réorganisée en conséquence (items 1, 2, 3, 13, 14, 16, 17 mis à jour). Le point de passage obligatoire (`CLAUDE.md` section 12) est levé.
-- [x] Item 1 (soldat ennemi simple) sur `feature/enemy-soldier` : code terminé et testé en PIE (suivi de spline, détection/approche du destructible le plus proche, attaque, mort, drop d'os via `AResourceDrop`). Pas encore fusionné dans `dev`.
-- [ ] Ajouter `AEnemySoldier::SetPathSplineActor(AEnemyPathSpline*)` : `PathSplineActor` est `EditInstanceOnly` (assignable seulement sur une instance déjà placée dans le niveau), donc un ennemi spawné dynamiquement par un futur spawner de vagues n'a aucun moyen de recevoir cette référence par l'éditeur — le spawner devra l'appeler juste après `SpawnActor`, sur le principe de `AResourceDrop::InitializeDrop`
+- [x] Item 1 (soldat ennemi simple) : terminé, testé en PIE (suivi de spline, détection/approche du destructible le plus proche, attaque, mort, drop d'os via `AResourceDrop`), fusionné dans `dev` (PR #7)
+- [ ] Corriger les includes courts de `Enemies/EnemyAIController.cpp` : `"EnemyPathSpline.h"` → `"Enemies/EnemyPathSpline.h"`, `"EnemySoldier.h"` → `"Enemies/EnemySoldier.h"` (convention `CLAUDE.md` section 6)
+- [ ] Item 2, étape 1 : recette chaudron os + potion → objet de résurrection (nom à choisir), stocké provisoirement comme ressource comptée (voir item 2 ci-dessous)
 
 ## Divers à régler
  
@@ -15,9 +16,9 @@
 - [ ] Passer Unreal en 5.8.3 sur l'autre ordinateur
 - [x] Supprimer la branche `feature/plantation` sur `origin` (déjà fusionnée dans `dev`)
 
-## Planning du Bloc 1
+## Planning
 
-Refait le 2026-10-07 (ancien découpage par « périodes » abandonné). Détail du raisonnement dans `CLAUDE.md` section 12. Règles : une mécanique par tâche, livrée entière et fusionnée dans `dev` ; les semaines de cours sont réservées au CDC ; si une tâche déborde, on coupe ou on repousse en fin de file ; **tout est visé pour le Bloc 1**, pas de report présumé vers le Bloc 2.
+Depuis le 2026-11-09 : **plus de découpage par semaines**. On avance à notre rythme dans la file ci-dessous ; Timéo signale lui-même chaque deadline (rendu, oral) quand elle se présente, et on recale la file à ce moment-là. Règles conservées : une mécanique par tâche, livrée entière et fusionnée dans `dev` ; si une tâche déborde, on coupe ou on repousse en fin de file. Détail dans `CLAUDE.md` section 12.
 
 **Déjà fait**
 - [x] Sprint et endurance (valeurs du 3C)
@@ -31,9 +32,16 @@ Refait le 2026-10-07 (ancien découpage par « périodes » abandonné). Détail
 **Semaine de cours (Bloc 1, S2)** : livrable du CDC
 
 **File d'attente après S2, dans l'ordre**
-1. [ ] Un soldat ennemi simple : se déplace, attaque, meurt, laisse tomber des os au sol (nouvelle ressource `EResourceType::Bone`, paliers de rareté selon la force de l'ennemi — réutilise l'architecture `AResourceDrop`)
-2. [ ] Résurrection : nouvelle recette au chaudron (os + potion) → objet posable ajouté à l'inventaire (comme un œuf de monstre) → posé librement depuis le personnage, n'importe où → serviteur qui apparaît et erre sans tâche dans la zone de la base jusqu'à assignation (item 3) ; revient automatiquement dans la zone s'il est posé en dehors. Dépend d'un nouveau concept technique : la « zone de base » (volume délimité, probablement calé sur `BP_Fences`). À livrer avec l'item 3 comme un seul bloc
+1. [x] Un soldat ennemi simple : se déplace, attaque, meurt, laisse tomber des os au sol (nouvelle ressource `EResourceType::Bone`, paliers de rareté selon la force de l'ennemi — réutilise l'architecture `AResourceDrop`) — fusionné dans `dev` (PR #7)
+2. [ ] Résurrection : nouvelle recette au chaudron (os + potion) → objet posable (comme un œuf de monstre) → posé librement depuis le personnage, n'importe où → serviteur qui apparaît et erre sans tâche dans la zone de la base jusqu'à assignation (item 3) ; revient automatiquement dans la zone s'il est posé en dehors. Dépend d'un nouveau concept technique : la « zone de base » (volume délimité, probablement calé sur `BP_Fences`).
+   **Stockage provisoire (décidé le 2026-11-09)** : en attendant le vrai inventaire (item 7), l'objet de résurrection est une ressource comptée dans `UResourceCounterComponent`. Tout accès à ce stockage (« en ai-je un ? », « en consommer un ») doit être isolé à **un seul endroit** du code de pose, pour que le passage à l'inventaire ne touche que cet endroit.
+   Livré en branches successives, chacune testable et fusionnable seule :
+   - [ ] 2.1 Recette os + potion → objet de résurrection (réutilise le chaudron)
+   - [ ] 2.2 Pose de l'objet → apparition du serviteur + zone de base + errance dans la zone (retour automatique si posé hors zone)
 3. [ ] Assignation des tâches aux serviteurs : menu dédié (touche à définir), deux colonnes — serviteurs non assignés à gauche, catégories de tâche à droite (« attaque/défense », « récolte de champ »...). La récolte automatique devient une conséquence de l'assignation à « récolte de champ », pas un comportement indépendant. Ferme la boucle de jeu principale, combiné à l'item 2
+   - [ ] 3.1 Menu d'assignation (deux colonnes, sans comportement derrière au début)
+   - [ ] 3.2 Comportement « récolte de champ » (le serviteur interagit avec `AFieldPlot`)
+3b. [ ] Spawner de vagues d'ennemis (manquait dans la file, prérequis de l'item 16 et du rôle « attaque/défense »). Inclut `AEnemySoldier::SetPathSplineActor(AEnemyPathSpline*)` : `PathSplineActor` est `EditInstanceOnly`, donc un soldat spawné par code doit recevoir sa spline autrement. **Piège** : `AEnemyAIController::OnPossess` lit la spline au moment de la possession, et avec `AutoPossessAI` la possession a lieu *pendant* `SpawnActor` — un setter appelé après `SpawnActor` arriverait trop tard. Utiliser `SpawnActorDeferred` → setter → `FinishSpawning` (même principe que `AResourceDrop::InitializeDrop`), ou faire lire la spline plus tard par le contrôleur
 4. [ ] Menu de paramètres complet : son, FOV, remappage réel des touches (Enhanced Input, Player Mappable Keys)
 5. [ ] Système de sauvegarde (détail ci-dessous)
 6. [ ] UI hors du Character (PlayerController/HUD) + despawn des drops au sol après délai
@@ -48,8 +56,6 @@ Refait le 2026-10-07 (ancien découpage par « périodes » abandonné). Détail
 15. [ ] Construction ↔ ressources (coût, effets des bâtiments)
 16. [ ] Zone de fin : trigger box le long du chemin existant, accessible une fois un seuil de vagues survécues atteint (valeur à déterminer par playtest), avec indicateur visuel quand la condition est remplie. Remplace l'idée initiale de village jouable + patrouilles (`GDD.md` section 2)
 17. [ ] Condition de victoire + clôture narrative : en entrant dans la zone de fin (item 16), choix binaire (terminer la run / continuer à jouer). Si le joueur termine : cinématique à variantes (petite/moyenne/grande armée, choisie par le nombre de serviteurs au moment du déclenchement) montrant la conquête du village — victoire teintée, le joueur reste l'antagoniste (`GDD.md` section 2)
-
-**Semaine de cours (Bloc 1, S3)** : livrable du CDC + oral de fin de Bloc 1 — position exacte dans la file inconnue pour l'instant (nombre de semaines d'alternance restantes non précisé).
 
 À chaque étape significative : tag et Release GitHub (`v0.2`, `v0.3`...).
  
