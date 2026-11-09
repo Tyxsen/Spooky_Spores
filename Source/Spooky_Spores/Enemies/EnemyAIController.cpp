@@ -3,6 +3,8 @@
 #include "EnemySoldier.h"
 #include "EngineUtils.h"
 #include "Components/SplineComponent.h"
+#include "Components/PrimitiveComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Enemies/Destructible.h"
 #include "Health/HealthComponent.h"
 
@@ -16,10 +18,9 @@ void AEnemyAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
-	for (TActorIterator<AEnemyPathSpline> Spline(GetWorld()); Spline; ++Spline)
+	if (AEnemySoldier* Soldier = Cast<AEnemySoldier>(InPawn))
 	{
-		PathSplineActor = *Spline;
-		break;
+		PathSplineActor = Soldier->GetPathSplineActor();
 	}
 
 	DistanceAlongSpline = 0.0f;
@@ -76,25 +77,29 @@ void AEnemyAIController::TickEngage(float DeltaSeconds)
 	AEnemySoldier* Soldier = Cast<AEnemySoldier>(ControlledPawn);
 	if (!ControlledPawn || !Soldier) return;
 
-	const float Distance = FVector::Dist(ControlledPawn->GetActorLocation(), CurrentTarget->GetActorLocation());
+	const FVector TargetLocation = CurrentTarget->GetActorLocation();
+
+	FVector ClosestPoint = TargetLocation;
+	if (UPrimitiveComponent* TargetCollision = Cast<UPrimitiveComponent>(CurrentTarget->GetRootComponent()))
+	{
+		FVector CollisionPoint;
+		if (TargetCollision->GetClosestPointOnCollision(ControlledPawn->GetActorLocation(), CollisionPoint) >= 0.0f)
+			ClosestPoint = CollisionPoint;
+	}
+
+	// Measured in 2D (ignoring height), consistent with how the player's own movement is driven.
+	float Distance = (ControlledPawn->GetActorLocation() - ClosestPoint).Size2D();
+
+	const float SoldierRadius = Soldier->GetCapsuleComponent()->GetScaledCapsuleRadius();
+	Distance -= SoldierRadius;
 
 	if (Distance > Soldier->GetAttackRange())
 	{
-		MoveToLocation(CurrentTarget->GetActorLocation(), Soldier->GetAttackRange() * 0.9f);
-
-		EPathFollowingRequestResult::Type MoveResult = MoveToLocation(CurrentTarget->GetActorLocation(), Soldier->GetAttackRange() * 0.9f);
-		UE_LOG(LogTemp, Warning, TEXT("MoveToActor result: %d"), (int32)MoveResult);
-		
-		/** UE_LOG(LogTemp, Warning, TEXT("Pawn: %s | Target: %s | Distance: %f | AcceptRadius: %f"),
-		*ControlledPawn->GetActorLocation().ToString(),
-		*CurrentTarget->GetActorLocation().ToString(),
-		Distance,
-		Soldier->GetAttackRange() * 0.9f); */
+		const FVector Direction = (TargetLocation - ControlledPawn->GetActorLocation()).GetSafeNormal();
+		ControlledPawn->AddMovementInput(Direction);
 	}
 	else
 	{
-		StopMovement();
-
 		if (!GetWorldTimerManager().IsTimerActive(AttackTimerHandle))
 		{
 			GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &AEnemyAIController::HandleAttackTimer, Soldier->GetAttackInterval(), true);
@@ -115,8 +120,6 @@ AActor* AEnemyAIController::FindNearestDestructible() const
 	{
 		AActor* Candidate = *It;
 		if (!Candidate->Implements<UDestructible>()) continue;
-
-		UE_LOG(LogTemp, Warning, TEXT("Destructible candidate found: %s"), *Candidate->GetName());
 
 		UHealthComponent* Health = IDestructible::Execute_GetHealthComponent(Candidate);
 		if (!Health || Health->IsDead()) continue;

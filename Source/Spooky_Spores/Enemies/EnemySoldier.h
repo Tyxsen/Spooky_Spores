@@ -8,6 +8,7 @@
 #include "EnemySoldier.generated.h"
 
 class UHealthComponent;
+class AEnemyPathSpline;
 
 UCLASS()
 class SPOOKY_SPORES_API AEnemySoldier : public ACharacter
@@ -26,6 +27,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Combat")
 	float GetAttackInterval() const;
 
+	UFUNCTION(BlueprintPure, Category = "Movement")
+	AEnemyPathSpline* GetPathSplineActor() const;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -42,7 +46,7 @@ private:
 	float AttackDamage = 10.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Combat")
-	float AttackRange = 150.0f;
+	float AttackRange = 100.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Combat")
 	float AttackInterval = 1.5f;
@@ -52,4 +56,7 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "Loot")
 	float DropSpawnRadius = 30.0f;
+
+	UPROPERTY(EditInstanceOnly, Category = "Movement")
+	TObjectPtr<AEnemyPathSpline> PathSplineActor;
 };

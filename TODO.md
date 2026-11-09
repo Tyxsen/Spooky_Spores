@@ -6,7 +6,8 @@
 - [x] Composant de santé + frapper les arbres et pierres + premier sort avec mana — terminé et testé (non-régression comprise), sur `feature/health-and-combat`, prêt à fusionner dans `dev`
 - [x] Semaine de cours S2 : environnement du joueur (colline, cabane) livré, Release `V1.0.1` — fusionné dans `dev`
 - [x] GDD complet (`GDD.md`, 5 sections) — rédigé du 2026-10-26 au 2026-11-03. La file d'attente ci-dessous a été réorganisée en conséquence (items 1, 2, 3, 13, 14, 16, 17 mis à jour). Le point de passage obligatoire (`CLAUDE.md` section 12) est levé.
-- [ ] Item 1 (soldat ennemi simple) en cours sur `feature/enemy-soldier` : les 4 classes (`IDestructible`, `AEnemySoldier`, `AEnemyAIController`, `AEnemyPathSpline`) sont écrites, pas encore testées en PIE. Reste à faire dans l'éditeur : placer la spline le long du chemin, un NavMesh Bounds Volume sur la zone de la base, un `BP_EnemySoldier` au départ de la spline, et faire implémenter `IDestructible` à un acteur de test (ex. `BP_Rock` avec `UHealthComponent`) pour avoir une cible
+- [x] Item 1 (soldat ennemi simple) sur `feature/enemy-soldier` : code terminé et testé en PIE (suivi de spline, détection/approche du destructible le plus proche, attaque, mort, drop d'os via `AResourceDrop`). Pas encore fusionné dans `dev`.
+- [ ] Ajouter `AEnemySoldier::SetPathSplineActor(AEnemyPathSpline*)` : `PathSplineActor` est `EditInstanceOnly` (assignable seulement sur une instance déjà placée dans le niveau), donc un ennemi spawné dynamiquement par un futur spawner de vagues n'a aucun moyen de recevoir cette référence par l'éditeur — le spawner devra l'appeler juste après `SpawnActor`, sur le principe de `AResourceDrop::InitializeDrop`
 
 ## Divers à régler
  

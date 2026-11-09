@@ -285,6 +285,27 @@ Le terrain est un unique **Landscape** sculpté en colline, plutôt qu'un sol pl
 
 ---
 
-## 13. Limitations connues et dette technique
+## 13. Ennemi — soldat, poursuite et combat
+
+`Enemies/` : `IDestructible` (interface — un ennemi ou une ressource expose son `UHealthComponent`, pour être repérable comme cible), `AEnemySoldier` (Character), `AEnemyAIController`, `AEnemyPathSpline` (wrapper autour d'un `USplineComponent`).
+
+Machine à deux états dans `AEnemyAIController` (`EEnemyState::Transit` / `Engage`), pilotée par son propre `Tick`.
+
+- **`Transit`** : suit `AEnemyPathSpline` en avançant un accumulateur `DistanceAlongSpline` (vitesse `MoveSpeed`), avec anticipation (`LookAheadDistance`) pour viser un point légèrement en avant sur la courbe plutôt que la position exacte — évite les à-coups de direction. Bascule en `Engage` dès que la distance accumulée dépasse la longueur de la spline.
+- **`Engage`** : cherche le `IDestructible` vivant le plus proche (`FindNearestDestructible`, parcours de tous les acteurs du monde filtrés par l'interface, dans un rayon `TargetSearchRadius`), avance vers lui tant que la distance mesurée dépasse `AttackRange`, sinon s'arrête et attaque à intervalle régulier (`AttackInterval`).
+
+**Choix technique — `AddMovementInput`, pas `AIController::MoveToLocation`, pour les deux phases** : la première version d'`Engage` utilisait `MoveToLocation`/`PathFollowingComponent` (navigation NavMesh). Plusieurs comportements internes du moteur rendaient le réglage fragile (zone d'exclusion du NavMesh autour des obstacles, critère d'arrivée mesuré en 2D uniquement côté moteur, rayon de capsule compté deux fois par deux mécanismes différents — voir les pièges correspondants section 11 du `CLAUDE.md`) et cassaient l'Animation Blueprint : un personnage déplacé par `PathFollowingComponent` ne joue pas forcément son cycle de marche, selon la façon dont l'Anim BP lit la vitesse. Remplacé par un simple `AddMovementInput` vers la direction de la cible à chaque tick — exactement comme `Transit` : plus de NavMesh à gérer pour cet ennemi, animation cohérente entre les deux phases, logique plus simple (limite assumée : il marche en ligne droite vers sa cible, sans contourner d'obstacles sur le chemin).
+
+**Mesure de distance pour l'attaque** : `UPrimitiveComponent::GetClosestPointOnCollision` donne le point le plus proche sur la **surface réelle** de la cible (pas son pivot), dont on soustrait le rayon de la capsule du soldat (`GetScaledCapsuleRadius()`) pour obtenir une distance bord-à-bord cohérente avec `AttackRange`. Mesurée en 2D (`FVector::Size2D()`, Z ignoré), par cohérence avec la façon dont le moteur évalue lui-même l'arrivée à destination ailleurs dans Unreal.
+
+**Référence à la spline, pas de recherche automatique** : `AEnemySoldier::PathSplineActor` (`EditInstanceOnly`) est assignée à la main sur l'instance placée dans le niveau, lue par le contrôleur dans `OnPossess`. Remplace une première version qui cherchait « le premier `AEnemyPathSpline` trouvé dans le monde » (`TActorIterator`) — fragile dès qu'il y a plusieurs splines dans le niveau, ou qu'une ancienne traîne encore dedans. Limite connue : ne fonctionne que pour un ennemi placé à la main ; un futur spawner de vagues devra assigner cette référence par code juste après `SpawnActor` (voir `TODO.md`).
+
+**Rotation** : `AEnemySoldier` désactive `bUseControllerRotationYaw` et active `GetCharacterMovement()->bOrientRotationToMovement`, pour que le personnage tourne vers sa direction de déplacement réelle plutôt que vers la rotation du Controller (pensée par défaut pour un joueur qui regarde à la souris) — s'applique uniformément aux deux phases puisque les deux passent par `AddMovementInput`.
+
+**Mort et butin** : `UHealthComponent::OnDeath` déclenche `HandleDeath`, qui réutilise `AResourceDrop::SpawnDrops` (même mécanisme que la récolte de ressources et les champs, sections 4 et 6) pour faire tomber des os (`EResourceType::Bone`).
+
+---
+
+## 14. Limitations connues et dette technique
 
 Centralisées dans [`TODO.md`](TODO.md), pour éviter une double liste qui diverge avec le temps.

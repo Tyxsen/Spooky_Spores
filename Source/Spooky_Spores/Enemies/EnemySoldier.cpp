@@ -1,4 +1,5 @@
 #include "Enemies/EnemySoldier.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Health/HealthComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Resources/ResourceDrop.h"
@@ -10,6 +11,10 @@ AEnemySoldier::AEnemySoldier()
 	PrimaryActorTick.bCanEverTick = false;
 
 	HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("HealthComponent"));
+
+	// Face movement direction instead of control rotation, so it turns to match AddMovementInput (spline or target chase).
+	bUseControllerRotationYaw = false;
+	GetCharacterMovement()->bOrientRotationToMovement = true;
 }
 
 // Called when the game starts or when spawned
@@ -35,6 +40,11 @@ float AEnemySoldier::GetAttackRange() const
 float AEnemySoldier::GetAttackInterval() const
 {
 	return AttackInterval;
+}
+
+AEnemyPathSpline* AEnemySoldier::GetPathSplineActor() const
+{
+	return PathSplineActor;
 }
 
 void AEnemySoldier::HandleDeath()

@@ -16,7 +16,7 @@ Le fonctionnement établi depuis le début du projet :
 3. Claude relit, signale les erreurs en expliquant leur cause, et Timéo corrige.
 
 **Règles qui en découlent :**
-- **Ne modifie jamais les fichiers source (C++, Blueprints, config) sans demande explicite.** Par défaut, tu guides, tu ne codes pas à la place de l'utilisateur.
+- **Par défaut, tu guides, tu n'écris pas le code à la place de l'utilisateur.** Mais quand Timéo te demande explicitement de modifier directement les fichiers source (C++, Blueprints, config) — typiquement pour aller plus vite sur une implémentation déjà discutée et actée ensemble —, tu peux le faire. L'explicite s'entend au cas par cas : une autorisation donnée sur une tâche ne vaut pas blanc-seing pour les suivantes.
 - Quand tu donnes du code, privilégie les signatures, les étapes en pseudo-code et les appels d'API non évidents. Donne du code complet seulement quand l'utilisateur est bloqué et le demande, ou pour des corrections très courtes.
 - Tu peux créer ou modifier des fichiers de documentation (README, documentation technique, TODO) quand l'utilisateur le demande.
 - Tu peux proposer des mises à jour de CLAUDE.md (nouvelle décision, feature terminée, piège découvert, point « à vérifier » résolu). Présente la modification et applique-la après validation de l'utilisateur.
@@ -391,6 +391,12 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 - Damage Threshold par défaut trop élevé pour un petit objet.
 - Question systématique à se poser : **à quel moment cette ligne s'exécute-t-elle ?**
 - Touche assignée à une Input Action qui semblait libre mais ouvrait la console (`²` en AZERTY) → vérifier les bindings réservés par le moteur/l'éditeur avant d'assigner une touche à une nouvelle action.
+- Une propriété modifiée à la main sur une **instance placée dans le niveau** (ex. `AttackRange`, mais ça vaut aussi pour les points d'une spline) ignore ensuite toute nouvelle valeur par défaut venant du C++ ou du Blueprint, tant qu'elle n'est pas réinitialisée (`Reset to Default`) — toujours vérifier l'instance placée, pas seulement la classe, quand une modification de valeur par défaut semble n'avoir aucun effet.
+- `UPathFollowingComponent::HasReachedInternal` (utilisé par `AIController::MoveToLocation`) mesure la distance d'arrivée **en 2D uniquement** (Z ignoré) → une distance 3D calculée à la main ne concordera jamais exactement avec le `AlreadyAtGoal` du moteur.
+- Le paramètre `bStopOnOverlap` de `AIController::MoveToLocation` ajoute **automatiquement** le rayon de capsule de l'agent, à la fois pour arrêter le mouvement et pour le test d'arrivée (`SetReachTestIncludesAgentRadius`) → l'ajouter une seconde fois à la main dans `AcceptanceRadius` le compte en double.
+- `Default Query Extent` (`Project Settings > Navigation System`) trop petit empêche de projeter un point de destination situé dans la marge d'exclusion du NavMesh autour d'un obstacle (ex. le pivot d'un objet) → `MoveToLocation` échoue silencieusement (`Failed`) même avec `bProjectDestinationToNavigation = true`, si le point visé reste hors de cette zone de recherche.
+- Un personnage déplacé via `AIController::MoveToLocation`/`PathFollowingComponent` n'alimente pas forcément l'Animation Blueprint de la même façon qu'`AddMovementInput` (l'ennemi soldat glissait sans jouer son cycle de marche) → vérifier avec l'Anim Blueprint Debugger avant de chercher une cause côté C++.
+- `TActorIterator<T>` ne garantit aucun ordre de parcours → ne jamais s'en servir pour choisir "le bon" acteur parmi plusieurs instances du même type (ex. une spline de chemin) ; préférer une référence explicite assignée à la main (`EditInstanceOnly`) sur l'acteur concerné.
 
 ---
 
@@ -407,6 +413,7 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 - **Composant de santé + frappe des ressources + premier sort** : terminé et testé (non-régression comprise). `UHealthComponent` générique ajouté en composition optionnelle sur `BP_Harvestable_Wood`/`BP_Harvestable_Stone` ; `UManaComponent` + `USpellCastingComponent` gèrent un premier sort (clic gauche) avec coup différé et cadencé par timer. **Fusionné dans `dev`** en Squash (confirmé le 2026-10-11). Documenté dans `documentation-technique.md`. Branche `feature/health-and-combat` supprimée.
 - **Environnement du joueur (colline, cabane, clôture, forêt)** : terminé et testé. Niveau `Lvl_Principal` (Landscape sculpté en colline, cabane avec sol/toit/fenêtre/lumière intérieure, clôture, chaudron, champs, rocher de démo, champignons, ressources dispersées via Foliage Mode) remplaçant `Lvl_FirstPerson` comme carte par défaut du projet. **Fusionné dans `dev`** en Squash (confirmé le 2026-10-23). Documenté dans `documentation-technique.md`. Publié en Release GitHub (`V1.0.1`). Branche `feature/environment-blockout` supprimée.
 - **Dette connue laissée par cette feature** : bug de logique inversée dans `AStoryTrigger::OnBoxOverlap` (`bTriggerOnce`/`bHasTriggered`, voir section 11), debug `DrawDebugLine` de `UInteractionComponent` commenté en dur (pas un interrupteur), dossier `Content/RockEnv_Pack/Meshes/Small_Rocks/` gardant 7 meshes au lieu des 3 réellement utilisés. À vérifier si toujours d'actualité.
+- **Soldat ennemi simple (file d'attente, item 1)** : terminé et testé en PIE sur `feature/enemy-soldier` (suivi de spline, détection/approche du destructible le plus proche, attaque, mort, drop d'os via `AResourceDrop`). Documenté dans `documentation-technique.md` section 13. **Pas encore fusionné dans `dev`.** Dette laissée : `AEnemySoldier::PathSplineActor` est `EditInstanceOnly`, assignable seulement sur une instance déjà placée dans le niveau — un futur spawner de vagues devra l'assigner par code (`SetPathSplineActor`, pas encore écrite, voir `TODO.md`).
 
 ### Planning du Bloc 1
 
