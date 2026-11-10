@@ -53,23 +53,23 @@ Convention : [MCP] = exécutable par `bp-integrator` ; [HUMAIN] = tout le reste.
 
 ### Étape 5 [MCP] : relever les repères de `BP_Fences` dans le niveau (lecture seule)
 - Action : `ue_list_actors` avec `name_contains="Fences"`, puis `ue_get_actor` sur chaque résultat (le label exact est **inconnu** : le lire, ne pas le deviner). Relever position, rotation, échelle et liste de composants.
-- Résultat attendu : le rapport de `bp-integrator` donne position/rotation/échelle de chaque acteur de clôture. Aucun outil ne donne la boîte englobante d'un acteur : si l'enceinte est faite de plusieurs segments ou d'un seul acteur multi-meshes, les dimensions ne sont peut-être pas lisibles ; l'étape 6 utilise alors un centre estimé (moyenne des positions) et l'étape 7 fait le calage.
+- Résultat attendu : le rapport de `bp-integrator` donne position/rotation/échelle de chaque acteur de clôture. Aucun outil ne donne la boîte englobante d'un acteur : si l'enceinte est faite de plusieurs segments ou d'un seul acteur multi-meshes, les dimensions ne sont peut-être pas lisibles ; l'étape 6 utilise alors un centre approximatif de la clôture (moyenne des positions) et l'étape 7 fait le calage.
 
 ### Étape 6 [MCP] : placer UNE instance de `BP_BaseZone` dans `Lvl_Principal`
 - Pré-conditions : `Lvl_Principal` est le niveau courant (`ue_project_info`), sinon arrêt ; aucune instance de `BaseZone` n'existe déjà (`ue_list_actors`), sinon arrêt.
-- Action : `ue_spawn_actor` de la classe générée par `BP_BaseZone` (chemin de classe attendu par l'outil : **à confirmer à l'exécution**, probablement `/Game/Spooky_Spores/Placeables/Base/BP_BaseZone.BP_BaseZone_C`, ne pas supposer), au centre estimé à l'étape 5 (X, Y de l'enceinte ; Z du sol de la clôture), rotation (0,0,0) ou le yaw de `BP_Fences` si l'enceinte est tournée, **échelle (1,1,1)**. Label `BaseZone` seulement si l'outil le permet.
+- Action : `ue_spawn_actor` de la classe générée par `BP_BaseZone` (chemin de classe attendu par l'outil : **à confirmer à l'exécution**, probablement `/Game/Spooky_Spores/Placeables/Base/BP_BaseZone.BP_BaseZone_C`, ne pas supposer), au centre approximatif de la clôture estimé à l'étape 5 (X, Y de la clôture ; Z du sol de la clôture), rotation (0,0,0) ou le yaw de `BP_Fences` si l'enceinte est tournée, **échelle (1,1,1)**. Label `BaseZone` seulement si l'outil le permet.
 - Choix : ne pas dimensionner par l'échelle de l'acteur ; l'étape 7 règle `Box Extent` (se lit directement ; le C++ gère les deux).
 - Résultat attendu : `ue_list_actors` (filtre sur la classe) renvoie **exactement un** acteur ; `ue_get_actor` donne la position demandée, l'échelle (1,1,1) et un composant `ZoneBox`.
 - Effet de bord attendu : One File Per Actor crée un fichier sous `Content/__ExternalActors__/` ; **`Lvl_Principal.umap` (point chaud) peut aussi être modifié** : à signaler dans le rapport.
 
-### Étape 7 [HUMAIN] : caler la boîte sur l'intérieur de `BP_Fences`
-- Pourquoi [HUMAIN] : le calage se juge à l'œil, et la propriété (`Box Extent` du composant `ZoneBox` d'une **instance**) est une propriété de composant hérité (même doute que l'étape 3). Les clôtures étant arrondies, une boîte approximative est acceptée (décision 3) : « ce qui est à l'intérieur des clôtures est dans la boîte ».
+### Étape 7 [HUMAIN] : caler la boîte pour qu'elle englobe toute la clôture `BP_Fences`
+- Pourquoi [HUMAIN] : le calage se juge à l'œil, et la propriété (`Box Extent` du composant `ZoneBox` d'une **instance**) est une propriété de composant hérité (même doute que l'étape 3). Les clôtures étant arrondies, une boîte approximative est acceptée (décision 3) : la boîte englobe la clôture (la clôture est dans la boîte), donc tout ce qui est à l'intérieur de la clôture est dans la zone. (Précision de Timéo : englober, pas tenir à l'intérieur.)
 - Action : dans le viewport de `Lvl_Principal`, sélectionner l'instance, composant `ZoneBox`, Details :
-  - ajuster **Box Extent** (**demi**-dimensions : 500 donne 10 m de côté) pour que la boîte tienne à l'intérieur des clôtures ;
+  - ajuster **Box Extent** (**demi**-dimensions : 500 donne 10 m de côté) pour que toute la clôture soit contenue dans la boîte ;
   - ajuster au besoin position et yaw de l'acteur pour centrer la boîte ;
   - **ne pas toucher à `Hidden in Game` sur l'instance** (étape 8) ; ne pas utiliser l'échelle.
 - Rappel (`CLAUDE.md` section 11) : une extension réglée à la main sur l'instance ignore ensuite tout changement de défaut du C++ ou du Blueprint, jusqu'à `Reset to Default`. Voulu pour l'extension, piège pour `Hidden in Game`.
-- Résultat attendu : la boîte englobe l'intérieur des clôtures sans déborder largement. Relever dans le rapport l'extension et la transformation finales. Contrôle visuel complet en PIE (T1).
+- Résultat attendu : toute la clôture est dans la boîte, sans marge excessive autour. Relever dans le rapport l'extension et la transformation finales. Contrôle visuel complet en PIE (T1).
 
 ### Étape 8 [HUMAIN] : vérifier que l'instance ne surcharge pas `Hidden In Game` (critère G2)
 - Pourquoi [HUMAIN] : lecture d'une propriété de composant hérité sur une instance ; rien ne garantit que `ue_get_actor` l'expose.
@@ -100,7 +100,7 @@ Le C++ de `Base/` est neuf (nouvelles `UCLASS`) : le Live Coding ne suffit pas.
 - Tools > Test Automation, filtre `SpookySpores.Base`, tout cocher, Start Tests. Attendu : tout vert. Si la liste est vide ou si un test manque, c'est un échec (nom exact du filtre à ajuster selon `qa-test-writer`).
 
 ### T1 : critère G1 (boîte filaire visible)
-1. PIE depuis `Lvl_Principal`. Attendu : boîte filaire visible, posée sur l'intérieur des clôtures. Faire le tour pour juger le calage ; retoucher (étape 7) si besoin.
+1. PIE depuis `Lvl_Principal`. Attendu : boîte filaire visible, englobant toute la clôture. Faire le tour pour juger le calage ; retoucher (étape 7) si besoin.
 2. Arrêter le PIE, recocher `Hidden in Game` sur `ZoneBox` de `BP_BaseZone`, compiler, relancer : la boîte **disparaît**. Redécocher, compiler, enregistrer (état final voulu en développement : décoché).
 3. Si la boîte ne s'affiche jamais décochée : limite non vérifiée de la spec 2.6 (`IsShown` non lu en entier). Aucun repli prévu : l'humain investigue.
 4. `show collision` ne dessine **pas** cette boîte (preset `NoCollision`) : ce n'est pas un bug.

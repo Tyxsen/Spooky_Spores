@@ -8,7 +8,7 @@
 
 1. **Hauteur** : `bIgnoreHeight = true` par défaut, validé (point tiré au plan médian de la boîte).
 2. **Retrouver la zone** : le Character est spawné depuis un `PlayerStart` (la référence `EditInstanceOnly` sur lui est donc impossible). `UBaseZoneSubsystem` **accepté**, avec ses 2 fichiers.
-3. **Forme dans le niveau** : Blueprint `BP_BaseZone` (enfant de `ABaseZone`), placé dans le niveau. L'extension de la boîte est calée à la main sur l'intérieur de `BP_Fences`. Les clôtures étant arrondies, une boîte approximative convient : l'intention est « ce qui est à l'intérieur des clôtures est dans la boîte ».
+3. **Forme dans le niveau** : Blueprint `BP_BaseZone` (enfant de `ABaseZone`), placé dans le niveau. La boîte **englobe `BP_Fences`** (conforme au `GDD.md` : « volume englobant la clôture ») : posée à la main, approximative, la clôture arrondie tient entièrement dans la boîte, donc tout ce qui est à l'intérieur de la clôture est dans la boîte. La boîte n'est pas couplée à la clôture.
 4. **Une seule zone de base par niveau** : validé (une seule base, autour d'un bâtiment).
 5. **Pas de marge intérieure (inset)** en 2.2b ; à revoir pendant le test.
 6. **Une seule boîte** suffit pour l'instant. Évolution prévue (pas un risque à traiter maintenant) : Timéo repassera sur cette feature pour caler la zone sur la future gestion de base (items 13-14).
@@ -154,7 +154,7 @@ Convention : `Z` désigne une `ABaseZone` (ou ses fonctions statiques, voir 6) a
 
 ### Visibilité (vérification humaine, pas de code)
 
-- [ ] **G1 — PIE.** `BP_BaseZone` placé dans `Lvl_Principal`, `Hidden In Game` décoché sur son composant `ZoneBox` : la boîte filaire est visible en jeu, calée sur l'intérieur de `BP_Fences`. Recocher `Hidden In Game` la fait disparaître. C'est la confirmation de la lecture du code moteur de 2.6 ; si elle échoue, Timéo investigue lui-même (aucun repli prévu).
+- [ ] **G1 — PIE.** `BP_BaseZone` placé dans `Lvl_Principal`, `Hidden In Game` décoché sur son composant `ZoneBox` : la boîte filaire est visible en jeu, englobant `BP_Fences` (la clôture tient entièrement dans la boîte). Recocher `Hidden In Game` la fait disparaître. C'est la confirmation de la lecture du code moteur de 2.6 ; si elle échoue, Timéo investigue lui-même (aucun repli prévu).
 - [ ] **G2 — instance.** Sur l'instance placée, la propriété `Hidden In Game` n'est pas surchargée à la main (sinon elle ignore la valeur du Blueprint, voir `CLAUDE.md` section 11).
 
 Note pour `qa-test-writer` : A1 à A9, R1 à R7 et D1 à D2 portent sur de la logique pure ; les fonctions statiques de 6 permettent de les écrire en **Automation Spec sans monde** (stratégie de test de `docs/WORKFLOW_AGENTS.md` section 7). Les critères C1 à C3 s'écrivent sur le CDO. Ce qui exige un monde (C4, S1 à S4, et au moins un test d'intégration qui passe par l'acteur réel, pour ne pas tester seulement les fonctions statiques) : voir si un monde de test est réalisable en Automation Spec ; si ça ne l'est pas, c'est un Functional Test (map créée par l'humain) ou une vérification manuelle en PIE, à signaler. Je n'ai pas pu vérifier ce qu'un monde de test d'Automation Spec permet sous 5.8.3. Le montage de l'infrastructure de test touche probablement `Spooky_Spores.Build.cs` (point chaud, voir 7).
@@ -172,7 +172,7 @@ Note pour `qa-test-writer` : A1 à A9, R1 à R7 et D1 à D2 portent sur de la lo
 - **Deux zones dans le niveau** : voir S3. C'est une erreur de level design signalée par un log `Error`, pas un cas géré fonctionnellement.
 - **Zone supprimée en jeu** : `TWeakObjectPtr` donne `nullptr` ; aucun pointeur pendant.
 - **Zone déplacée ou redimensionnée à l'exécution** : prise en compte au prochain appel (A8).
-- **Point tiré hors du sol / dans un obstacle (arbre, clôture, mur)** : normal, la zone ne connaît ni le terrain ni le NavMesh. Le filtrage est le rôle de 2.2c.
+- **Point tiré hors du sol / dans un obstacle (arbre, clôture, mur)** : normal, la zone ne connaît ni le terrain ni le NavMesh. La boîte englobant le tracé de la clôture, un point tiré peut tomber sur la clôture elle-même ou sur un arbre : c'est traité en 2.2c (projection NavMesh, essais bornés), **pas** en 2.2b.
 - **Pas de `World` (CDO, aperçu d'éditeur)** : les fonctions de calcul n'ont pas besoin de `UWorld`.
 - **Zone invisible en jeu** : sans effet sur le calcul. `Hidden In Game` ne concerne que le rendu (2.6).
 
@@ -182,7 +182,7 @@ Réglages de l'instance placée (ce sont des réglages de level design, pas d'é
 
 | Paramètre | Défaut | Rôle |
 |---|---|---|
-| `ZoneBox` extension (`BoxExtent`) | (500, 500, 200) **[CHOIX arbitraire]** | Demi-dimensions. Valeur de départ seulement : la vraie est calée **à la main sur la clôture** après placement |
+| `ZoneBox` extension (`BoxExtent`) | (500, 500, 200) **[CHOIX arbitraire]** | Demi-dimensions. Valeur de départ seulement : la vraie est réglée **à la main pour englober `BP_Fences`** après placement |
 | `bIgnoreHeight` | `true` | Voir 2.3 |
 | `ZoneBox` > `Hidden In Game` | `false` sur `BP_BaseZone` (`true` dans le C++, défaut moteur) | Boîte filaire visible en jeu pendant le développement ; **à remettre à `true` avant Release** (2.6) |
 | Tolérance de bord | 0,1 cm (constante du `.cpp`, non exposée) | Voir 4 |
@@ -300,7 +300,7 @@ Rien d'autre n'est nécessaire côté zone. En particulier, la zone ne fournit *
 
 **À créer (éditeur, par `bp-integrator`, [MCP] possible)**
 - `Content/Spooky_Spores/Placeables/Base/BP_BaseZone.uasset` : Blueprint enfant de `ABaseZone`, sans logique, pour respecter la convention `BP_` des placeables. Décision de Timéo (3) : Blueprint, par cohérence avec `BP_Fences`. **Réglage à faire dans ce Blueprint : composant `ZoneBox` > `Hidden In Game` décoché** (2.6) ; `bIgnoreHeight` et l'extension (500, 500, 200) y sont aussi les valeurs par défaut.
-- Instance de `BP_BaseZone` placée dans `Lvl_Principal`, **extension et position calées à la main sur la clôture `BP_Fences`**. Étape [HUMAIN] ou [MCP] selon l'outillage disponible (placement et réglage de propriété d'une instance : réalisable avec des outils limités ; le calage fin sur l'intérieur de la clôture se vérifie à l'œil en PIE grâce à la boîte visible, `Hidden In Game` décoché ; les clôtures étant arrondies, une boîte approximative suffit).
+- Instance de `BP_BaseZone` placée dans `Lvl_Principal`, **extension et position réglées à la main pour englober `BP_Fences`** (boîte approximative, non couplée à la clôture). Étape [HUMAIN] ou [MCP] selon l'outillage disponible (placement et réglage de propriété d'une instance : réalisable avec des outils limités ; on vérifie à l'œil en PIE, grâce à la boîte visible (`Hidden In Game` décoché), que la clôture arrondie tient dans la boîte ; une boîte approximative suffit).
 
 **Fichiers existants modifiés** : aucun. Notamment, **ni `AServant`, ni `Spooky_SporesCharacter`, ni `BP_Fences`** ne sont modifiés par 2.2b.
 
@@ -313,6 +313,7 @@ Rien d'autre n'est nécessaire côté zone. En particulier, la zone ne fournit *
 ## 8. Dépendances
 
 - **Aucune dépendance bloquante** : 2.2a est fusionnée (`AServant` existe), mais 2.2b n'en dépend pas.
+- **Relation avec `BP_Fences`** : aucune dépendance de code ni de composant. La zone englobe la clôture par réglage manuel de sa position et de son extension ; `BP_Fences` n'est pas modifiée.
 - **Bloque 2.2c** (errance), qui consomme l'API de 6.
 - **Prépare les items 13-14** (vue de gestion, construction) : la zone doit pouvoir être redimensionnée à l'exécution sans que ses consommateurs le sachent. **Évolution prévue** (décision 6) : Timéo repassera sur cette feature pour caler la zone sur la future gestion de base ; une seule boîte suffit d'ici là. Ce n'est pas un risque à traiter en 2.2b.
 - Dépend de `LogSpooky_Spores` (existe, `Spooky_Spores.h`).
