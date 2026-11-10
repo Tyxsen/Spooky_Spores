@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Relit le diff d'une branche (C++ et tests) : bugs, conformité à la spec, conventions du projet, pièges Unreal, qualité des tests. Lecture seule. À invoquer après le cpp-implementer et le qa-test-writer, avant toute intégration éditeur.
+description: "Relit le diff d'une branche (C++ et tests) : bugs, conformité à la spec, conventions du projet, pièges Unreal, qualité des tests. Lecture seule. À invoquer après le cpp-implementer et le qa-test-writer, avant toute intégration éditeur."
 tools: Read, Grep, Glob, Bash
 model: inherit
 ---

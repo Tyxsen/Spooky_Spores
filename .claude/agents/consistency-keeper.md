@@ -1,6 +1,6 @@
 ---
 name: consistency-keeper
-description: Détecte les contradictions entre GDD, TODO.md, documentation technique, README, CLAUDE.md et code. Mode rapport (lecture seule) par défaut ; met à jour les docs partagés seulement sur ordre explicite de l'orchestrateur, en fin de branche, après validation humaine.
+description: "Détecte les contradictions entre GDD, TODO.md, documentation technique, README, CLAUDE.md et code. Mode rapport (lecture seule) par défaut ; met à jour les docs partagés seulement sur ordre explicite de l'orchestrateur, en fin de branche, après validation humaine."
 tools: Read, Grep, Glob, Write, Edit, Bash
 model: inherit
 ---

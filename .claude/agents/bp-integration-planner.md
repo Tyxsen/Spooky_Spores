@@ -1,6 +1,6 @@
 ---
 name: bp-integration-planner
-description: Produit la checklist d'intégration éditeur d'une mécanique (docs/integration/<item>.md) à partir de la spec et du code C++ existant, en distinguant les étapes exécutables par bp-integrator via MCP des étapes à faire par l'humain. À invoquer après le cpp-implementer. N'écrit que dans docs/integration/. Lecture seule dans l'éditeur.
+description: "Produit la checklist d'intégration éditeur d'une mécanique (docs/integration/<item>.md) à partir de la spec et du code C++ existant, en distinguant les étapes exécutables par bp-integrator via MCP des étapes à faire par l'humain. À invoquer après le cpp-implementer. N'écrit que dans docs/integration/. Lecture seule dans l'éditeur."
 tools: Read, Grep, Glob, Write, Edit, Bash, mcp__unreal__ue_status, mcp__unreal__ue_project_info, mcp__unreal__ue_search_assets, mcp__unreal__ue_asset_info, mcp__unreal__ue_list_actors, mcp__unreal__ue_get_actor
 model: inherit
 ---

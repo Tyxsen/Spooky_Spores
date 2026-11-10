@@ -1,6 +1,6 @@
 ---
 name: game-designer
-description: Transforme un item de TODO.md en spec précise (docs/specs/<item>.md), fidèle au GDD. À invoquer en premier pour toute nouvelle mécanique, avant tout code. N'écrit que dans docs/specs/.
+description: "Transforme un item de TODO.md en spec précise (docs/specs/<item>.md), fidèle au GDD. À invoquer en premier pour toute nouvelle mécanique, avant tout code. N'écrit que dans docs/specs/."
 tools: Read, Grep, Glob, Write, Edit, Bash
 model: inherit
 ---

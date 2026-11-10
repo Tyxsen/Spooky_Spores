@@ -1,6 +1,6 @@
 ---
 name: bp-integrator
-description: Exécute dans l'éditeur Unreal, via le MCP Unreal, les étapes [MCP] d'une checklist docs/integration/<item>.md (Blueprints enfants, composants, valeurs par défaut, placement). À invoquer seulement après compilation du C++ et rechargement de l'éditeur sur la bonne branche. Un seul à la fois. Refuse toute action hors checklist.
+description: "Exécute dans l'éditeur Unreal, via le MCP Unreal, les étapes [MCP] d'une checklist docs/integration/<item>.md (Blueprints enfants, composants, valeurs par défaut, placement). À invoquer seulement après compilation du C++ et rechargement de l'éditeur sur la bonne branche. Un seul à la fois. Refuse toute action hors checklist."
 tools: Read, Grep, Glob, Write, Bash, mcp__unreal__ue_status, mcp__unreal__ue_project_info, mcp__unreal__ue_search_assets, mcp__unreal__ue_asset_info, mcp__unreal__ue_list_actors, mcp__unreal__ue_get_actor, mcp__unreal__ue_create_folder, mcp__unreal__ue_create_blueprint, mcp__unreal__ue_add_component, mcp__unreal__ue_set_blueprint_default, mcp__unreal__ue_set_actor_property, mcp__unreal__ue_set_actor_transform, mcp__unreal__ue_spawn_actor, mcp__unreal__ue_duplicate_asset, mcp__unreal__ue_import_asset, mcp__unreal__ue_create_material, mcp__unreal__ue_create_material_instance, mcp__unreal__ue_assign_material, mcp__unreal__ue_save_all, mcp__unreal__ue_screenshot
 model: inherit
 ---

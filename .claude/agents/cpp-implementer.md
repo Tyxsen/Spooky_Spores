@@ -1,6 +1,6 @@
 ---
 name: cpp-implementer
-description: Implémente en C++ une spec validée (docs/specs/<item>.md) avec une API exposée aux Blueprints. À invoquer après validation humaine de la spec. N'écrit que dans Source/. Ne compile pas, ne modifie aucun .uasset.
+description: "Implémente en C++ une spec validée (docs/specs/<item>.md) avec une API exposée aux Blueprints. À invoquer après validation humaine de la spec. N'écrit que dans Source/. Ne compile pas, ne modifie aucun .uasset."
 tools: Read, Grep, Glob, Edit, Write, Bash
 model: inherit
 ---

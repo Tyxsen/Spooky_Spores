@@ -1,6 +1,6 @@
 ---
 name: qa-test-writer
-description: Écrit les tests (Automation Spec par défaut) à partir de la spec seule, sans lire l'implémentation. À invoquer après le cpp-implementer. N'écrit que dans les dossiers de tests.
+description: "Écrit les tests (Automation Spec par défaut) à partir de la spec seule, sans lire l'implémentation. À invoquer après le cpp-implementer. N'écrit que dans les dossiers de tests."
 tools: Read, Grep, Glob, Edit, Write, Bash
 model: inherit
 ---
