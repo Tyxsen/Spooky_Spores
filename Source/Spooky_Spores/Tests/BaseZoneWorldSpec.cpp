@@ -340,6 +340,31 @@ void FBaseZoneWorldSpec::Define()
 			TestEqual(TEXT("no LogSpooky_Spores error for an invalid zone"), Counter.ErrorCount, 0);
 		});
 
+		It("Non-finite extent through the actor: invalid, every query false, no crash, one single warning", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			ABaseZone* Zone = SpawnZone(TEXT("BaseZoneInfExtent"));
+			if (!TestNotNull(TEXT("zone spawned"), Zone)) { return; }
+			Zone->GetZoneBox()->SetBoxExtent(FVector(std::numeric_limits<double>::infinity(), 300, 100), false);
+
+			FCategoryLogCounter Counter(LogSpooky_Spores.GetCategoryName());
+			for (int32 HeightMode = 0; HeightMode < 2; ++HeightMode)
+			{
+				SetIgnoreHeight(Zone, HeightMode == 1);
+				for (int32 Index = 0; Index < 5; ++Index)
+				{
+					TestFalse(TEXT("IsZoneValid() is false"), Zone->IsZoneValid());
+					TestFalse(TEXT("the center is not inside an infinite-extent zone"), Zone->IsPointInZone(Zone->GetActorLocation()));
+					TestFalse(TEXT("a far point is not inside either"), Zone->IsPointInZone(FVector(1e9, 0, 0)));
+					FVector Out(1, 2, 3);
+					TestFalse(TEXT("GetRandomPointInZone returns false"), Zone->GetRandomPointInZone(Out));
+				}
+			}
+			Counter.FlushPendingLogs();
+			TestEqual(TEXT("exactly one LogSpooky_Spores warning for 40 queries on one non-finite zone"), Counter.WarningCount, 1);
+			TestEqual(TEXT("no LogSpooky_Spores error"), Counter.ErrorCount, 0);
+		});
+
 		It("Section 4: a valid zone never logs a warning", [this]()
 		{
 			if (!RequireWorld()) { return; }

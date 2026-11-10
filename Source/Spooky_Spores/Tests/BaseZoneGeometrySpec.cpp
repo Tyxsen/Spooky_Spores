@@ -225,6 +225,94 @@ void FBaseZoneGeometrySpec::Define()
 		});
 	});
 
+	Describe("Non-finite zone inputs (validity must be robust to NaN / infinity)", [this]()
+	{
+		const double NaN = std::numeric_limits<double>::quiet_NaN();
+		const double Inf = std::numeric_limits<double>::infinity();
+
+		It("NaN transform: IsPointInOrientedBox is false (Abs(NaN) > x is false on every axis, so a naive test says inside)", [this, NaN]()
+		{
+			const FVector E(500.0, 300.0, 100.0);
+			const FVector Probe(1, 2, 3);
+
+			// Control: the same probe with a finite transform is inside, so the "false" below is caused by the NaN.
+			ExpectPoint(TEXT("NaN control"), MakeTransform(FVector::ZeroVector), E, Probe, false, true);
+			ExpectPoint(TEXT("NaN control"), MakeTransform(FVector::ZeroVector), E, Probe, true, true);
+
+			const FTransform NaNRotation(FQuat(NaN, NaN, NaN, NaN), FVector::ZeroVector, FVector::OneVector);
+			const FTransform NaNTranslation(FQuat::Identity, FVector(NaN, 0, 0), FVector::OneVector);
+			const FTransform NaNTranslationZ(FQuat::Identity, FVector(0, 0, NaN), FVector::OneVector);
+
+			for (int32 HeightMode = 0; HeightMode < 2; ++HeightMode)
+			{
+				const bool bIgnoreHeight = (HeightMode == 1);
+				ExpectPoint(TEXT("NaN rotation"), NaNRotation, E, Probe, bIgnoreHeight, false);
+				ExpectPoint(TEXT("NaN translation X"), NaNTranslation, E, Probe, bIgnoreHeight, false);
+				ExpectPoint(TEXT("NaN translation Z"), NaNTranslationZ, E, Probe, bIgnoreHeight, false);
+			}
+		});
+
+		It("Infinite or NaN extent: IsOrientedBoxValid is false on every axis (+inf, -inf, NaN)", [this, NaN, Inf]()
+		{
+			const FTransform T = MakeTransform(FVector::ZeroVector);
+			TestTrue(TEXT("control: finite extent is valid"), ABaseZone::IsOrientedBoxValid(T, FVector(500, 300, 100)));
+
+			const double Bad[] = { Inf, -Inf, NaN };
+			for (const double Value : Bad)
+			{
+				for (int32 Axis = 0; Axis < 3; ++Axis)
+				{
+					FVector E(500, 300, 100);
+					E[Axis] = Value;
+					TestFalse(FString::Printf(TEXT("extent axis %d = %f is invalid"), Axis, Value), ABaseZone::IsOrientedBoxValid(T, E));
+				}
+			}
+		});
+
+		It("Infinite or NaN scale: IsOrientedBoxValid is false on every axis (+inf, -inf, NaN)", [this, NaN, Inf]()
+		{
+			const FVector E(100, 100, 100);
+			const double Bad[] = { Inf, -Inf, NaN };
+			for (const double Value : Bad)
+			{
+				for (int32 Axis = 0; Axis < 3; ++Axis)
+				{
+					FVector S(1, 1, 1);
+					S[Axis] = Value;
+					const FTransform T = MakeTransform(FVector::ZeroVector, FRotator::ZeroRotator, S);
+					TestFalse(FString::Printf(TEXT("scale axis %d = %f is invalid"), Axis, Value), ABaseZone::IsOrientedBoxValid(T, E));
+				}
+			}
+		});
+
+		It("R1: a random draw on an infinite extent or scale returns false, and never true with a non-finite point", [this, NaN, Inf]()
+		{
+			TArray<TPair<FTransform, FVector>> Cases;
+			Cases.Add({ MakeTransform(FVector::ZeroVector), FVector(Inf, 300, 100) });
+			Cases.Add({ MakeTransform(FVector::ZeroVector), FVector(500, Inf, 100) });
+			Cases.Add({ MakeTransform(FVector::ZeroVector), FVector(500, 300, Inf) });
+			Cases.Add({ MakeTransform(FVector::ZeroVector), FVector(NaN, 300, 100) });
+			Cases.Add({ MakeTransform(FVector::ZeroVector, FRotator::ZeroRotator, FVector(Inf, 1, 1)), FVector(100, 100, 100) });
+			Cases.Add({ MakeTransform(FVector::ZeroVector, FRotator::ZeroRotator, FVector(1, 1, NaN)), FVector(100, 100, 100) });
+
+			for (int32 CaseIndex = 0; CaseIndex < Cases.Num(); ++CaseIndex)
+			{
+				for (int32 HeightMode = 0; HeightMode < 2; ++HeightMode)
+				{
+					const bool bIgnoreHeight = (HeightMode == 1);
+					FVector Out(1, 2, 3);
+					const bool bResult = ABaseZone::TryGetRandomPointInOrientedBox(Cases[CaseIndex].Key, Cases[CaseIndex].Value, bIgnoreHeight, Out);
+					TestFalse(FString::Printf(TEXT("case %d (ignoreHeight=%d): the draw returns false"), CaseIndex, HeightMode), bResult);
+					if (bResult)
+					{
+						// Invariant R1: a successful draw must be a finite member of the zone.
+						TestFalse(FString::Printf(TEXT("case %d: a true result must never carry a non-finite point"), CaseIndex), Out.ContainsNaN());
+					}
+				}
+			}
+		});
+	});
+
 	Describe("Random draw (TryGetRandomPointInOrientedBox)", [this]()
 	{
 		It("R1: every drawn point is a member of the zone, for every reference config and both height modes", [this]()
