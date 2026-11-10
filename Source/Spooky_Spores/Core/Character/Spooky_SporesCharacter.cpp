@@ -11,7 +11,10 @@
 #include "Spooky_Spores.h"
 #include "Interaction/GrabComponent.h"
 #include "Interaction/InteractionComponent.h"
+#include "Engine/World.h"
 #include "Movement/StaminaComponent.h"
+#include "Resources/ResourceCounterComponent.h"
+#include "Servants/Servant.h"
 #include "Spells/SpellCastingComponent.h"
 
 ASpooky_SporesCharacter::ASpooky_SporesCharacter()
@@ -93,6 +96,9 @@ void ASpooky_SporesCharacter::SetupPlayerInputComponent(UInputComponent* PlayerI
 
 		// Cast Spell
 		EnhancedInputComponent->BindAction(CastSpellAction, ETriggerEvent::Started, this, &ASpooky_SporesCharacter::DoCastSpell);
+
+		// Place Servant
+		EnhancedInputComponent->BindAction(PlaceServantAction, ETriggerEvent::Started, this, &ASpooky_SporesCharacter::DoPlaceServant);
 	}
 	else
 	{
@@ -202,6 +208,44 @@ void ASpooky_SporesCharacter::DoCastSpell()
 {
 	if (USpellCastingComponent* SpellCasting = FindComponentByClass<USpellCastingComponent>())
 		SpellCasting->TryCastSpell();
+}
+
+void ASpooky_SporesCharacter::DoPlaceServant()
+{
+	if (!ServantClass)
+	{
+		UE_LOG(LogSpooky_Spores, Warning, TEXT("'%s' has no ServantClass set, cannot place a servant"), *GetNameSafe(this));
+		return;
+	}
+
+	UInteractionComponent* Interaction = FindComponentByClass<UInteractionComponent>();
+	UResourceCounterComponent* Counter = FindComponentByClass<UResourceCounterComponent>();
+	if (!Interaction || !Counter) return;
+
+	// 1. Find a valid ground point first, so aiming at the sky or a wall never costs a Necrospore
+	FVector PlacementPoint;
+	if (!Interaction->GetPlacementPoint(PlacementPoint)) return;
+
+	// 2. Single access point to the resurrection item storage: to replace here once the real inventory exists
+	if (!Counter->TrySpendResource(EResourceType::Necrospore, 1)) return;
+
+	// 3. A Character's origin is the centre of its capsule: raise it by the half height so its feet touch the ground
+	const ACharacter* ServantDefaults = ServantClass->GetDefaultObject<ACharacter>();
+	const float HalfHeight = ServantDefaults->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	const FVector SpawnLocation = PlacementPoint + FVector(0.0f, 0.0f, HalfHeight);
+
+	// Yaw only, facing the player
+	const FRotator SpawnRotation(0.0f, (GetActorLocation() - PlacementPoint).Rotation().Yaw, 0.0f);
+
+	// Always spawn (moved out of overlaps if possible), so a spent Necrospore never needs to be refunded
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+	if (!GetWorld()->SpawnActor<AServant>(ServantClass, SpawnLocation, SpawnRotation, SpawnParams))
+	{
+		// Only reachable on a programming error (e.g. world being torn down): the Necrospore is lost, make it visible
+		UE_LOG(LogSpooky_Spores, Error, TEXT("'%s' failed to spawn a servant after spending a Necrospore"), *GetNameSafe(this));
+	}
 }
 
 void ASpooky_SporesCharacter::HandleSprintStateChanged(bool bNewIsSprinting)

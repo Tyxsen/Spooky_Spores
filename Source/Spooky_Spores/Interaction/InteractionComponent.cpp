@@ -3,6 +3,7 @@
 
 #include "Interaction/InteractionComponent.h"
 #include "CollisionChannels.h"
+#include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "Interaction/Grabbable.h"
 #include "Interaction/Interactable.h"
@@ -107,5 +108,32 @@ void UInteractionComponent::TryInteract()
 	if (!IsInteractableTarget()) return;
 
 	IInteractable::Execute_OnInteract(ActualTarget.Get(), GetOwner());
+}
+
+bool UInteractionComponent::GetPlacementPoint(FVector& OutLocation) const
+{
+	OutLocation = FVector::ZeroVector;
+
+	const APawn* Pawn = Cast<APawn>(GetOwner());
+	if (!Pawn) return false;
+
+	FVector EyeLocation;
+	FRotator EyeRotation;
+	Pawn->GetActorEyesViewPoint(EyeLocation, EyeRotation);
+
+	const FVector TraceEnd = EyeLocation + (EyeRotation.Vector() * PlacementRange);
+
+	FCollisionQueryParams QueryParams;
+	QueryParams.AddIgnoredActor(Pawn);
+
+	// Visibility channel instead of the Interactable object type: the ground must be hit too
+	FHitResult HitResult;
+	if (!GetWorld()->LineTraceSingleByChannel(HitResult, EyeLocation, TraceEnd, ECC_Visibility, QueryParams)) return false;
+
+	// Reject walls and steep slopes: only surfaces facing up enough are valid ground
+	if (HitResult.ImpactNormal.Z < MinPlacementNormalZ) return false;
+
+	OutLocation = HitResult.ImpactPoint;
+	return true;
 }
 

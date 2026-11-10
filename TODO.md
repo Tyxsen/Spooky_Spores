@@ -7,15 +7,14 @@
 - [x] Semaine de cours S2 : environnement du joueur (colline, cabane) livré, Release `V1.0.1` — fusionné dans `dev`
 - [x] GDD complet (`GDD.md`, 5 sections) — rédigé du 2026-10-26 au 2026-11-03. La file d'attente ci-dessous a été réorganisée en conséquence (items 1, 2, 3, 13, 14, 16, 17 mis à jour). Le point de passage obligatoire (`CLAUDE.md` section 12) est levé.
 - [x] Item 1 (soldat ennemi simple) : terminé, testé en PIE (suivi de spline, détection/approche du destructible le plus proche, attaque, mort, drop d'os via `AResourceDrop`), fusionné dans `dev` (PR #7)
-- [ ] Corriger les includes courts de `Enemies/EnemyAIController.cpp` : `"EnemyPathSpline.h"` → `"Enemies/EnemyPathSpline.h"`, `"EnemySoldier.h"` → `"Enemies/EnemySoldier.h"` (convention `CLAUDE.md` section 6)
 - [x] Corriger les includes courts de `Enemies/EnemyAIController.cpp` et `Resources/ResourceCounterComponent.h`
 - [x] Item 2, étape 2.1 : chaudron multi-recettes + recette os + potion → Necrospore (ressource comptée provisoire) — terminé et testé sur `feature/cauldron-recipes`
-- [ ] Item 2, étape 2.2 : pose de la Necrospore → apparition du serviteur + zone de base + errance
+- [x] Item 2, étape 2.2a : pose de la Necrospore (touche L) → apparition d'un serviteur immobile — terminé et testé sur `feature/servant-placement`
+- [ ] Item 2, étape 2.2b : zone de base (`UBoxComponent`, « point dans la zone ? » / « point au hasard dans la zone », avec debug visuel)
 
 ## Divers à régler
  
 - [ ] `CLAUDE.md` : préciser quels projets de l'année doivent être rendus en anglais (dépend des CDC pas encore communiqués)
-- [ ] Passer Unreal en 5.8.3 sur l'autre ordinateur
 - [x] Supprimer la branche `feature/plantation` sur `origin` (déjà fusionnée dans `dev`)
 
 ## Planning
@@ -39,7 +38,9 @@ Depuis le 2026-11-09 : **plus de découpage par semaines**. On avance à notre r
    **Stockage provisoire (décidé le 2026-11-09)** : en attendant le vrai inventaire (item 7), l'objet de résurrection est une ressource comptée dans `UResourceCounterComponent`. Tout accès à ce stockage (« en ai-je un ? », « en consommer un ») doit être isolé à **un seul endroit** du code de pose, pour que le passage à l'inventaire ne touche que cet endroit.
    Livré en branches successives, chacune testable et fusionnable seule :
    - [x] 2.1 Recette os + potion → Necrospore (chaudron multi-recettes) — `feature/cauldron-recipes`
-   - [ ] 2.2 Pose de l'objet → apparition du serviteur + zone de base + errance dans la zone (retour automatique si posé hors zone)
+   - [x] 2.2a Pose de l'objet (touche L) → apparition d'un serviteur immobile — `feature/servant-placement`
+   - [ ] 2.2b Zone de base : `UBoxComponent` qui fournit elle-même les points (tirés dans son espace local, donc valides même si la boîte est tournée). Les serviteurs l'interrogent à chaque décision, sans mémoriser ses dimensions, pour suivre un futur agrandissement de la base (items 13-14)
+   - [ ] 2.2c Errance dans la zone : destination tirée par la zone puis projetée sur le NavMesh (`ProjectPointToNavigation`, essais bornés), ce qui écarte les points tombés dans un arbre ou une clôture. Le retour d'un serviteur posé hors zone en découle sans mode dédié. À vérifier : arbres (Foliage, `Can Ever Affect Navigation`) et clôture découpent bien le NavMesh (touche P), cas d'un serviteur posé sans chemin vers la base
 3. [ ] Assignation des tâches aux serviteurs : menu dédié (touche à définir), deux colonnes — serviteurs non assignés à gauche, catégories de tâche à droite (« attaque/défense », « récolte de champ »...). La récolte automatique devient une conséquence de l'assignation à « récolte de champ », pas un comportement indépendant. Ferme la boucle de jeu principale, combiné à l'item 2
    - [ ] 3.1 Menu d'assignation (deux colonnes, sans comportement derrière au début)
    - [ ] 3.2 Comportement « récolte de champ » (le serviteur interagit avec `AFieldPlot`)
@@ -74,8 +75,9 @@ Depuis le 2026-11-09 : **plus de découpage par semaines**. On avance à notre r
 ## Dette technique
  
 - [ ] Supprimer `AEnemySoldier::DebugKill` (fonction de debug temporaire, ajoutée le 2026-11-10 pour tester le chaudron) **et la touche de debug qui l'appelle dans `BP_FirstPersonCharacter`** dès que le joueur a un vrai moyen de tuer un soldat — à ne pas laisser dans un build livré
+- [ ] Supprimer le nœud `Add Resource (Necrospore)` de test dans le `BeginPlay` de `BP_FirstPersonCharacter` (ajouté le 2026-11-10 pour tester la pose des serviteurs) — à ne pas laisser dans un build livré
 - [ ] Déplacer la création de l'UI hors du personnage (PlayerController ou HUD) quand l'interface grossira
-- [ ] Faire disparaître les drops restés au sol après un délai (avant les serviteurs)
+- [ ] Faire disparaître les drops restés au sol après un délai (avant l'item 3.2, quand les serviteurs récolteront)
 - [ ] Vérifier / faire la factorisation du calcul de la cible dans `UGrabComponent` (`GetGrabTargetTransform`)
 - [ ] Adopter `TObjectPtr` pour les membres `UPROPERTY` dans `Interaction/` et `Core/Character/` (déjà fait dans tout `Resources/` ; adoption par domaine, pas une bascule globale — voir `CLAUDE.md` section 6)
 - [ ] Nettoyage optionnel des assets inutilisés du template (animations `Pistol`...) : branche `chore/`, suppression via le Content Browser en vérifiant les références

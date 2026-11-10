@@ -31,7 +31,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void TryInteract();
 
-private:	
+	// On-demand trace against the world (not only interactables): returns a ground point in front of the player.
+	// Fails if nothing is hit within PlacementRange or if the hit surface is too steep to stand on.
+	UFUNCTION(BlueprintCallable, Category = "Interaction|Placement")
+	bool GetPlacementPoint(FVector& OutLocation) const;
+
+private:
 	void UpdateInteractionTrace();
 	
 // -----------PROPERTIES-----------
@@ -51,4 +56,11 @@ private:
 	
 	// Actual target registered by the line trace
 	TWeakObjectPtr<AActor> ActualTarget;
+
+	UPROPERTY(EditAnywhere, Category = "Interaction|Placement")
+	float PlacementRange = 300.0f;
+
+	// Minimum Z of the hit normal to accept a placement (0.7 is about 45 degrees of slope, same rule as AResourceDrop)
+	UPROPERTY(EditAnywhere, Category = "Interaction|Placement", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float MinPlacementNormalZ = 0.7f;
 };

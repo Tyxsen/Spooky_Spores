@@ -11,6 +11,7 @@ class UInputComponent;
 class USkeletalMeshComponent;
 class UCameraComponent;
 class UInputAction;
+class AServant;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -68,7 +69,16 @@ protected:
 	/** Cast a spell Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")
 	UInputAction* CastSpellAction;
-	
+
+	/** Place a servant (consumes a Necrospore) Input Action */
+	UPROPERTY(EditAnywhere, Category ="Input")
+	UInputAction* PlaceServantAction;
+
+	/** SERVANTS */
+	/** Servant class spawned when a Necrospore is placed (set to the Blueprint child in BP_FirstPersonCharacter) */
+	UPROPERTY(EditAnywhere, Category = "Servants")
+	TSubclassOf<AServant> ServantClass;
+
 	/** MOVEMENT */
 	UPROPERTY(EditAnywhere, Category = "Movement")
 	float WalkSpeed = 400.0f;
@@ -127,6 +137,10 @@ protected:
 
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	virtual void DoCastSpell();
+
+	/** Places a servant at the aimed ground point if the player has a Necrospore */
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void DoPlaceServant();
 
 	UFUNCTION()
 	void HandleSprintStateChanged(bool bNewIsSprinting);
