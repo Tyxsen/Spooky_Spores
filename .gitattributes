@@ -6,6 +6,8 @@
 *.wav filter=lfs diff=lfs merge=lfs -text
 *.fbx filter=lfs diff=lfs merge=lfs -text
 *.psd filter=lfs diff=lfs merge=lfs -text
+*.blend filter=lfs diff=lfs merge=lfs -text
+*.tga filter=lfs diff=lfs merge=lfs -text
 
 # Documentation → suivi Git classique, pour un affichage fiable sur GitHub
 Documentation_Documents/** -filter -diff -merge -text
