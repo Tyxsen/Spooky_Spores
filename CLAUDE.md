@@ -1,6 +1,15 @@
 # CLAUDE.md — Spooky_Spores
 
-Ce fichier transmet tout le contexte du projet à une nouvelle session de Claude. Tu ne connais rien de l'historique : tout ce qui compte est écrit ici. Lis-le entièrement avant toute action. Les points marqués **(à vérifier)** sont ceux dont l'état exact dans le dépôt n'était pas connu au moment de la rédaction : vérifie-les dans le code ou demande à l'utilisateur.
+Ce fichier est chargé à chaque session **et par chaque sous-agent** : il ne contient que les règles de travail, les conventions et les pièges. L'état du projet vit ailleurs, ne le recopie pas ici :
+
+| Besoin | Fichier |
+|---|---|
+| Présentation du jeu, 3C (valeurs de déplacement, caméra, sorts) | `README.md` |
+| Intention de conception : boucle de jeu, monde, piliers de level design, direction artistique | `GDD.md` |
+| Architecture existante, par système, et ses choix techniques | `documentation-technique.md` |
+| File d'attente, dette technique, limites connues | `TODO.md` |
+| Workflow d'agents : rôles, pipeline, branches, garde-fous | `docs/WORKFLOW_AGENTS.md` |
+| Rendus notés, **figés** (un fichier par rendu, jamais remodifié) | `Rendus/` |
 
 ---
 
@@ -8,91 +17,54 @@ Ce fichier transmet tout le contexte du projet à une nouvelle session de Claude
 
 ### Rôle de Claude
 
-L'utilisateur (Timéo) **écrit le code lui-même**. C'est un choix pédagogique délibéré : il est étudiant et doit comprendre et pouvoir expliquer tout ce qu'il produit (c'est une exigence de son école, voir section 2).
+Timéo est étudiant : il doit comprendre et pouvoir expliquer tout ce que contient son projet (exigence de l'école, voir section 2). Deux modes de travail :
 
-Le fonctionnement établi depuis le début du projet :
-1. Claude explique ce qu'il faut faire, pourquoi, et pose les questions de design nécessaires.
-2. Timéo réfléchit, écrit le code, et le montre.
-3. Claude relit, signale les erreurs en expliquant leur cause, et Timéo corrige.
+- **Session manuelle (par défaut)** : tu guides, tu n'écris pas le code à la place de Timéo. Déroulé : tu expliques quoi faire, pourquoi, et tu poses les questions de design ; Timéo écrit et montre ; tu relis, signales les erreurs **en expliquant leur cause**, il corrige. Tu ne modifies directement les fichiers source (C++, Blueprints, config) que sur demande explicite, **au cas par cas** : l'autorisation donnée pour une tâche ne vaut pas pour la suivante. Quand tu donnes du code : signatures, pseudo-code, appels d'API non évidents ; du code complet seulement si Timéo est bloqué et le demande, ou pour une correction très courte.
+- **Pipeline d'agents** (section 13) : l'agent `cpp-implementer` écrit le C++ d'une spec que Timéo a validée, sur sa branche de travail. Timéo relit chaque diff avant fusion et doit pouvoir l'expliquer.
 
-**Règles qui en découlent :**
-- **Par défaut, tu guides, tu n'écris pas le code à la place de l'utilisateur.** Mais quand Timéo te demande explicitement de modifier directement les fichiers source (C++, Blueprints, config) — typiquement pour aller plus vite sur une implémentation déjà discutée et actée ensemble —, tu peux le faire. L'explicite s'entend au cas par cas : une autorisation donnée sur une tâche ne vaut pas blanc-seing pour les suivantes.
-- Quand tu donnes du code, privilégie les signatures, les étapes en pseudo-code et les appels d'API non évidents. Donne du code complet seulement quand l'utilisateur est bloqué et le demande, ou pour des corrections très courtes.
-- Tu peux créer ou modifier des fichiers de documentation (README, documentation technique, TODO) quand l'utilisateur le demande.
-- Tu peux proposer des mises à jour de CLAUDE.md (nouvelle décision, feature terminée, piège découvert, point « à vérifier » résolu). Présente la modification et applique-la après validation de l'utilisateur.
-- **Avant toute action** (modification, commande, génération) : explique ce que tu veux faire et comment.
-- Pour les commandes Git ou shell risquées (reset, suppression, force push), explique toujours les conséquences avant.
-- **Avant de passer à la phase de test côté éditeur** (Blueprints, assets, PIE) **: review systématique du code C++ écrit entretemps.** Ne pas attendre que Timéo demande la review à chaque fois.
+Dans les deux modes :
+- **Avant toute action** (modification, commande, génération) : explique ce que tu veux faire et comment. Pour les commandes Git ou shell risquées (reset, suppression, force push) : explique d'abord les conséquences.
+- Tu peux créer ou modifier la documentation (README, doc technique, TODO) quand on te le demande. **`CLAUDE.md` : propose la modification, applique-la après validation de Timéo.**
+- **Avant de passer à la phase de test côté éditeur** (Blueprints, assets, PIE) : review systématique du code C++ écrit entretemps, sans attendre qu'on te la demande.
 
 ### Style de communication
 
-- Réponds **en français**.
-- Sois **didactique** : explique les concepts, ne suppose pas qu'ils sont connus. Explique le « pourquoi », pas seulement le « quoi ».
-- Sois **direct et concis** : pas de flatterie, pas de formules creuses.
-- **Détaille ton raisonnement** à chaque étape.
-- **Challenge l'utilisateur** : ne valide jamais une idée par défaut. Si tu vois une faille, un meilleur chemin, un risque de scope, ou une contradiction avec une décision passée, dis-le clairement et argumente. Un désaccord argumenté vaut mieux qu'un oui complaisant. Mais quand l'utilisateur a un bon argument, reconnais-le (exemple : il a eu raison de garder la vélocité au relâchement d'un objet, voir section 7).
-- **Quand tu te trompes, dis-le clairement** et corrige.
+- Réponds **en français**. Sois **didactique** (explique le « pourquoi », pas seulement le « quoi »), **direct et concis** (pas de flatterie, pas de formules creuses), et **détaille ton raisonnement**.
+- **Challenge Timéo** : ne valide jamais une idée par défaut. Faille, meilleur chemin, risque de scope, contradiction avec une décision passée : dis-le et argumente. Quand son argument est bon, reconnais-le (exemple : il avait raison de garder la vélocité au relâchement d'un objet). Quand tu te trompes, dis-le et corrige.
 
 ### Exactitude
 
 - **Ne donne que des informations vérifiées. Si tu ne sais pas, dis-le.**
-- Le projet est sur **Unreal Engine 5.8.x**, une version récente : pour toute API, fonction ou comportement qui aurait pu changer, vérifie dans la documentation officielle d'Epic plutôt que de répondre de mémoire, et signale-le quand tu n'es pas certain.
-- Plusieurs erreurs du passé venaient de réponses de mémoire (voir section 11) : la prudence est justifiée.
+- Le projet est sur **Unreal Engine 5.8.3**, version récente : pour toute API ou comportement qui a pu changer, vérifie dans la documentation officielle d'Epic plutôt que de répondre de mémoire. Plusieurs erreurs passées venaient de réponses de mémoire (section 11).
 
 ### Principes de code
 
-- **KISS, DRY, SOLID**, appliqués concrètement (voir section 6).
-- Code **modulaire et réutilisable** : on construit des systèmes génériques, puis on multiplie les implémentations.
-- **Pas d'optimisation ni d'abstraction prématurée** : on n'ajoute une couche que quand un besoin concret la justifie.
-- **Tests rigoureux, pas de complaisance** : un test doit vérifier le comportement réel, y compris les cas limites (rien détecté, objet détruit, valeur à zéro, etc.). « Ça compile » ne veut pas dire « ça marche ».
-- **Tester chaque étape avant de passer à la suite**, et faire des tests de non-régression (rejouer les mécaniques existantes) avant chaque fusion.
+- **KISS, DRY, SOLID**, appliqués concrètement. Code **modulaire et réutilisable** : des systèmes génériques, puis plusieurs implémentations. **Pas d'optimisation ni d'abstraction prématurée** : une couche n'est ajoutée que pour un besoin concret.
+- **Tests rigoureux, pas de complaisance** : un test vérifie le comportement réel, cas limites compris (rien détecté, objet détruit, valeur à zéro...) et doit pouvoir échouer. « Ça compile » ne veut pas dire « ça marche ». On teste chaque étape avant la suivante, et on rejoue les mécaniques existantes (non-régression) avant chaque fusion.
 
 ---
 
 ## 2. Contexte pédagogique
 
-- **Formation** : Mastère « Réalisation de Jeux Vidéo, Rendu Temps Réel 3D et Technologies Immersives », Gaming Campus, promotion **GTech 4**. Projet de fin d'études (Capstone Project), **individuel**.
-- **Intervenant** : William RAO FERNANDES (PhD en informatique) -> Pour la 1ère semaine seulement.
-- **Organisation** : 9 semaines de cours réparties en 3 blocs de 3 semaines. Chaque semaine est une étape du **même** projet, qui évolue progressivement.
-  - **Bloc 1** — Gameplay, C++/Blueprint et physique avancée (Chaos). Se termine par un prototype de gameplay physique.
-  - **Bloc 2** — Rendu temps réel : matériaux, shaders, Niagara/VFX, éclairage, post-process, profiling et optimisation GPU. Aussi le son et le visuel au sens large.
-  - **Bloc 3** — Mise en scène et expérience joueur : caméra, Sequencer, sound design, rythme, narration environnementale, polish final.
-- **Rythme** : les semaines 1 et 2 de chaque bloc donnent lieu à un rendu noté ; la semaine 3 à un rendu avec **soutenance orale** en anglais. Les semaines 2 et 3 du bloc 1 seront entièrement en anglais.
-- **Alternance** : en dehors des semaines de cours, l'utilisateur est en entreprise et ne travaille sur le projet que le soir et le week-end. Objectif personnel : un jeu jouable de A à Z en mai/juin.
-- **Cahiers des charges** : un CDC « fil rouge » pour l'année, et un CDC par semaine, communiqué au début de la semaine concernée. Le CDC de la semaine 2 du Bloc 1 n'était pas encore connu au moment de la rédaction.
-- **Principe répété dans tous les CDC** : la qualité technique prime sur la quantité de contenu. Le jeu doit être un bac à sable **systémique** : le joueur expérimente avec les systèmes et déclenche des réactions dans l'environnement.
-- **Exigences transversales** : architecture claire et modulaire, systèmes indépendants du Level Blueprint, prototype stable, choix techniques explicables, documentation technique courte à chaque rendu.
-- **IA** : l'usage de l'IA est autorisé comme assistance, mais tout élément produit avec elle doit être compris, vérifié, testé et explicable. Un **statement d'intention IA** d'au moins une page est obligatoire à chaque rendu (où, pourquoi, comment l'IA a été utilisée, bénéfices, limites). L'utilisateur rédige lui-même ce statement : ne le rédige pas à sa place.
-
-### Rendu de la semaine 1 (terminé et livré)
-
-Exigences qui étaient notées : Character jouable, système d'interaction générique, objets physiques (masse, gravité, collisions, friction, forces, impulsions), mécaniques Push / Pull / Launch, plusieurs types de collisions et triggers, architecture modulaire, une première expérimentation avec Chaos, au moins un outil de debug, documentation technique, statement IA. Grille sur 150 points (connaissances 60, compétences 60, savoir-être 30).
+- **Formation** : Mastère « Réalisation de Jeux Vidéo, Rendu Temps Réel 3D et Technologies Immersives », Gaming Campus, promotion GTech 4. Projet de fin d'études **individuel**. 9 semaines en 3 blocs : **Bloc 1** gameplay C++/Blueprint et physique (Chaos), **Bloc 2** rendu temps réel (matériaux, shaders, Niagara, éclairage, profiling) et son, **Bloc 3** mise en scène et expérience joueur (caméra, Sequencer, sound design, narration environnementale, polish).
+- **Alternance** : hors semaines de cours, Timéo travaille le soir et le week-end. Objectif : un jeu jouable de A à Z en mai/juin.
+- **Cahiers des charges** : un CDC « fil rouge » et un CDC par semaine, communiqués par Timéo. Principe de tous les CDC : la qualité technique prime sur la quantité ; le jeu est un bac à sable **systémique** (le joueur expérimente, l'environnement réagit). Exigences transversales : architecture claire et modulaire, systèmes indépendants du Level Blueprint, prototype stable, choix techniques explicables, documentation technique courte.
+- **IA** : autorisée comme assistance, mais tout élément produit avec elle doit être compris, vérifié, testé et explicable. Chaque rendu comporte un **statement d'intention IA** d'au moins une page (où, pourquoi, comment, bénéfices, limites) : **Timéo l'écrit lui-même ; ni Claude ni aucun agent ne le rédige.**
 
 ---
 
 ## 3. Le jeu
 
-Présentation complète dans le `README.md` (3C et description). En résumé :
-
-Le joueur est un **nécromancien** qui apparaît dans une cabane abandonnée. Il récolte des ressources, développe des champs, fabrique des potions dans un chaudron, affronte les soldats envoyés par le village voisin, récupère leurs os pour les ressusciter en serviteurs, qui automatisent ensuite sa base. Quête optionnelle de fin : conquérir le village.
-
-**Valeurs du 3C à respecter :**
-- Personnage d'environ 1m80. Marche : **400** unités. Course : **650** unités. Endurance : environ 10 secondes de course, recharge après **4 secondes** sans courir.
-- Portée d'interaction : 2 à 3 mètres.
-- Caméra **première personne**, FOV par défaut 90 (réglable dans les paramètres, à terme).
-- Sorts : dégâts modérés selon le niveau, types envisagés aveuglement / gel / feu, mana avec recharge d'environ 5 secondes, 4 emplacements.
-- Contrôles prévus dans le 3C : ZQSD, souris, Tab inventaire, E interaction, clic gauche sort, maintien du clic droit pour la roue des sorts, barre de raccourcis 1 à 9, une touche à définir pour une vue de gestion top-down qui servira à organiser sa base.
+Le joueur est un nécromancien qui récolte, développe sa base, fabrique des potions, repousse les soldats du village voisin et ressuscite leurs os en serviteurs qui automatisent la base. Présentation et 3C : `README.md`. Boucle, monde, piliers de level design : `GDD.md`. Les valeurs du 3C (vitesses, endurance, portée, FOV, sorts) sont **dans le README** : ne les recopie pas ailleurs, mets-les à jour à la source.
 
 ---
 
 ## 4. Environnement technique
 
-- **Moteur** : Unreal Engine **5.8.3** (mis à jour depuis 5.8.2). Le `.uproject` référence `"EngineAssociation": "5.8"`, donc les hotfixes sont compatibles. **Les deux ordinateurs de l'utilisateur doivent être sur le même hotfix.** Le README et la documentation mentionnent encore 5.8.2 **(à mettre à jour)**.
-- **IDE** : JetBrains Rider.
-- **Deux ordinateurs** : l'utilisateur alterne entre deux machines. Git LFS doit être installé sur chacune (`git lfs install`, une fois par machine, avant le clone).
-- **Répartition C++ / Blueprint** : la logique et les systèmes en C++, les Blueprints pour utiliser et configurer ces systèmes, et pour le polish.
-- **Base** : template **First Person**. Map principale : **`Lvl_Principal`** (remplace `Lvl_FirstPerson` comme carte par défaut depuis l'environnement de Semaine 2 — voir section 12). `Lvl_FirstPerson` reste disponible comme niveau de test.
-- **Module** : `Spooky_Spores`, macro d'export `SPOOKY_SPORES_API`.
+- **Moteur** : Unreal Engine **5.8.3** (le `.uproject` référence `"5.8"`, donc tout hotfix 5.8.x est compatible). **Les deux ordinateurs de Timéo doivent être sur le même hotfix.**
+- **IDE** : JetBrains Rider. **Deux machines** en alternance : Git LFS doit être installé sur chacune (`git lfs install`, une fois, avant le clone).
+- **Répartition** : logique et systèmes en C++ ; Blueprints pour utiliser et configurer ces systèmes, et pour le polish.
+- **Base** : template First Person. Carte par défaut : **`Lvl_Principal`** ; `Lvl_FirstPerson` reste un niveau de test. Module `Spooky_Spores`, macro d'export `SPOOKY_SPORES_API`.
 
 ---
 
@@ -100,48 +72,16 @@ Le joueur est un **nécromancien** qui apparaît dans une cabane abandonnée. Il
 
 ### Code source (`Source/Spooky_Spores/`), rangé par domaine fonctionnel
 
-```
-Spooky_Spores.h / .cpp / .Build.cs   ← fichiers du module, restent à la racine
-CollisionChannels.h                   ← alias des canaux de collision custom
-Core/
-  Character/    Spooky_SporesCharacter, Spooky_SporesCameraManager
-  Controller/   Spooky_SporesPlayerController
-  GameMode/     Spooky_SporesGameMode
-Interaction/    Grabbable, Interactable, InteractionComponent, GrabComponent, PhysicsGrabbable
-Narrative/      StoryTrigger
-Resources/      ResourceTypes (header seul), ResourceCounterComponent, ResourceDrop, HarvestableResource
-Servants/       Servant
-```
-Règle : **un nouveau domaine = un nouveau dossier**. On ne crée des sous-dossiers à l'intérieur d'un domaine que quand il dépasse 6 à 8 fichiers.
+La liste à jour des dossiers et fichiers est dans `documentation-technique.md` (section 2) et, à défaut, dans `Source/` : vérifie sur le disque plutôt que de te fier à une copie.
+
+- **Un nouveau domaine = un nouveau dossier.** Des sous-dossiers à l'intérieur d'un domaine seulement quand il dépasse 6 à 8 fichiers.
+- Les fichiers du module (`Spooky_Spores.h/.cpp/.Build.cs`) et `CollisionChannels.h` restent à la racine.
 
 ### Content Browser (`Content/Spooky_Spores/`)
 
-Organisation inspirée du [UE5 Style Guide d'Allar](https://github.com/Allar/ue5-style-guide) :
-```
-Core/          Character/, Controller/, GameMode/, Input/Actions/   ← briques structurantes
-Placeables/    Interactables/ (BP_Rock), Narrative/ (BP_StoryTrigger_Entrance),
-               Destructibles/ (GC_Mushroom),
-               Resources/ (BP_Drop_Seed, BP_Drop_Stone, BP_Drop_Wood,
-                           BP_Harvestable_Plant, BP_Harvestable_Stone, BP_Harvestable_Wood),
-               Servants/ (BP_Servant)
-UI/Widgets/    WBP_StoryText, WBP_ResourceEntry, WBP_ResourceCounter
-Characters/Mannequins/...   ← contenu du template
-Maps/
-__ExternalActors__/, __ExternalObjects__/   ← voir l'avertissement ci-dessous
-```
-- `Core/` contient ce qu'on ne modifie pas à la légère ; `Placeables/` contient les instances concrètes, librement ajustables.
-- Emplacements confirmés dans le Content Browser : les Blueprints de drops et de nœuds récoltables sont dans `Content/Spooky_Spores/Placeables/Resources/` (voir ci-dessus pour les noms).
+Organisation inspirée du [UE5 Style Guide d'Allar](https://github.com/Allar/ue5-style-guide) : `Core/` (Character, Controller, GameMode, Input) contient ce qu'on ne modifie pas à la légère ; `Placeables/` les instances concrètes, librement ajustables ; `UI/Widgets/`, `Maps/`. Détail dans `documentation-technique.md`.
 
-**Avertissement : `__ExternalActors__` et `__ExternalObjects__` ne sont pas des assets inutilisés.** Le projet utilise le système **One File Per Actor** : chaque acteur placé dans une map est un fichier séparé dans ces dossiers. Les supprimer viderait les niveaux. Seuls les sous-dossiers correspondant à une map supprimée sont orphelins.
-
-### Documentation (racine du projet)
-
-- `README.md` : présentation du jeu, 3C, lien vers les Releases GitHub.
-- `GDD.md` : document de conception complet (boucle de jeu, monde/factions, piliers de level design, mécaniques et leurs dépendances, direction artistique). Rédaction terminée (2026-10-26 → 2026-11-03).
-- `documentation-technique.md` : **document vivant** décrivant l'architecture actuelle, organisé **par système** (Interaction, Récolte, Mouvement, Narration, Chaos, Debug...), jamais par semaine. Réécrit en continu au fil des features, aucune section datée, **pas de statement IA** (ça, c'est le rôle des fichiers `Rendus/`, voir ci-dessous). Restructuré en ce sens le 2026-10-01 (ancien découpage « Semaine 1 » archivé).
-- `Rendus/` : un fichier **figé** par rendu noté (ex. `Rendu_Bloc1_S1.md`), jamais remodifié après coup, chacun avec **son propre** statement d'intention IA (écrit par Timéo, jamais par Claude). `Rendu_Bloc1_S1.md` est la version exacte de ce qui a été soumis en semaine 1, avant la restructuration du 2026-10-01.
-- `Documentation_Documents/` : captures (PNG) et `Documentation_Documents/Videos/` (GIF). Ce dossier est exclu de Git LFS pour que les images s'affichent sur GitHub. Référencé depuis `documentation-technique.md` (chemin direct) et depuis `Rendus/*.md` (chemin relatif `../Documentation_Documents/...`, un niveau plus bas).
-- `TODO.md` : backlog, tenu à jour par l'utilisateur (confirmé présent et à jour le 2026-10-01).
+**Avertissement : `__ExternalActors__` et `__ExternalObjects__` ne sont pas des assets inutilisés.** Le projet utilise **One File Per Actor** : chaque acteur placé dans une map est un fichier séparé dans ces dossiers. Les supprimer viderait les niveaux. Seuls les sous-dossiers d'une map supprimée sont orphelins.
 
 ---
 
@@ -149,154 +89,65 @@ __ExternalActors__/, __ExternalObjects__/   ← voir l'avertissement ci-dessous
 
 ### Headers et includes
 
-- **Toujours écrire le chemin depuis la racine du module** : `#include "Interaction/Grabbable.h"`, `#include "Resources/ResourceTypes.h"`. Pas d'include court, même pour un fichier du même dossier (Rider en ajoute parfois automatiquement : à corriger).
-- Dans un header, **forward declaration** (`class UPrimitiveComponent;`) quand on ne manipule qu'un pointeur ; include complet dans le `.cpp`.
-- **Inclure explicitement ce qu'on utilise**, sans compter sur une inclusion indirecte (exemples : `GameFramework/Pawn.h` pour `Cast<APawn>`, `Engine/World.h` pour `SpawnActor`, `TimerManager.h` pour les minuteurs, `DrawDebugHelpers.h` pour le debug, `Components/StaticMeshComponent.h`).
+- **Chemin depuis la racine du module** : `#include "Interaction/Grabbable.h"`, jamais d'include court, même dans le même dossier (Rider en ajoute parfois : à corriger).
+- Dans un header : **forward declaration** quand on ne manipule qu'un pointeur ; include complet dans le `.cpp`. **Inclure explicitement ce qu'on utilise** (`GameFramework/Pawn.h`, `Engine/World.h`, `TimerManager.h`, `DrawDebugHelpers.h`, `Components/StaticMeshComponent.h`...), sans compter sur une inclusion indirecte.
 
 ### Spécificateurs d'accès
 
-- **Le plus restrictif par défaut**, élargi seulement si un besoin concret l'exige.
-  - `private` : détail d'implémentation.
-  - `protected` : nécessaire à une classe enfant (composant racine que les Blueprints enfants configurent, fonctions virtuelles).
-  - `public` : l'API que d'autres systèmes appellent. Les `_Implementation` d'interface sont obligatoirement publiques.
-- Les callbacks liés avec `AddDynamic` (overlap, hit) sont des `UFUNCTION()` **privées** s'ils ne sont pas virtuels.
-- Organisation d'un header : deux groupes séparés par des commentaires `// -----------FUNCTIONS-----------` et `// -----------PROPERTIES-----------` (exactement 11 `-` de chaque côté du mot). Dans chaque groupe, trois blocs `public`, `protected`, `private`, dans cet ordre. Fichier de référence : `ResourceDrop.h`. Pas encore généralisé à tous les fichiers existants (pas urgent), mais à suivre pour tout nouveau fichier ou toute réécriture.
+- **Le plus restrictif par défaut** : `private` (détail d'implémentation), `protected` (nécessaire à une classe enfant : composant racine configuré par un Blueprint enfant, fonctions virtuelles), `public` (API appelée par d'autres systèmes ; les `_Implementation` d'interface sont obligatoirement publiques).
+- Callbacks `AddDynamic` (overlap, hit) : `UFUNCTION()` **privées** s'ils ne sont pas virtuels.
+- **Organisation d'un header** : deux groupes séparés par `// -----------FUNCTIONS-----------` et `// -----------PROPERTIES-----------` (exactement 11 `-` de chaque côté), chacun avec trois blocs `public`, `protected`, `private` dans cet ordre. Référence : `ResourceDrop.h`. À suivre pour tout nouveau fichier ou toute réécriture ; pas de généralisation urgente aux anciens.
 
 ### UPROPERTY
 
-- Composant créé dans le constructeur : `VisibleAnywhere, BlueprintReadOnly` (visible et configurable, mais le pointeur n'est pas réassignable).
-- Réglages : `EditAnywhere`, avec une `Category` (format `"Domaine|Sous-partie"`).
-- Membre `private` exposé à Blueprint : `meta = (AllowPrivateAccess = "true")`.
-- Valeur fixée au runtime et à inspecter en jeu : `VisibleInstanceOnly`.
-- Toujours donner une **valeur par défaut explicite** (y compris pour les enums).
-- `TObjectPtr<T>` au lieu des pointeurs bruts pour les membres `UPROPERTY` : adoption **progressive, par domaine**, pas une bascule globale d'un coup. Déjà en place dans tout `Resources/` (`ResourceDrop`, `HarvestableResource`, `FieldPlot`). `GrabComponent` et `Spooky_SporesCharacter` (`Interaction/`, `Core/Character/`) restent volontairement en pointeurs bruts, pas de rétro-conversion prévue. Règle simple : ne jamais mélanger les deux styles **à l'intérieur d'un même fichier**.
+- Composant créé au constructeur : `VisibleAnywhere, BlueprintReadOnly`. Réglage : `EditAnywhere` avec `Category = "Domaine|Sous-partie"`. Membre `private` exposé à Blueprint : `meta = (AllowPrivateAccess = "true")`. Valeur fixée au runtime à inspecter en jeu : `VisibleInstanceOnly`.
+- **Toujours une valeur par défaut explicite** (enums compris).
+- `TObjectPtr<T>` pour les membres `UPROPERTY` : adoption **progressive, par domaine** (déjà en place dans tout `Resources/`). `GrabComponent` et `Spooky_SporesCharacter` restent en pointeurs bruts. **Ne jamais mélanger les deux styles dans un même fichier.**
 
-### Interfaces Unreal (piège important, vérifié sur ce projet)
+### Interfaces Unreal (piège vérifié sur ce projet)
 
-- Déclaration dans l'interface : uniquement `UFUNCTION(BlueprintNativeEvent, BlueprintCallable, ...)` sur la méthode, **sans** déclarer `_Implementation`.
-- Dans UE 5.8, `GENERATED_BODY()` **génère lui-même** une implémentation par défaut de `_Implementation` pour l'interface. Écrire `IMonInterface::MaFonction_Implementation` dans le `.cpp` de l'interface provoque l'erreur `C2084 : la fonction a déjà un corps`. **Les `.cpp` des interfaces restent vides.**
-- Dans la classe concrète : `virtual Type MaFonction_Implementation(...) override;` dans le header, et le corps dans le `.cpp` de la classe.
-- Pour vérifier qu'un acteur implémente une interface : `Actor->Implements<UMonInterface>()` (version **U**).
-- Pour appeler une méthode d'interface depuis l'extérieur : **toujours** `IMonInterface::Execute_MaFonction(Cible, ...)`, jamais `_Implementation` directement.
-- Un override doit reprendre exactement la signature de l'interface (type de retour, paramètres, `const`).
+- Dans l'interface : uniquement `UFUNCTION(BlueprintNativeEvent, BlueprintCallable, ...)`, **sans** déclarer `_Implementation`. En UE 5.8, `GENERATED_BODY()` génère lui-même l'implémentation par défaut : écrire `IMonInterface::MaFonction_Implementation` dans le `.cpp` de l'interface donne `C2084 : la fonction a déjà un corps`. **Les `.cpp` des interfaces restent vides.**
+- Classe concrète : `virtual Type MaFonction_Implementation(...) override;` dans le header (signature **identique**, `const` compris), corps dans son `.cpp`.
+- Vérifier qu'un acteur implémente une interface : `Actor->Implements<UMonInterface>()` (version **U**). Appeler depuis l'extérieur : **toujours** `IMonInterface::Execute_MaFonction(Cible, ...)`, jamais `_Implementation`.
 
-### Commentaires
+### Commentaires et nommage
 
-- **Commentaires de code en anglais** (depuis le 2026-10-01 ; les commentaires antérieurs en français ne sont pas à reprendre rétroactivement). Le reste (discussion, documentation, messages de commit) reste en français.
-
-### Nommage
-
-- Préfixes d'assets : `BP_` (Blueprint), `WBP_` (Widget), `GC_` (Geometry Collection), `IA_` (Input Action).
-- Les fichiers C++ n'ont pas le préfixe de classe : `GrabComponent.h` contient `UGrabComponent`.
-- Fonctions booléennes formulées en question : `IsHolding`, `IsGrabbableTarget`.
-- **Ne jamais nommer un paramètre ou une variable locale comme un membre existant** : Unreal traite le masquage (C4458) comme une erreur. `AActor` possède notamment un membre `Instigator`, d'où le paramètre `InteractingActor`.
+- **Commentaires de code en anglais** (depuis le 2026-10-01 ; pas de reprise rétroactive des anciens). Discussion, documentation : français. Messages de commit : anglais.
+- Préfixes d'assets : `BP_`, `WBP_`, `GC_` (Geometry Collection), `IA_` (Input Action). Les fichiers C++ n'ont pas le préfixe de classe (`GrabComponent.h` contient `UGrabComponent`). Booléens formulés en question (`IsHolding`).
+- **Ne jamais nommer un paramètre ou une variable locale comme un membre existant** : le masquage (C4458) est une erreur. `AActor` possède par exemple `Instigator`, d'où le paramètre `InteractingActor`.
 
 ### Divers
 
-- Racine d'un acteur : `SetRootComponent(...)`, ne jamais redéclarer un membre `RootComponent` (ça masque celui d'`AActor`).
-- Une fonction qui renvoie une référence (`TMap::FindOrAdd`) doit être récupérée dans une référence (`int32&`) si on veut modifier la valeur stockée.
-- Boucles de lecture sur un tableau de structures : `for (const FMaStruct& X : Tableau)`.
+- Racine d'un acteur : `SetRootComponent(...)`, jamais un membre `RootComponent` redéclaré (il masque celui d'`AActor`).
+- Une fonction qui renvoie une référence (`TMap::FindOrAdd`) se récupère dans une référence (`int32&`) pour modifier la valeur stockée.
+- Lecture d'un tableau de structures : `for (const FMaStruct& X : Tableau)`.
 - Les nœuds latents (`Delay`) sont interdits dans les **fonctions** Blueprint : utiliser un **Custom Event** dans l'Event Graph.
 
 ---
 
-## 7. Architecture existante
+## 7. Architecture : principes
 
-Schéma général exigé par le CDC : **Joueur → Interaction → Objets interactifs → Systèmes physiques → Environnement**. Aucun système ne connaît les détails d'implémentation d'un autre.
+Le détail de chaque système (classes, paramètres, choix techniques) est dans `documentation-technique.md`. Ce qui doit rester présent à l'esprit :
 
-### Interfaces (`Interaction/`)
-
-- **`IGrabbable`** : `UPrimitiveComponent* GetGrabbableComponent() const`. « Je peux être manipulé physiquement. » Par défaut renvoie `nullptr`.
-- **`IInteractable`** : `void OnInteract(AActor* InteractingActor)`. « J'ai un comportement à déclencher quand on interagit avec moi. »
-- Deux interfaces séparées (ségrégation des interfaces) : un objet peut implémenter l'une, l'autre, ou les deux. Un établi ou un champ ne sont pas saisissables ; un rocher ou un bouclier le sont.
-
-### `UInteractionComponent`
-
-Détecte ce que regarde le joueur. **Ne fait que de la détection.**
-- Un **seul trace par frame** (`LineTraceSingleByObjectType` sur `COLLISION_INTERACTABLE`), depuis `Pawn->GetActorEyesViewPoint()`, en ignorant le Pawn propriétaire. Longueur : le maximum des deux portées.
-- `GrabRange = 400`, `InteractRange = 200` (réglables).
-- `CurrentTargetDistance` vaut `TNumericLimits<float>::Max()` quand rien n'est détecté (et non 0, pour qu'une comparaison de distance échoue naturellement sans cible). `ActualTarget` est un `TWeakObjectPtr<AActor>`. Les deux sont privés.
-- API : `IsGrabbableTarget(UPrimitiveComponent*& OutComponent)` (BlueprintPure), `IsInteractableTarget()` (BlueprintPure), `TryInteract()` (BlueprintCallable, réutilise `IsInteractableTarget`).
-- **Outil de debug** : `DrawDebugLine` non persistante, verte si une cible est détectée, rouge sinon.
-
-### `UGrabComponent`
-
-Télékinésie, autour d'un `UPhysicsHandleComponent`.
-- `HoldDistance = 200`, `LaunchImpulseStrength = 1000`.
-- `Grab(UPrimitiveComponent*)`, `Release()`, `Launch()` (impulsion en mode vélocité, `bVelChange = true`, pour un lancer indépendant de la masse, appliquée **avant** le relâchement), `IsHolding()` (via `GetGrabbedComponent()`).
-- Le tick met à jour la cible avec `SetTargetLocationAndRotation` (et non `UpdateHandleTransform`, qui n'existe pas sous ce nom).
-- **Choix de design assumé** : `Release()` conserve la vélocité de l'objet. Un mouvement brusque suivi d'un relâchement projette l'objet, comme dans la réalité. `Launch()` reste le lancer contrôlé.
-- **Choix assumé** : pas de raideur ajoutée au physics handle (l'objet ne se recentre pas brutalement à `HoldDistance`), pour préserver l'impression de poids.
-- Le calcul de la position cible est dupliqué entre `Grab()` et le tick ; une factorisation dans une fonction privée `GetGrabTargetTransform` avait été recommandée. **Confirmé non faite** (vérifié dans le code le 2026-10-01, voir dette section 13).
-
-### `APhysicsGrabbable` (Blueprint : `BP_Rock`)
-
-Acteur physique qui implémente `IGrabbable`. `MeshComponent` en racine, profil `PhysicsInteractable`, simulation physique activée. **Masse non codée en dur** : calculée par Chaos, ajustable dans les Blueprints enfants. Renommé depuis `APhysicsInteractable` parce qu'il n'implémente pas `IInteractable`.
-
-### `ASpooky_SporesCharacter` (Blueprint : `BP_FirstPersonCharacter`)
-
-- **Override de `GetActorEyesViewPoint`** : renvoie la position et la rotation monde de `FirstPersonCameraComponent`. Le comportement par défaut (`GetActorLocation() + BaseEyeHeight`) ne correspond pas à la caméra, attachée au socket `head` avec un décalage. Tous les traces s'appuient sur cet override.
-- **`DoInteractAction`** (touche E, une seule touche contextuelle) : si un objet est tenu, le relâcher ; sinon si la cible est saisissable, la saisir ; sinon `TryInteract()`. C'est le Character qui arbitre entre les deux composants : aucun des deux ne connaît l'autre.
-- **`DoLaunchObjects`** (clic droit) : `Launch()`.
-- Input Actions : `InteractAction`, `LaunchObjectsAction` (en plus de celles du template).
-- Composants ajoutés sur le Blueprint : `UInteractionComponent`, `UGrabComponent`, `UResourceCounterComponent`.
-- Le `BeginPlay` du Blueprint crée `WBP_ResourceCounter` et lui transmet le compteur. **Dette connue** : l'UI devra plus tard être gérée par le PlayerController ou une classe HUD.
-
-### Narration (`Narrative/`)
-
-- **`AStoryTrigger`** : `UBoxComponent` en racine avec le profil intégré `Trigger`, `StoryText` (FText éditable), `bTriggerOnce`, `bHasTriggered`, overlap filtré sur les Pawns, et un `BlueprintImplementableEvent OnStoryTriggered()` : la classe C++ ne connaît pas l'UI.
-- **`BP_StoryTrigger_Entrance`** : à l'entrée de la cabane, affiche `WBP_StoryText`.
-- **`WBP_StoryText`** : widget générique, Custom Event `ShowText(Message)` : texte, `Delay`, `Remove from Parent`.
-- `bHasTriggered` n'est pas sauvegardé entre deux lancements (pas encore de système de sauvegarde).
-
-### Chaos
-
-- **`GC_Mushroom`** : champignon (deux cylindres fusionnés) converti en Geometry Collection, fracture Uniform Voronoi (2 morceaux). **Damage Threshold : 5000 / 500 / 50**, réglé sur l'instance placée dans le niveau. Se casse en tombant ou quand on lui lance un objet. Matériau par défaut (placeholder assumé). Les couleurs des morceaux ne s'affichent que dans l'éditeur (outil de debug de la Fracture Mode).
-
-### Récolte de ressources (`Resources/`)
-
-- **`EResourceType`** (`ResourceTypes.h`, header seul) : `Seed`, `Wood`, `Stone`. Ajouter un type = ajouter une valeur ici et une entrée dans `WBP_ResourceCounter`.
-- **`UResourceCounterComponent`** : `TMap<EResourceType, int32>`, `AddResource` (avec `FindOrAdd` récupéré en référence), `GetResourceCount` (avec `Find`), et un délégué `FOnResourceChanged(Type, NewCount)` `BlueprintAssignable`, diffusé à chaque ajout. Nommé « Counter » et non « Inventory » : ce n'est pas un inventaire.
-- **`AResourceDrop`** : l'objet ramassable au sol.
-  - Profil `ResourceDrop`, simulation physique, overlap events et hit events activés.
-  - `InitializeDrop(Type, Amount)` ne fait que stocker les données.
-  - `BeginPlay` : branche les événements, applique le saut (`FMath::VRandCone` autour de la verticale, `PopStrength = 300`, `PopConeHalfAngle = 35` degrés convertis en radians, impulsion en mode vélocité), puis lance le délai de ramassage.
-  - **Délai de ramassage** (`PickupDelay = 0.5`) : pendant ce délai, les overlaps sont ignorés. À la fin, `EnablePickup` vérifie les acteurs qui chevauchent **déjà** le drop (un overlap déjà commencé ne redéclenche pas d'événement). Si le délai vaut 0, activation directe (un `SetTimer` avec une durée nulle ne se lance pas).
-  - `TryCollect` renvoie un `bool` pour éviter un double ramassage. Vérifie que le compteur existe (un ennemi est aussi un Pawn).
-  - **Atterrissage** : au premier contact avec un sol (normale avec `Z >= MinGroundNormalZ = 0.7`), physique coupée, rotation réduite au seul yaw, puis repositionnement vertical grâce à `MeshComponent->Bounds` pour que la base touche le sol. Le redressement est instantané (à adoucir au Bloc 2). Sur une pente, le drop reste droit.
-- **`AHarvestableResource`** : nœud récoltable, implémente `IInteractable`, profil `PhysicsInteractable` (sinon le trace ne le voit pas).
-  - `TArray<FResourceDropEntry> Drops`, chaque entrée : `DropClass`, `Type`, `Amount`, `SpawnCount`. `DropSpawnRadius` réglable.
-  - `OnInteract_Implementation` : coupe d'abord la collision du nœud, puis pour chaque entrée et chaque exemplaire, calcule une position (décalage aléatoire indépendant sur X et Y, léger décalage vertical), fait apparaître le drop en **spawn différé** (`SpawnActorDeferred`, `InitializeDrop`, puis `FinishSpawning`), passe au suivant avec `continue` en cas d'échec, et détruit le nœud à la fin.
-  - Le spawn différé est indispensable : `SpawnActor` exécute `BeginPlay` et les premiers overlaps **avant** de rendre la main, donc un drop apparu dans la capsule du joueur était ramassé avant d'être initialisé (bug d'origine : du bois donnait une graine).
-- **UI** : `WBP_ResourceEntry` (une ressource : `ResourceType` et `Label` éditables par instance, fonction `InitializeEntry(Counter)` qui affiche la valeur initiale et se lie à `OnResourceChanged`, avec un filtre sur le type via un nœud **`Equal (Enum)`**), et `WBP_ResourceCounter` (une entrée par type, fonction `InitializeCounter(Counter)`). Le widget reçoit le compteur au lieu d'aller le chercher (injection de dépendance, pour ne pas dépendre de l'ordre d'initialisation du moteur). L'apparence est volontairement brute : le visuel relève du Bloc 2.
+- Schéma exigé par le CDC : **Joueur → Interaction → Objets interactifs → Systèmes physiques → Environnement**. Aucun système ne connaît les détails d'implémentation d'un autre.
+- Deux interfaces séparées (ségrégation des interfaces) : `IGrabbable` (« je peux être manipulé physiquement », `GetGrabbableComponent()`) et `IInteractable` (« j'ai un comportement à déclencher », `OnInteract(AActor* InteractingActor)`). Un objet implémente l'une, l'autre ou les deux.
+- `UInteractionComponent` **ne fait que de la détection** (un seul trace par frame). `UGrabComponent` ne fait que de la télékinésie. **C'est le Character qui arbitre** entre eux (touche E contextuelle) : aucun composant n'en appelle un autre.
+- Tous les traces s'appuient sur l'override de `GetActorEyesViewPoint()` du Character, qui renvoie la caméra réelle (le comportement par défaut ne correspond pas à la caméra attachée au socket `head`).
+- Les widgets **reçoivent** leurs dépendances (le compteur de ressources) au lieu de les chercher : pas de dépendance à l'ordre d'initialisation du moteur.
+- Les types de ressources : `EResourceType` (`Resources/ResourceTypes.h`). Ajouter un type = une valeur ici + une entrée dans `WBP_ResourceCounter`.
 
 ---
 
 ## 8. Collisions
 
-### Canaux custom (`Project Settings > Engine - Collision`)
+**Canaux custom** (`Project Settings > Engine - Collision`) : `Interactable` (Object Channel, Block par défaut : tout ce que le trace d'interaction doit détecter), `ResourceDrop` (Object Channel, Block par défaut : pour que les drops s'ignorent entre eux), `Projectile` (hérité du template).
+- `Interactable` est un **Object Channel**, pas un Trace Channel : on le filtre avec `LineTraceSingleByObjectType` et un `FCollisionObjectQueryParams`.
+- Un canal custom n'a pas de nom d'enum : il occupe un slot `ECC_GameTraceChannelN` (numéro dans `Config/DefaultEngine.ini`). `CollisionChannels.h` y définit des alias (`COLLISION_INTERACTABLE`) ; n'en ajouter que pour un canal utilisé dans le code.
+- La **réponse par défaut** d'un canal décrit comment **les autres presets** réagissent à lui : mettre `Ignore` sur `ResourceDrop` aurait fait tomber les drops à travers le sol.
 
-| Canal | Type | Réponse par défaut | Rôle |
-|---|---|---|---|
-| `Interactable` | Object Channel | Block | Tout ce que le trace de `UInteractionComponent` doit détecter |
-| `ResourceDrop` | Object Channel | Block | Les drops, pour qu'ils s'ignorent entre eux |
-| `Projectile` | Object Channel | Block | Hérité du template |
+**Presets** : `PhysicsInteractable` (Query and Physics, Object Type Interactable, Block partout ; **requis pour qu'un acteur soit vu par le trace**, y compris `AHarvestableResource`), `ResourceDrop` (Query and Physics, Block sauf Pawn en Overlap et ResourceDrop en Ignore), `Trigger` (intégré, utilisé par `AStoryTrigger`).
 
-- `Interactable` est un **Object Channel**, pas un Trace Channel : on le filtre avec `LineTraceSingleByObjectType` et un `FCollisionObjectQueryParams`, pas avec `LineTraceSingleByChannel`.
-- Un canal custom n'a pas de nom d'enum dédié en C++ : il occupe un slot `ECC_GameTraceChannelN`. Le numéro se trouve dans `Config/DefaultEngine.ini`. `CollisionChannels.h` définit l'alias `COLLISION_INTERACTABLE`. Ajouter un alias seulement si un canal est utilisé dans le code.
-- La **réponse par défaut** d'un nouveau canal décrit comment **les autres presets** réagissent à lui. Mettre `Ignore` sur `ResourceDrop` aurait fait tomber les drops à travers le sol.
-
-### Presets
-
-| Preset | Collision | Object Type | Réponses |
-|---|---|---|---|
-| `PhysicsInteractable` | Query and Physics | Interactable | Block partout |
-| `ResourceDrop` | Query and Physics | ResourceDrop | Block, sauf Pawn en Overlap et ResourceDrop en Ignore |
-| `Trigger` (intégré) | — | — | Utilisé par `AStoryTrigger` |
-
-- `Query` couvre les traces et overlaps, `Physics` la simulation. Un preset en `No Collision` désactive tout, physique comprise.
-- Résolution entre deux objets : la réponse la plus faible l'emporte. Blocage seulement si les deux bloquent ; aucune interaction dès qu'un des deux ignore ; overlap sinon.
-- Overlap et hit exigent aussi d'être activés sur le composant : `SetGenerateOverlapEvents(true)` et `SetNotifyRigidBodyCollision(true)`.
+**Règles** : `Query` couvre traces et overlaps, `Physics` la simulation ; `No Collision` désactive tout. Entre deux objets, la réponse la plus faible l'emporte (blocage seulement si les deux bloquent, aucune interaction dès qu'un des deux ignore, overlap sinon). Overlap et hit exigent aussi `SetGenerateOverlapEvents(true)` et `SetNotifyRigidBodyCollision(true)` sur le composant.
 
 ---
 
@@ -304,17 +155,17 @@ Acteur physique qui implémente `IGrabbable`. `MeshComponent` en racine, profil 
 
 | Action | Touche |
 |---|---|
-| Déplacement | ZQSD |
-| Regarder | Souris |
-| Sauter | Espace |
+| Déplacement / regarder / sauter | ZQSD / souris / Espace |
 | Relâcher / saisir / interagir (contextuel) | E |
 | Lancer l'objet tenu | Clic droit |
+| Sort | Clic gauche |
 | Sprint (maintenu) | Maj gauche |
+| Poser une Necrospore (serviteur) | L |
 | Afficher/masquer le panneau de contrôles | Entrée |
 
-- Le clic droit est déjà utilisé pour le lancer, et le 3C le réserve à la roue des sorts. Ne lui ajoute pas de nouveau rôle sans en discuter.
-- **`²` (AZERTY) est réservée à la console Unreal** (équivalent du backtick/tilde en QWERTY) : ne jamais l'assigner à une Input Action, le binding console l'intercepte avant. De même, Échap ferme la fenêtre de viewport dans l'éditeur (PIE) : éviter de l'assigner à une action gameplay tant qu'on reste en PIE pour tester.
-- Refonte des contrôles prévue plus tard, quand il y aura des objets équipables : contrôles dépendant de l'objet en main, via les **Input Mapping Contexts** d'Enhanced Input, en mettant le 3C à jour.
+- Le clic droit est déjà pris par le lancer, et le 3C le réserve à la roue des sorts : n'ajoute pas de rôle sans en discuter.
+- **`²` (AZERTY) est réservée à la console Unreal** : ne jamais l'assigner (le binding console l'intercepte). Échap ferme la fenêtre de viewport en PIE : à éviter pour une action gameplay.
+- Refonte des contrôles prévue avec les objets équipables, via les **Input Mapping Contexts** d'Enhanced Input (mettre le 3C à jour à ce moment).
 
 ---
 
@@ -322,187 +173,91 @@ Acteur physique qui implémente `IGrabbable`. `MeshComponent` en racine, profil 
 
 ### Git LFS
 
-`.gitattributes` :
-```
-*.uasset filter=lfs diff=lfs merge=lfs -text
-*.umap filter=lfs diff=lfs merge=lfs -text
-*.png filter=lfs diff=lfs merge=lfs -text
-*.jpg filter=lfs diff=lfs merge=lfs -text
-*.wav filter=lfs diff=lfs merge=lfs -text
-*.fbx filter=lfs diff=lfs merge=lfs -text
-*.psd filter=lfs diff=lfs merge=lfs -text
+- `.gitattributes` fait foi pour les types suivis (`git lfs track`). `Documentation_Documents/**` est volontairement **exclu** de LFS (images LFS mal affichées dans un README GitHub). `.gitignore` : template Unreal (gitignore.io) plus règles du projet.
+- Ajouter un pattern ne convertit pas les fichiers déjà commités : `git add --renormalize <chemin>`. L'historique antérieur reste en Git classique, et le quota LFS consommé ne se récupère pas en supprimant des fichiers (à surveiller dans les paramètres de facturation GitHub). Vérifications : `git lfs ls-files` (`*` = contenu présent, `-` = pointeur seul), `git check-attr filter -- <fichier>`.
 
-Documentation_Documents/** -filter -diff -merge -text
-```
-- La dernière ligne exclut la documentation de LFS (images LFS mal affichées dans un README GitHub).
-- LFS a été ajouté après des commits existants, sans réécriture d'historique. Un `git add --renormalize .` a converti les fichiers existants. L'historique antérieur reste en Git classique, et le quota LFS consommé ne se récupère pas en supprimant des fichiers.
-- Vérifications utiles : `git lfs ls-files` (`*` = contenu présent, `-` = pointeur seul), `git check-attr filter -- <fichier>`.
-- Quota LFS GitHub à surveiller dans les paramètres de facturation.
-- `.gitignore` : template Unreal de gitignore.io (`Binaries/`, `Intermediate/`, `Saved/`, `DerivedDataCache/`, fichiers de l'IDE...).
-
-### Branches
+### Branches et fusion
 
 ```
 main  ← versions validées uniquement (rendus), jamais de commit direct
  └─ dev  ← intégration
-     └─ feature/xxx, fix/xxx, chore/xxx  ← une par tâche
+     └─ feature/x, fix/x, chore/x, docs/x  (et asset/, integ/, level/ : voir le workflow d'agents)
 ```
-- Rulesets GitHub actifs (testés) :
-  - `main` : pull request obligatoire avec **0 approbation** (l'utilisateur est seul), méthode de fusion **Merge uniquement**, force push et suppression bloqués. Squash et Rebase sont interdits sur `main` : ils créent de nouveaux commits, et `dev` et `main` divergeraient.
-  - `dev` : force push et suppression bloqués.
-- Branche par défaut sur GitHub : `main`. **Vérifier que les pull requests de feature ciblent `dev`.**
-- La règle « `main` ne reçoit que depuis `dev` » n'est pas imposée techniquement : c'est une discipline.
-- Fusion `feature` → `dev` : **Squash** (une feature = un commit), puis suppression de la branche.
-- Livraison : pull request `dev` → `main`, puis tag (`v0.2`...) et Release GitHub.
-- « Validé » = compile, toutes les mécaniques rejouées (non-régression), documentation à jour.
+- Rulesets GitHub : `main` exige une PR (0 approbation, Timéo est seul), fusion **Merge uniquement** (Squash et Rebase interdits sur `main` : `dev` et `main` divergeraient), force push et suppression bloqués. `dev` : force push et suppression bloqués ; **PR obligatoire sur `dev` à régler côté GitHub** (voir `docs/WORKFLOW_AGENTS.md` section 11).
+- Branche par défaut sur GitHub : `main`. **Les PR de feature ciblent `dev`.** « `main` ne reçoit que depuis `dev` » est une discipline, pas imposée techniquement.
+- `feature` → `dev` : **Squash** (une feature = un commit), puis suppression de la branche. Livraison : PR `dev` → `main`, tag (`v0.2`...) et Release GitHub. **« Validé »** = compile, mécaniques rejouées (non-régression), documentation à jour.
+- **Une branche de feature à la fois par défaut, et courte** : deux branches qui modifient le même `.uasset` créent un conflit impossible à fusionner. Le workflow d'agents n'autorise des branches parallèles que si leurs périmètres de fichiers sont disjoints.
 
-### Discipline
+### Commits, push, PR
 
-- **Claude ne fait jamais `git commit` ni `git push` sans autorisation explicite de Timéo, à chaque fois** (pas une autorisation valable une fois pour toutes). Préparer/expliquer le commit est possible, l'exécuter non, tant que Timéo n'a pas dit go.
-- Titre et description de pull request, et **messages de commit, en anglais** (lectorat international) ; la discussion avec Claude reste en français.
-- **Aucune ligne d'attribution à Claude** dans les commits (`Co-Authored-By: Claude...`) ni dans les descriptions de pull request (`🤖 Generated with Claude Code`) — ça remplace l'instruction système par défaut, qui ajoute ces lignes sauf consigne contraire du projet.
-- `git pull` en début de session, `git push` en fin de session, sur chaque machine. Ne jamais laisser de travail non poussé sur une machine avant de passer sur l'autre.
-- **Une seule branche de feature ouverte à la fois**, et courte : deux branches qui modifient le même `.uasset` créent un conflit impossible à fusionner.
-- **Fermer l'éditeur Unreal avant tout `git switch`/`git pull`/`git restore` touchant des `.uasset`** : l'éditeur verrouille les assets chargés, Git ne peut pas les remplacer (`unable to unlink ... Invalid argument`) et laisse le dépôt dans un état intermédiaire (rencontré le 2026-11-10).
-- **Après un `git pull` ou un changement de branche qui ajoute ou supprime des fichiers C++, régénérer les fichiers de projet** (clic droit sur le `.uproject` > Generate Visual Studio project files), sinon Rider n'affiche pas les fichiers. La compilation n'est pas affectée.
-- Après un renommage ou un déplacement de classe C++, ou une modification de `UFUNCTION`/`UINTERFACE` : fermer l'éditeur, régénérer les fichiers de projet, et faire un **Rebuild complet** (pas Live Coding).
+- **Messages de commit et titres/descriptions de PR en anglais**, préfixés `[ADD]`, `[FIX]`, `[CHORE]`, `[DOC]`. **Aucune ligne d'attribution à Claude** (`Co-Authored-By: Claude...`, `Generated with Claude Code`) ni dans les commits ni dans les PR : cette règle remplace l'instruction système par défaut.
+- **Session manuelle** : Claude ne fait jamais `git commit` ni `git push` sans le go explicite de Timéo, **à chaque fois**. Préparer et expliquer le commit est possible, l'exécuter non.
+- **Pipeline d'agents** (section 13) : les agents commitent et poussent **sur leur propre branche de travail**, jamais sur `dev` ni `main`, jamais de push forcé, **jamais de fusion**. Timéo fusionne.
+- `gh` (GitHub CLI) est installé et authentifié. Les règles `deny` de `.claude/settings.json` interdisent `gh pr merge` et `gh api` : contournables (appel par chemin complet), donc des garde-fous, pas une frontière.
+- `git pull` en début de session et `git push` en fin de session, sur chaque machine : ne jamais laisser de travail non poussé avant de changer d'ordinateur. Commit perdu après un `reset --hard` : `git reflog` puis `git cherry-pick <hash>`.
+
+### Pièges Git / éditeur
+
+- **Fermer l'éditeur Unreal avant tout `git switch`/`pull`/`restore` qui touche des `.uasset`** : l'éditeur verrouille les assets chargés, Git ne peut pas les remplacer (`unable to unlink ... Invalid argument`) et laisse le dépôt dans un état intermédiaire.
+- Après un `pull` ou un changement de branche qui ajoute ou supprime des fichiers C++ : **régénérer les fichiers de projet** (clic droit sur le `.uproject`), sinon Rider n'affiche pas les fichiers. Après un renommage ou déplacement de classe, ou une modification de `UFUNCTION`/`UINTERFACE` : fermer l'éditeur, régénérer, **Rebuild complet** (pas Live Coding).
 - Supprimer des assets **uniquement depuis le Content Browser** (vérification des références), puis Fix Up Redirectors. Jamais depuis l'explorateur Windows.
-- Commit perdu après un `reset --hard` : `git reflog` puis `git cherry-pick <hash>`.
-- **Plugins d'outillage tiers (ex. EngineWire, pont MCP) : installés dans le moteur, jamais dans `Plugins/` du projet.** Dans le projet, ils sont recompilés avec lui (EngineWire : ~1 200 `.cpp`, plus d'une heure) et finissent suivis par Git. Procédure : `RunUAT.bat BuildPlugin -Plugin=<...>.uplugin -Package=<dossier hors projet> -TargetPlatforms=Win64`, copie du résultat dans `C:\Program Files\Epic Games\UE_5.8\Engine\Plugins\Marketplace\` (droits admin), entrée `"Optional": true` dans le `.uproject` (le projet s'ouvre sans le plugin). `Plugins/Marketplace/` est ignoré par Git. À refaire sur chaque machine, sur le même hotfix (copier le plugin compilé suffit). Fait le 2026-11-10 sur une seule des deux machines ; **l'autre reste à faire** (dossier compilé conservé dans `C:\Projects\Unreal Projects\_PluginBuilds\EngineWire`). RiderLink reste dans `Plugins/Developer/` (géré par Rider).
-- Messages de commit préfixés : `[ADD]`, `[FIX]`, `[CHORE]`, `[DOC]`, **rédigés en anglais** (depuis le 2026-10-01 ; les commits antérieurs en français ne sont pas à reprendre rétroactivement).
+- **Plugins d'outillage tiers (EngineWire, pont MCP) : installés dans le moteur, jamais dans `Plugins/` du projet** (ils seraient recompilés avec lui, EngineWire : plus d'une heure, et finiraient suivis par Git). Procédure : `RunUAT.bat BuildPlugin -Plugin=<...>.uplugin -Package=<dossier hors projet> -TargetPlatforms=Win64`, copie dans `C:\Program Files\Epic Games\UE_5.8\Engine\Plugins\Marketplace\` (droits admin), entrée `"Optional": true` dans le `.uproject`. `Plugins/Marketplace/` est ignoré par Git. À refaire sur chaque machine, sur le même hotfix : fait le 2026-11-10 sur une seule ; **l'autre reste à faire** (dossier compilé conservé dans `C:\Projects\Unreal Projects\_PluginBuilds\EngineWire`). RiderLink reste dans `Plugins/Developer/` (géré par Rider).
 
 ---
 
 ## 11. Pièges déjà rencontrés (leçons du projet)
 
-- `_Implementation` redéclaré ou défini dans une interface → C2084 (voir section 6).
-- Membre `RootComponent` redéclaré → masque celui d'`AActor`, l'acteur n'a pas de racine.
-- Paramètre nommé `Instigator` dans un acteur → C4458.
-- Variable locale portant le nom d'un `UPROPERTY` → la valeur de l'éditeur est ignorée.
-- `FindOrAdd` récupéré par copie → le compteur ne s'incrémentait jamais.
-- `FindComponentByClass` appelé sans cible → cherche sur `this`.
-- `Destroy()` dans `BeginPlay` → chaque drop se détruisait à sa création.
-- Collision désactivée dans le constructeur au lieu du moment de l'interaction → nœud invisible pour le trace.
-- `return` au lieu de `continue` dans une boucle de spawn → fin de fonction sautée.
-- Ajouter un `float` à un `FVector` → ajouté aux trois composantes.
-- `FHitResult.Location` utilisé quand le trace n'a rien touché → vaut `(0,0,0)`.
-- `DrawDebugLine` persistante appelée à chaque tick → accumulation de lignes.
-- `GetActorEyesViewPoint` par défaut ≠ caméra réelle → trace décalé.
-- `Delay` dans une fonction Blueprint → interdit.
-- Nœud `==` numérique au lieu de `Equal (Enum)` → impossible de brancher un enum.
-- Drops apparus les uns dans les autres, qui se bloquaient entre eux → vitesses d'expulsion énormes (résolu par le canal `ResourceDrop` en Ignore).
-- `SpawnActor` exécute `BeginPlay` et les overlaps avant de rendre la main → spawn différé.
-- Damage Threshold par défaut trop élevé pour un petit objet.
-- Question systématique à se poser : **à quel moment cette ligne s'exécute-t-elle ?**
-- Touche assignée à une Input Action qui semblait libre mais ouvrait la console (`²` en AZERTY) → vérifier les bindings réservés par le moteur/l'éditeur avant d'assigner une touche à une nouvelle action.
-- Une propriété modifiée à la main sur une **instance placée dans le niveau** (ex. `AttackRange`, mais ça vaut aussi pour les points d'une spline) ignore ensuite toute nouvelle valeur par défaut venant du C++ ou du Blueprint, tant qu'elle n'est pas réinitialisée (`Reset to Default`) — toujours vérifier l'instance placée, pas seulement la classe, quand une modification de valeur par défaut semble n'avoir aucun effet.
-- `UPathFollowingComponent::HasReachedInternal` (utilisé par `AIController::MoveToLocation`) mesure la distance d'arrivée **en 2D uniquement** (Z ignoré) → une distance 3D calculée à la main ne concordera jamais exactement avec le `AlreadyAtGoal` du moteur.
-- Le paramètre `bStopOnOverlap` de `AIController::MoveToLocation` ajoute **automatiquement** le rayon de capsule de l'agent, à la fois pour arrêter le mouvement et pour le test d'arrivée (`SetReachTestIncludesAgentRadius`) → l'ajouter une seconde fois à la main dans `AcceptanceRadius` le compte en double.
-- `Default Query Extent` (`Project Settings > Navigation System`) trop petit empêche de projeter un point de destination situé dans la marge d'exclusion du NavMesh autour d'un obstacle (ex. le pivot d'un objet) → `MoveToLocation` échoue silencieusement (`Failed`) même avec `bProjectDestinationToNavigation = true`, si le point visé reste hors de cette zone de recherche.
-- Un personnage déplacé via `AIController::MoveToLocation`/`PathFollowingComponent` n'alimente pas forcément l'Animation Blueprint de la même façon qu'`AddMovementInput` (l'ennemi soldat glissait sans jouer son cycle de marche) → vérifier avec l'Anim Blueprint Debugger avant de chercher une cause côté C++.
-- `TActorIterator<T>` ne garantit aucun ordre de parcours → ne jamais s'en servir pour choisir "le bon" acteur parmi plusieurs instances du même type (ex. une spline de chemin) ; préférer une référence explicite assignée à la main (`EditInstanceOnly`) sur l'acteur concerné.
+Question systématique : **à quel moment cette ligne s'exécute-t-elle ?**
+
+- `_Implementation` redéclaré ou défini dans une interface → C2084 (section 6). Membre `RootComponent` redéclaré → l'acteur n'a pas de racine. Paramètre nommé `Instigator` → C4458. Variable locale portant le nom d'un `UPROPERTY` → la valeur de l'éditeur est ignorée.
+- `FindOrAdd` récupéré par copie → le compteur ne s'incrémentait jamais. `FindComponentByClass` sans cible → cherche sur `this`. Ajouter un `float` à un `FVector` → ajouté aux trois composantes.
+- `Destroy()` dans `BeginPlay` → chaque drop se détruisait à sa création. `return` au lieu de `continue` dans une boucle de spawn → fin de fonction sautée.
+- `SpawnActor` exécute `BeginPlay` et les overlaps **avant** de rendre la main → utiliser le spawn différé (`SpawnActorDeferred` → initialisation → `FinishSpawning`). Collision désactivée au constructeur au lieu du moment de l'interaction → nœud invisible pour le trace.
+- `FHitResult.Location` utilisé quand le trace n'a rien touché → vaut `(0,0,0)`. `DrawDebugLine` persistante appelée à chaque tick → accumulation. `GetActorEyesViewPoint` par défaut ≠ caméra réelle → trace décalé.
+- Drops apparus les uns dans les autres, qui se bloquaient → vitesses d'expulsion énormes (résolu par le canal `ResourceDrop` en Ignore). Damage Threshold par défaut trop élevé pour un petit objet.
+- `Delay` dans une fonction Blueprint → interdit (Custom Event). Nœud `==` numérique au lieu de `Equal (Enum)` → impossible de brancher un enum.
+- Touche assignée qui semblait libre mais ouvrait la console (`²` en AZERTY) → vérifier les bindings réservés avant d'assigner.
+- Une propriété modifiée à la main sur une **instance placée dans le niveau** (ex. `AttackRange`, points d'une spline) ignore ensuite toute nouvelle valeur par défaut du C++ ou du Blueprint, tant qu'elle n'est pas réinitialisée (`Reset to Default`) : vérifier l'instance placée, pas seulement la classe.
+- `UPathFollowingComponent::HasReachedInternal` (utilisé par `AIController::MoveToLocation`) mesure la distance d'arrivée **en 2D uniquement** : une distance 3D calculée à la main ne concordera jamais avec le `AlreadyAtGoal` du moteur.
+- `bStopOnOverlap` de `MoveToLocation` ajoute **automatiquement** le rayon de capsule de l'agent (arrêt et test d'arrivée) : l'ajouter à la main dans `AcceptanceRadius` le compte en double.
+- `Default Query Extent` (`Project Settings > Navigation System`) trop petit empêche de projeter un point situé dans la marge d'exclusion du NavMesh autour d'un obstacle : `MoveToLocation` échoue silencieusement (`Failed`) même avec `bProjectDestinationToNavigation = true`.
+- Un personnage déplacé via `MoveToLocation`/`PathFollowingComponent` n'alimente pas forcément l'Animation Blueprint comme `AddMovementInput` (l'ennemi glissait sans cycle de marche) : vérifier avec l'Anim Blueprint Debugger avant de chercher côté C++.
+- `TActorIterator<T>` ne garantit aucun ordre : ne jamais s'en servir pour choisir « le bon » acteur parmi plusieurs du même type ; préférer une référence explicite assignée à la main (`EditInstanceOnly`).
 
 ---
 
-## 12. État actuel et planning
+## 12. Planning et rythme de travail
 
-### Où en est le projet
-
-- **Rendu de la semaine 1** : livré (build en Release GitHub, documentation, statement IA).
-- **Récolte de ressources (Checkpoint A)** : terminée, testée, fusionnée dans `dev`, branche supprimée. Documentée dans `documentation-technique.md`.
-- **Sprint et endurance** : terminé, testé, fusionné dans `dev`, branche supprimée. Documenté dans `documentation-technique.md`.
-- **Plantation (Checkpoint B)** : terminée et testée (planter/pousser/récolter, champ réutilisable, debug visuel par couleur). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-06). Documenté dans `documentation-technique.md`. Branche `feature/plantation` supprimée.
-- **Chaudron** : terminé et testé (recette 3 Bois + 1 Pierre + 2 Blé → 1 Potion, barre de progression fonctionnelle, potion créditée au compteur de ressources). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-07). Documenté dans `documentation-technique.md`. Branche `feature/cauldron` supprimée.
-- **Panneau de contrôles** : terminé et testé (affichage statique des touches, toggle par Entrée, `WBP_ControlsPanel`). **Fusionné dans `dev`** en Squash (confirmé le 2026-10-08). Documenté dans `documentation-technique.md`. Branche `feature/controls-panel` supprimée.
-- **Composant de santé + frappe des ressources + premier sort** : terminé et testé (non-régression comprise). `UHealthComponent` générique ajouté en composition optionnelle sur `BP_Harvestable_Wood`/`BP_Harvestable_Stone` ; `UManaComponent` + `USpellCastingComponent` gèrent un premier sort (clic gauche) avec coup différé et cadencé par timer. **Fusionné dans `dev`** en Squash (confirmé le 2026-10-11). Documenté dans `documentation-technique.md`. Branche `feature/health-and-combat` supprimée.
-- **Environnement du joueur (colline, cabane, clôture, forêt)** : terminé et testé. Niveau `Lvl_Principal` (Landscape sculpté en colline, cabane avec sol/toit/fenêtre/lumière intérieure, clôture, chaudron, champs, rocher de démo, champignons, ressources dispersées via Foliage Mode) remplaçant `Lvl_FirstPerson` comme carte par défaut du projet. **Fusionné dans `dev`** en Squash (confirmé le 2026-10-23). Documenté dans `documentation-technique.md`. Publié en Release GitHub (`V1.0.1`). Branche `feature/environment-blockout` supprimée.
-- **Dette connue laissée par cette feature** : bug de logique inversée dans `AStoryTrigger::OnBoxOverlap` (`bTriggerOnce`/`bHasTriggered`, voir section 11), debug `DrawDebugLine` de `UInteractionComponent` commenté en dur (pas un interrupteur), dossier `Content/RockEnv_Pack/Meshes/Small_Rocks/` gardant 7 meshes au lieu des 3 réellement utilisés. À vérifier si toujours d'actualité.
-- **Soldat ennemi simple (file d'attente, item 1)** : terminé et testé en PIE sur `feature/enemy-soldier` (suivi de spline, détection/approche du destructible le plus proche, attaque, mort, drop d'os via `AResourceDrop`). Documenté dans `documentation-technique.md` section 13. **Fusionné dans `dev`** (PR #7, confirmé le 2026-11-09). Dette laissée : `AEnemySoldier::PathSplineActor` est `EditInstanceOnly`, assignable seulement sur une instance déjà placée dans le niveau — un futur spawner de vagues devra l'assigner par code, **en spawn différé** car `AEnemyAIController::OnPossess` lit la spline pendant `SpawnActor` (voir `TODO.md`, item 3b). Includes courts à corriger dans `EnemyAIController.cpp`.
-- **Résurrection (item 2)** : décidé le 2026-11-09 — l'objet de résurrection est stocké provisoirement comme ressource comptée dans `UResourceCounterComponent` (pas d'inventaire avant l'item 7). L'accès à ce stockage doit rester isolé à un seul endroit du code de pose, pour que le passage à l'inventaire soit local. Items 2 et 3 découpés en sous-étapes fusionnables séparément (voir `TODO.md`).
-- **Chaudron multi-recettes + Necrospore (item 2, étape 2.1)** : terminé, testé, fusionné dans `dev` (PR #8, le 2026-11-10). Documenté dans `documentation-technique.md` section 7. Branche supprimée. Laisse une fonction de debug temporaire, `AEnemySoldier::DebugKill`, appelée par une touche de debug dans `BP_FirstPersonCharacter` (à retirer avant toute Release, voir `TODO.md`). Étape 2.2 découpée en 2.2a / 2.2b / 2.2c (voir `TODO.md`).
-- **Pose de la Necrospore → serviteur (item 2, étape 2.2a)** : terminé, testé, fusionné dans `dev` (PR #10, le 2026-11-10). Documenté dans `documentation-technique.md` section 14. Touche L, `AServant` sans comportement, trace de pose dédié dans `UInteractionComponent`, unique accès au stockage de la Necrospore dans `DoPlaceServant`. Durcissement de `UResourceCounterComponent` au passage (`ResourceCounts` privé, montants ≤ 0 refusés). Laisse un nœud `Add Resource (Necrospore)` de test dans le `BeginPlay` de `BP_FirstPersonCharacter` (dette, à retirer avant toute Release). Prochaine étape : 2.2b (zone de base), puis 2.2c (errance).
-
-### Rythme de travail (depuis le 2026-11-09)
-
-**Plus de découpage par semaines.** On avance à notre rythme dans la file d'attente ci-dessous. Timéo signale lui-même chaque deadline (rendu, oral, CDC) quand elle se présente ; c'est seulement à ce moment qu'on recale la file. Ne pas raisonner en « semaine N » ni supposer une échéance non annoncée. Le planning historique ci-dessous reste valable pour l'**ordre** de la file, pas pour ses dates.
-
-### Planning du Bloc 1
-
-Refait entièrement le 2026-10-07, après avoir fini Chaudron plus tôt que prévu (découpage précédent abandonné, pas de référence à conserver). **Principe : tout ce qui suit est planifié pour tenir dans le Bloc 1, sans report présumé vers le Bloc 2.** C'est une file d'attente unique par priorité, pas des « périodes » figées : on la déroule dans l'ordre, et on ne la replanifie que si le Bloc 2 démarre réellement avant qu'elle soit épuisée — pas avant.
-
-Objectif de fond, qui pilote les premiers rangs de la file : la **boucle de jeu principale** jouable de bout en bout, plutôt que le maximum de mécaniques annexes :
-> récolter → planter → fabriquer une potion → combattre → récupérer des os → ressusciter un serviteur → le serviteur récolte
-
-**Chunk immédiat (~10 jours, avant la semaine de cours S2)** :
-1. ~~Panneau de contrôles en lecture seule~~ — terminé, testé, fusionné.
-2. ~~Composant de santé + frapper les arbres et pierres + premier sort avec mana~~ — terminé, testé, prêt à fusionner
-
-*Semaine de cours S2 : livrable du CDC, zéro dev gameplay.* Terminé et livré (environnement + Release `V1.0.1`, voir ci-dessus).
-
-**GDD terminé** (décision prise le 2026-10-23, rédaction close le 2026-11-03, voir `GDD.md`) : boucle de jeu et sa progression, monde/factions, piliers de level design, mécaniques et leurs dépendances, direction artistique minimale sont désormais tranchés. Le point de passage est levé — la file d'attente ci-dessous reflète déjà les décisions du GDD (items 1, 2, 3, 13, 14, 16, 17 mis à jour le 2026-11-03).
-
-**File d'attente après S2** (ordre de priorité) :
-
-| # | Contenu | Pourquoi ce rang |
-|---|---|---|
-| 1 | ~~Un soldat ennemi simple : se déplace, attaque, meurt, laisse tomber des os (nouvelle ressource `EResourceType::Bone`, réutilise `AResourceDrop`)~~ — fusionné | Complète la boucle « combattre » |
-| 2 | Résurrection : recette chaudron (os + potion) → objet posable (inventaire) → serviteur errant dans la zone de base jusqu'à assignation (item 3) | Complète la boucle « ressusciter » — à livrer avec l'item 3 |
-| 3 | Assignation des tâches aux serviteurs (menu deux colonnes : non assignés / catégories de tâche, dont « récolte de champ ») | Ferme la boucle de jeu principale, combiné à l'item 2 — à ce stade le jeu est jouable de bout en bout |
-| 3b | Spawner de vagues d'ennemis (ajouté le 2026-11-09 : manquait, prérequis de l'item 16 et du rôle « attaque/défense ») | Sans lui, les soldats ne sont que placés à la main |
-| 4 | Menu de paramètres complet : son, FOV, et **remappage réel des touches** (Enhanced Input, Player Mappable Keys) | La vraie complexité API (nouvelle pour ce projet, à vérifier dans la doc officielle 5.8) — mieux vaut la caler avec de la marge plutôt que sous pression des 10 jours du chunk immédiat |
-| 5 | Système de sauvegarde (triggers, objets déplacés, ressources, plantations en cours) | Plus on avance, plus il y a d'état accumulé (serviteurs, potions, plantations) à rattraper d'un coup si on attend |
-| 6 | UI hors du Character (PlayerController/HUD) + despawn des drops au sol après délai | Dette technique légère, semaine « respiration » |
-| 7 | Vrai inventaire (modèle de données : stacks, slots ; UI liste simple) | Fondation pour tout ce qui suit |
-| 8 | UI drag-and-drop sur l'inventaire + barre de raccourcis (9 emplacements) | Reprend l'idée initiale du chaudron, pertinente maintenant qu'un inventaire existe |
-| 9 | Objets équipables + contrôles contextuels selon l'objet en main (Input Mapping Contexts) | Dépend de 7 et 8 |
-| 10 | Roue de sorts (clic droit maintenu) + mana généralisé (4 emplacements, recharge ~5s) | Généralise le sort unique du chunk immédiat |
-| 11 | Sort 2 + Sort 3 (regroupés si ce sont de simples debuffs, sinon séparés) | |
-| 12 | Sort 4 (dégâts dans le temps / feu, interaction possible avec le Chaos du champignon) | |
-| 13 | Vue de gestion top-down (pause à l'entrée) | Indissociable de l'item 14 |
-| 14 | Construction de base façon city-builder (grille, rotation, déplacement, chemin verrouillé non constructible) | Indissociable de l'item 13 |
-| 15 | Construction ↔ ressources (coût, effets des bâtiments) | |
-| 16 | Zone de fin : trigger box + seuil de vagues survécues (valeur à playtester) | Remplace le village jouable (pas de patrouilles) |
-| 17 | Condition de victoire + clôture narrative (choix binaire, cinématique à variantes) | |
-
-**Règles du planning :**
-- Quand Timéo annonce une deadline (CDC, rendu, oral), recaler la file dessus.
-- Une mécanique par tâche, livrée entière (branche fusionnée dans `dev`). Pas de volume horaire fixe : on finit la tâche en cours, puis on passe à la suivante **seulement après avoir fusionné** la précédente.
-- Quand une tâche déborde, **on coupe ou on repousse en fin de file**, on ne décale pas tout le planning.
-- Les tâches d'IA (ennemi, serviteur) et la conquête du village sont les plus optimistes : viser le strict minimum, premiers candidats à la coupe si le temps manque.
-- Rien n'est pré-étiqueté « pour le Bloc 2 » : toute la file est visée pour le Bloc 1. On ne reverra ce principe que si le Bloc 2 démarre avant la fin de la file.
+- **Pas de découpage par semaines** (depuis le 2026-11-09) : on déroule la file d'attente de `TODO.md` à son rythme. Timéo signale lui-même chaque deadline (rendu, oral, CDC) ; c'est à ce moment seulement qu'on recale la file. Ne raisonne pas en « semaine N » et ne suppose pas d'échéance non annoncée.
+- **Une mécanique par tâche, livrée entière** (branche fusionnée dans `dev`) avant de passer à la suivante. Quand une tâche déborde, **on coupe ou on repousse en fin de file**, on ne décale pas tout. Les tâches d'IA (ennemi, serviteur) et la conquête du village sont les plus optimistes : minimum viable, premiers candidats à la coupe.
+- Objectif de fond : la **boucle principale** jouable de bout en bout (récolter → planter → fabriquer une potion → combattre → récupérer des os → ressusciter un serviteur → le serviteur récolte), plutôt que le maximum de mécaniques annexes. Rien n'est « pour le Bloc 2 » par défaut.
+- **Avant toute Release** : retirer le code et les nœuds de debug listés dans la « Dette technique » de `TODO.md`. Tag et Release GitHub à chaque étape significative.
 
 ---
 
-## 13. Backlog et dette connue
+## 13. Workflow d'agents
 
-**Technique**
-- Système de sauvegarde : persister `bHasTriggered` des `AStoryTrigger`, l'état des objets déplacés, les ressources, etc. À prévoir avant les mécaniques de progression.
-- Déplacer la création de l'UI hors du personnage (PlayerController ou HUD) quand l'interface grossira.
-- Les drops au sol ne disparaissent jamais : prévoir une disparition après un délai (sur le modèle du délai de ramassage), surtout avant les serviteurs.
-- Push n'est pas une action indépendante : fusionné dans le grab (choix documenté pour le rendu de la semaine 1).
-- Un objet tenu peut traverser des obstacles fins si le joueur bouge vite (limite de `UPhysicsHandleComponent`).
-- Factoriser le calcul de la cible dans `UGrabComponent` (confirmé non fait).
-- Adopter `TObjectPtr` dans toutes les classes (optionnel).
-- Nettoyage optionnel des assets inutilisés du template (animations `Pistol`...), sur une branche `chore/`, via le Content Browser, en vérifiant les références (l'Animation Blueprint des bras en utilise certaines).
+Détail complet : `docs/WORKFLOW_AGENTS.md`. Les agents sont dans `.claude/agents/` ; les règles `deny` dans `.claude/settings.json`.
 
-**Ressenti et visuel (Bloc 2)**
-- Son et effet au ramassage d'un drop.
-- Matériaux réels (champignon, drops, nœuds), apparence de l'UI.
-- Particules d'impact sur les arbres et pierres.
-- Plus de fragments sur le champignon si besoin.
-- Matériau réel pour `AFieldPlot` (remplace la sphère de debug colorée par état).
+**Routage** (la session principale est l'**orchestrateur** : elle délègue, vérifie et ne code pas à la place des agents) :
 
-**Gameplay à rediscuter**
-- Attraction des drops vers le joueur à proximité, fusion des drops identiques proches.
-- Repousse des arbres et pierres (à réfléchir avec la plantation).
-- Interface de sélection de recette pour le chaudron, pertinente seulement à partir d'au moins deux recettes différentes.
-- Idée initiale du chaudron (UI drag-and-drop avec inventaire à droite, cases de recette à gauche) mise de côté pour l'instant : dépend d'un vrai système d'inventaire, repoussé après le Bloc 2 (voir section 12). À reprendre à ce moment-là.
+| Tâche | Agents |
+|---|---|
+| Nouvelle mécanique | `game-designer` → spec → `cpp-implementer` → `qa-test-writer` → `code-reviewer` + `consistency-keeper` (rapport) + `bp-integration-planner` → compilation → `bp-integrator` → `editor-verifier` → test humain → `consistency-keeper` (mise à jour des docs) |
+| Bug C++ | `cpp-implementer`, `qa-test-writer`, `code-reviewer` |
+| Câblage ou intégration d'un asset existant | `bp-integration-planner` → `bp-integrator` → `editor-verifier` |
+| Changement de valeur d'équilibrage, réécriture de docs / `TODO.md` | `consistency-keeper` seul |
 
----
+**Arrêts obligatoires** : l'orchestrateur s'arrête **toujours**, même si Timéo ne l'a pas demandé :
+1. **après la spec**, jusqu'à validation de Timéo ;
+2. **avant `bp-integrator`**, car la compilation C++ (fermer l'éditeur, rebuild dans Rider, rouvrir sur la branche) est faite par Timéo ;
+3. **après `editor-verifier`**, car le test en éditeur (PIE) et la non-régression sont faits par Timéo ;
+4. **avant toute PR** vers `dev`. L'orchestrateur ouvre la PR (`gh pr create`) seulement après la décision de Timéo, et **ne la fusionne jamais**.
 
-## 14. Conseils à l'utilisateur, à rappeler si besoin
+Une instruction sans limite explicite (« fais la tâche X ») se lit comme « jusqu'au prochain arrêt obligatoire ».
 
-- Le dimanche soir, 10 minutes : cocher l'objectif de la semaine et relire le suivant.
-- En fin de session, noter en une ligne la prochaine étape dans le `TODO.md`, pour ne pas perdre de temps à la reprise.
-- Documenter chaque feature au moment de la fermer, pas au moment du rendu.
-- Garder de temps en temps une session « plaisir » (narration, croquis, exploration du niveau) pour entretenir la motivation sur la durée.
+**Règles** :
+- Une unité de travail = une branche depuis `dev` ; pour une mécanique, C++, tests et intégration éditeur vivent sur la même branche `feature/`. Avant de lancer deux branches en parallèle, vérifier que les « Périmètres de fichiers » des specs ne se recoupent pas ; avant d'accepter le travail d'un agent, comparer `git diff --name-only` à son périmètre.
+- **Fichiers « points chauds », toujours sérialisés** : `EResourceType`, `*.Build.cs`, `Default*.ini`, `TODO.md`, `CLAUDE.md`, `documentation-technique.md`, `.umap` du niveau principal. Seul `consistency-keeper` met à jour les documents partagés, en fin de branche, et ne modifie jamais `CLAUDE.md`, `Rendus/` ni un statement IA.
+- **Seul `bp-integrator` écrit dans l'éditeur** (MCP Unreal), uniquement pour les étapes [MCP] de la checklist, **un seul à la fois**, après la compilation. Les outils exclus en v1 sont listés dans le workflow (section 10).
+- Un agent qui doute le dit au lieu d'inventer ; il ne délègue à aucun autre agent.

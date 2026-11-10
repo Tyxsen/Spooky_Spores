@@ -12,7 +12,7 @@ Ce document décrit l'architecture **actuelle** du projet, organisée par systè
 
 3C complet (contrôles, caméra, personnage) : voir le `README.md`.
 
-**Map de test :** `Lvl_FirstPerson`
+**Cartes :** `Lvl_Principal` (carte par défaut du projet) ; `Lvl_FirstPerson` reste un niveau de test.
 
 ---
 
@@ -51,8 +51,12 @@ Core/
   GameMode/     Spooky_SporesGameMode
 Interaction/    Grabbable, Interactable, InteractionComponent, GrabComponent, PhysicsGrabbable
 Narrative/      StoryTrigger
-Resources/      ResourceTypes, ResourceCounterComponent, ResourceDrop, HarvestableResource
+Resources/      ResourceTypes, ResourceCounterComponent, ResourceDrop, HarvestableResource,
+                Cauldron, FieldPlot
 Movement/       StaminaComponent
+Health/         HealthComponent
+Spells/         ManaComponent, SpellCastingComponent
+Enemies/        EnemySoldier, EnemyAIController, EnemyPathSpline, Destructible
 Servants/       Servant
 ```
 Un nouveau domaine fonctionnel = un nouveau dossier.
@@ -96,7 +100,7 @@ L'organisation suit la logique du [UE5 Community Style Guide](https://github.com
 Deux interfaces séparées, chacune avec une seule responsabilité (principe SOLID de ségrégation des interfaces) :
 
 - **`IGrabbable`** — une seule méthode, `GetGrabbableComponent()`, qui renvoie le `UPrimitiveComponent` à manipuler physiquement (ou `nullptr` par défaut si l'objet n'est pas réellement saisissable).
-- **`IInteractable`** — une seule méthode, `OnInteract(AActor* Instigator)`, pour un comportement générique déclenché sans manipulation physique (établi, ressource à récolter...).
+- **`IInteractable`** — une seule méthode, `OnInteract(AActor* InteractingActor)`, pour un comportement générique déclenché sans manipulation physique (établi, ressource à récolter...).
 
 Un objet peut implémenter l'une, l'autre, ou les deux, sans jamais forcer les autres objets à connaître un comportement qui ne les concerne pas.
 
@@ -106,6 +110,8 @@ Un objet peut implémenter l'une, l'autre, ou les deux, sans jamais forcer les a
 - `IsInteractableTarget()` → vrai si la cible implémente `IInteractable` **et** est à portée de `InteractRange` (200 unités)
 
 **Choix technique :** une seule trace, à la plus grande des deux portées, plutôt que deux traces séparées, évite la duplication de la logique physique (DRY) pour un coût CPU négligeable.
+
+**Choix technique — « aucune cible » :** `CurrentTargetDistance` vaut `TNumericLimits<float>::Max()` quand rien n'est détecté (et non 0), pour qu'une comparaison de distance échoue naturellement sans cible. La cible courante (`ActualTarget`) est un `TWeakObjectPtr<AActor>`.
 
 ![Debug Line du trace partant de la caméra jusqu'à l'objet détecté](Documentation_Documents/Videos/Detection_DebugLine.gif)
 
@@ -122,6 +128,8 @@ Un objet peut implémenter l'une, l'autre, ou les deux, sans jamais forcer les a
 **Choix technique — Push transformé en Release :** plutôt qu'une quatrième action séparée, Push a été fusionné dans Release : relâcher l'objet permet de s'en séparer sans forcément le repousser (Launch étant déjà utilisé pour cela).
 
 **Choix technique — vélocité conservée au relâchement :** `Release()` ne neutralise pas la vélocité de l'objet au moment où il est lâché. Ce comportement est volontaire : il traduit fidèlement l'inertie du mouvement de caméra au moment du relâchement (cohérent avec l'idée d'un objet manipulé par télékinésie), et reste distinct du mécanisme `Launch()` qui, lui, applique une force contrôlée et réglable.
+
+**Choix technique — pas de raideur ajoutée au physics handle :** l'objet ne se recentre pas brutalement à `HoldDistance` (200) ; on préserve ainsi l'impression de poids. Le tick met à jour la cible avec `SetTargetLocationAndRotation`.
 
 Une seule touche contextuelle (`E` / `DoInteractAction`) arbitre entre reposer, saisir, et interagir, selon l'état courant :
 1. Si un objet est déjà tenu → le reposer.
