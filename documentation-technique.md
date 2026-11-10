@@ -58,13 +58,16 @@ Health/         HealthComponent
 Spells/         ManaComponent, SpellCastingComponent
 Enemies/        EnemySoldier, EnemyAIController, EnemyPathSpline, Destructible
 Servants/       Servant
+Base/           BaseZone, BaseZoneSubsystem
+Tests/          BaseZoneTestHelpers, BaseZoneGeometrySpec, BaseZoneCdoSpec, BaseZoneWorldSpec
+                (Automation Specs : ce n'est pas un domaine de gameplay, mais le code de test du module)
 ```
 Un nouveau domaine fonctionnel = un nouveau dossier.
 
 **Content Browser** (`Content/Spooky_Spores/`) :
 ```
 Core/          Character/, Controller/, GameMode/, Input/Actions/
-Placeables/    Interactables/ (BP_Rock), Narrative/ (BP_StoryTrigger_Entrance),
+Placeables/    Base/ (BP_BaseZone), Interactables/ (BP_Rock), Narrative/ (BP_StoryTrigger_Entrance),
                Destructibles/ (GC_Mushroom),
                Resources/ (BP_Drop_Seed, BP_Drop_Stone, BP_Drop_Wood,
                            BP_Harvestable_Plant, BP_Harvestable_Stone, BP_Harvestable_Wood),
@@ -304,7 +307,7 @@ Le terrain est un unique **Landscape** sculpté en colline, plutôt qu'un sol pl
 
 **Cabane** : géométrie simple construite directement dans le niveau (pas un Blueprint réutilisable, contrairement aux ressources — elle est unique), avec sol, murs, toit en pignon, une fenêtre, et une lumière intérieure contrastant avec l'obscurité extérieure.
 
-**Clôture** (`BP_Fences`) délimitant le territoire immédiat du joueur autour de la cabane.
+**Clôture** (`BP_Fences`) délimitant le territoire immédiat du joueur autour de la cabane. La zone de base (`BP_BaseZone`, section 15) est calée à la main pour englober la clôture ; elle n'en dépend pas.
 
 **Éléments de gameplay placés** : `BP_StoryTrigger_Entrance` à la porte, `BP_Cauldron`, plusieurs `BP_FieldPlot`, `BP_Rock` (démonstration du grab, dans l'axe de la porte), trois `GC_Mushroom`.
 
@@ -358,6 +361,30 @@ L'ordre garantit qu'une pose impossible (viser le ciel ou un mur) ne coûte jama
 
 ---
 
-## 15. Limitations connues et dette technique
+## 15. Zone de base
+
+`Base/` : `ABaseZone` (acteur) et `UBaseZoneSubsystem` (registre). La zone répond à deux questions : « ce point est-il dans la base ? » et « donne-moi un point au hasard dans la base ». Les serviteurs (errance et retour hors zone, item 2.2c) l'interrogeront ; la vue de gestion et la construction (items 13-14) s'appuieront dessus.
+
+**Forme — un acteur dédié** : la racine de `ABaseZone` est un `UBoxComponent` (`ZoneBox`). Elle n'est pas un composant de `BP_Fences` : la zone doit survivre à un agrandissement de la base, alors que la clôture n'est qu'un élément visuel. `BP_BaseZone` (`Placeables/Base/`, enfant de `ABaseZone`, sans logique) est instancié dans `Lvl_Principal` ; sa boîte est calée à la main pour **englober** la clôture `BP_Fences`, sans en dépendre. `Lvl_Principal` n'utilise pas One File Per Actor : l'instance est stockée dans `Lvl_Principal.umap`.
+
+**Calcul dans l'espace local de la boîte** : le point monde est ramené dans l'espace local du composant (`InverseTransformPosition`) puis comparé à l'extension **non mise à l'échelle** (`GetUnscaledBoxExtent`) : l'échelle, même non uniforme ou négative, est déjà dans la transformation. Le tirage se fait en local, uniformément sur chaque axe, puis est transformé en monde (transformation affine : la densité reste uniforme, et une boîte tournée est respectée, ce qu'un tirage en monde ne ferait pas). Aucune dimension n'est mémorisée : chaque appel relit le composant, donc un `SetBoxExtent`, un changement d'échelle ou un déplacement sont pris en compte à l'appel suivant. Les calculs sont des fonctions statiques publiques (`IsPointInOrientedBox`, `TryGetRandomPointInOrientedBox`, `IsOrientedBoxValid`) sans dépendance à un `UWorld`, ce qui permet de les tester sans monde.
+
+**Hauteur** : `bIgnoreHeight` (défaut `true`). Le terrain est une colline et une boîte posée à la main ne suit pas exactement le sol ; le moteur mesure d'ailleurs l'arrivée en 2D. Avec `true`, `IsPointInZone` teste seulement X et Y locaux et `GetRandomPointInZone` tire au plan médian de la boîte (Z local = 0), pas au sol. Invariant : tout point tiré satisfait `IsPointInZone`. Le consommateur qui projette sur le NavMesh doit donc utiliser une extension verticale qui couvre l'écart entre ce plan et le terrain (`GetZoneExtent().Z`).
+
+**Zone invalide** : si une composante de l'extension ou de la valeur absolue de l'échelle est inférieure ou égale à `KINDA_SMALL_NUMBER`, `IsZoneValid` renvoie faux, `IsPointInZone` renvoie faux et `GetRandomPointInZone` renvoie faux (la sortie est alors `ZeroVector` et ne doit pas être utilisée). Test explicite obligatoire : avec une échelle nulle, `InverseTransformPosition` ramènerait tout point au centre local, donc dedans. Un avertissement est émis une seule fois par zone dans `LogSpooky_Spores`. Un point non fini (NaN, infini) est hors zone. Tolérance de bord : 0,1 cm en local.
+
+**Collision** : preset `NoCollision`, pas d'événements d'overlap, `SetCanEverAffectNavigation(false)` : la boîte est invisible au trace d'interaction, ne bloque rien et ne découpe jamais le NavMesh. Ce n'est pas un trigger (contrairement à `AStoryTrigger`) : c'est un calcul à la demande. Pas de canal custom.
+
+**Retrouver la zone — sous-système** : `UBaseZoneSubsystem` (`UWorldSubsystem`) est un registre à une seule entrée (`TWeakObjectPtr`). `ABaseZone::BeginPlay` s'enregistre, `EndPlay` se désenregistre. Une seule zone par niveau : si une seconde s'enregistre, un message `Error` de `LogSpooky_Spores` nomme les deux acteurs, la première reste enregistrée et la seconde est ignorée. Pourquoi pas une référence `EditInstanceOnly` (recette habituelle) : les serviteurs sont spawnés par le code et le Character par un `PlayerStart`, aucun ne peut porter une référence à un acteur de niveau. Les consommateurs appellent `GetWorld()->GetSubsystem<UBaseZoneSubsystem>()->GetBaseZone()` à chaque décision et ne mettent jamais le résultat en cache : l'ordre des `BeginPlay` entre acteurs n'est pas garanti, et le résultat est `nullptr` sans zone.
+
+**Visibilité** : aucun code de dessin en C++ (pas de `DrawDebug*`, pas de `Tick`). La boîte filaire est visible en jeu grâce à la propriété `Hidden In Game` décochée sur le composant `ZoneBox` de `BP_BaseZone` ; le C++ garde le défaut du moteur (caché). Piège : avec `NoCollision`, la commande `show collision` ne dessine pas la boîte. Réglage de développement à rétablir avant Release (`TODO.md`, dette technique).
+
+**API (Blueprint)** : `IsPointInZone` et `IsZoneValid` et `GetZoneExtent` (pures) ; `GetRandomPointInZone(OutPoint)` en `BlueprintCallable` avec `BlueprintPure = false` : UHT rendrait sinon pure toute fonction `const` à paramètre de sortie, et un nœud pur serait réévalué à chaque branchement, donnant deux points différents pour une même décision. Sur échec, la fonction renvoie faux plutôt qu'un `(0,0,0)` muet. `GetZoneExtent` renvoie des composantes toujours positives (valeur absolue de l'échelle).
+
+**Tests** : Automation Specs dans `Tests/` : géométrie sans monde, valeurs par défaut sur le CDO, comportement avec monde (sous-système, traces). Lancement : clic droit sur le dossier `Tests/` dans Rider puis « Run Unit Tests », ou panneau Automation de l'éditeur avec le filtre `SpookySpores`.
+
+---
+
+## 16. Limitations connues et dette technique
 
 Centralisées dans [`TODO.md`](TODO.md), pour éviter une double liste qui diverge avec le temps.

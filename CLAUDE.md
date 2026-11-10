@@ -82,7 +82,7 @@ La liste à jour des dossiers et fichiers est dans `documentation-technique.md` 
 
 Organisation inspirée du [UE5 Style Guide d'Allar](https://github.com/Allar/ue5-style-guide) : `Core/` (Character, Controller, GameMode, Input) contient ce qu'on ne modifie pas à la légère ; `Placeables/` les instances concrètes, librement ajustables ; `UI/Widgets/`, `Maps/`. Détail dans `documentation-technique.md`.
 
-**Avertissement : `__ExternalActors__` et `__ExternalObjects__` ne sont pas des assets inutilisés.** Le projet utilise **One File Per Actor** : chaque acteur placé dans une map est un fichier séparé dans ces dossiers. Les supprimer viderait les niveaux. Seuls les sous-dossiers d'une map supprimée sont orphelins.
+**Avertissement : `__ExternalActors__` et `__ExternalObjects__` ne sont pas des assets inutilisés.** `Lvl_FirstPerson` utilise **One File Per Actor** : chaque acteur placé dans cette map est un fichier séparé dans ces dossiers. **`Lvl_Principal` ne l'utilise pas** : ses acteurs sont dans `Lvl_Principal.umap` (point chaud, à ne jamais modifier sur deux branches en parallèle). Supprimer ces dossiers viderait `Lvl_FirstPerson`. Seuls les sous-dossiers d'une map supprimée sont orphelins.
 
 ---
 

@@ -157,7 +157,7 @@ Convention : `Z` désigne une `ABaseZone` (ou ses fonctions statiques, voir 6) a
 - [ ] **G1 — PIE.** `BP_BaseZone` placé dans `Lvl_Principal`, `Hidden In Game` décoché sur son composant `ZoneBox` : la boîte filaire est visible en jeu, englobant `BP_Fences` (la clôture tient entièrement dans la boîte). Recocher `Hidden In Game` la fait disparaître. C'est la confirmation de la lecture du code moteur de 2.6 ; si elle échoue, Timéo investigue lui-même (aucun repli prévu).
 - [ ] **G2 — instance.** Sur l'instance placée, la propriété `Hidden In Game` n'est pas surchargée à la main (sinon elle ignore la valeur du Blueprint, voir `CLAUDE.md` section 11).
 
-Note pour `qa-test-writer` : A1 à A9, R1 à R7 et D1 à D2 portent sur de la logique pure ; les fonctions statiques de 6 permettent de les écrire en **Automation Spec sans monde** (stratégie de test de `docs/WORKFLOW_AGENTS.md` section 7). Les critères C1 à C3 s'écrivent sur le CDO. Ce qui exige un monde (C4, S1 à S4, et au moins un test d'intégration qui passe par l'acteur réel, pour ne pas tester seulement les fonctions statiques) : voir si un monde de test est réalisable en Automation Spec ; si ça ne l'est pas, c'est un Functional Test (map créée par l'humain) ou une vérification manuelle en PIE, à signaler. Je n'ai pas pu vérifier ce qu'un monde de test d'Automation Spec permet sous 5.8.3. Le montage de l'infrastructure de test touche probablement `Spooky_Spores.Build.cs` (point chaud, voir 7).
+Note pour `qa-test-writer` : A1 à A9, R1 à R7 et D1 à D2 portent sur de la logique pure ; les fonctions statiques de 6 permettent de les écrire en **Automation Spec sans monde** (stratégie de test de `docs/WORKFLOW_AGENTS.md` section 7). Les critères C1 à C3 s'écrivent sur le CDO. Ce qui exige un monde (C4, S1 à S4, et au moins un test d'intégration qui passe par l'acteur réel, pour ne pas tester seulement les fonctions statiques) : voir si un monde de test est réalisable en Automation Spec ; si ça ne l'est pas, c'est un Functional Test (map créée par l'humain) ou une vérification manuelle en PIE, à signaler. Un monde de test s'est révélé réalisable en Automation Spec (`BaseZoneWorldSpec`). Le montage de l'infrastructure de test n'a pas modifié `Spooky_Spores.Build.cs`.
 
 ## 4. Cas limites
 
@@ -212,7 +212,8 @@ public:
     // Picks a uniformly distributed random point in the zone (drawn in the box's local space,
     // then transformed to world space). Returns false and leaves OutPoint at ZeroVector
     // when the zone is invalid. Never use OutPoint when the return value is false.
-    UFUNCTION(BlueprintCallable, Category = "BaseZone")
+    // BlueprintPure = false: UHT would otherwise force a const function with an output param to be pure.
+    UFUNCTION(BlueprintCallable, BlueprintPure = false, Category = "BaseZone")
     bool GetRandomPointInZone(FVector& OutPoint) const;
 
     // False if any extent or scale component is <= KINDA_SMALL_NUMBER.
@@ -249,7 +250,7 @@ private:
 ```
 
 Remarques :
-- `GetRandomPointInZone` est `BlueprintCallable` et non `BlueprintPure` : un nœud pur serait réévalué à chaque branchement de sortie, et donnerait deux points différents pour une même « décision ».
+- `GetRandomPointInZone` est `BlueprintCallable` avec `BlueprintPure = false` explicite : un nœud pur serait réévalué à chaque branchement de sortie, et donnerait deux points différents pour une même « décision ». Le `BlueprintPure = false` est nécessaire car UHT rend sinon pure toute fonction `const` à paramètre de sortie, même déclarée `BlueprintCallable`.
 - Pas de `FVector` retourné directement sur échec : un `(0,0,0)` muet est le piège connu de `CLAUDE.md` section 11 (`FHitResult.Location` quand rien n'est touché).
 - Les noms exacts des fonctions statiques sont à discrétion de `cpp-implementer`, mais elles doivent exister, être publiques et ne dépendre d'aucun `UWorld`. Si elles ne sont pas retenues, tous les critères A/R/D devront passer par un acteur spawné et le coût de test augmente.
 - Pas de `Tick`, pas d'include de `DrawDebugHelpers.h`, aucun dessin : la visibilité en jeu est un réglage de propriété (2.6).
@@ -306,7 +307,7 @@ Rien d'autre n'est nécessaire côté zone. En particulier, la zone ne fournit *
 
 **Fichiers points chauds touchés**
 - `.umap` du niveau principal (`Lvl_Principal`) : placement de l'instance. **À sérialiser.**
-- `Spooky_Spores.Build.cs` : **non requis par la fonctionnalité** (`UBoxComponent` et `UWorldSubsystem` sont dans `Engine`, déjà déclaré). Possiblement touché par l'introduction de l'infrastructure de test, voir note en 3. À signaler par l'orchestrateur si c'est le cas.
+- `Spooky_Spores.Build.cs` : **non requis par la fonctionnalité** (`UBoxComponent` et `UWorldSubsystem` sont dans `Engine`, déjà déclaré). Non modifié par l'introduction de l'infrastructure de test (vérifié : aucune modification de ce fichier dans la branche).
 - `TODO.md` (dette technique proposée en 2.6 sous forme de réglage de propriété, et coche de 2.2b), `documentation-technique.md` (nouvelle section « Zone de base », et mention de `Base/` dans la liste de la section 2 qui sera en retard) : écrits **uniquement par `consistency-keeper`** en fin de branche.
 - `EResourceType`, `Default*.ini`, `CollisionChannels.h`, `CLAUDE.md` : non touchés.
 
