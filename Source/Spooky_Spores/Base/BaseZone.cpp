@@ -96,7 +96,16 @@ bool ABaseZone::TryGetRandomPointInOrientedBox(const FTransform& BoxTransform, c
 		FMath::FRandRange(-UnscaledExtent.Y, UnscaledExtent.Y),
 		bInIgnoreHeight ? 0.0 : FMath::FRandRange(-UnscaledExtent.Z, UnscaledExtent.Z));
 
-	OutPoint = BoxTransform.TransformPosition(Local);
+	const FVector WorldPoint = BoxTransform.TransformPosition(Local);
+
+	// A non-finite translation or rotation in the transform gives a non-finite point: IsPointInOrientedBox would reject it.
+	if (!FMath::IsFinite(WorldPoint.X) || !FMath::IsFinite(WorldPoint.Y) || !FMath::IsFinite(WorldPoint.Z))
+	{
+		OutPoint = FVector::ZeroVector;
+		return false;
+	}
+
+	OutPoint = WorldPoint;
 	return true;
 }
 
