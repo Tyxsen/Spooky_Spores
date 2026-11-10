@@ -29,7 +29,8 @@ public:
 	// Picks a uniformly distributed random point in the zone (drawn in the box's local space,
 	// then transformed to world space). Returns false and leaves OutPoint at ZeroVector
 	// when the zone is invalid. Never use OutPoint when the return value is false.
-	UFUNCTION(BlueprintCallable, Category = "BaseZone")
+	// BlueprintPure = false: UHT would otherwise force a const function with an output param to be pure.
+	UFUNCTION(BlueprintCallable, BlueprintPure = false, Category = "BaseZone")
 	bool GetRandomPointInZone(FVector& OutPoint) const;
 
 	// False if any extent or scale component is <= KINDA_SMALL_NUMBER.

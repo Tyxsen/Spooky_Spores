@@ -57,7 +57,10 @@ bool ABaseZone::IsOrientedBoxValid(const FTransform& BoxTransform, const FVector
 {
 	const FVector AbsScale = BoxTransform.GetScale3D().GetAbs();
 
-	// NaN comparisons are false, so a non-finite value is rejected as well.
+	// Non-finite values (NaN, infinity) make the zone invalid: an infinite extent would yield NaN random points.
+	if (!FMath::IsFinite(UnscaledExtent.X) || !FMath::IsFinite(UnscaledExtent.Y) || !FMath::IsFinite(UnscaledExtent.Z)) return false;
+	if (!FMath::IsFinite(AbsScale.X) || !FMath::IsFinite(AbsScale.Y) || !FMath::IsFinite(AbsScale.Z)) return false;
+
 	return UnscaledExtent.X > KINDA_SMALL_NUMBER && UnscaledExtent.Y > KINDA_SMALL_NUMBER && UnscaledExtent.Z > KINDA_SMALL_NUMBER
 		&& AbsScale.X > KINDA_SMALL_NUMBER && AbsScale.Y > KINDA_SMALL_NUMBER && AbsScale.Z > KINDA_SMALL_NUMBER;
 }
@@ -71,6 +74,8 @@ bool ABaseZone::IsPointInOrientedBox(const FTransform& BoxTransform, const FVect
 
 	// Scale (even non-uniform or negative) is already part of the inverse transform: compare against the unscaled extent.
 	const FVector Local = BoxTransform.InverseTransformPosition(WorldPoint);
+	// A NaN rotation or translation in the transform would otherwise slip through the comparisons below.
+	if (Local.ContainsNaN()) return false;
 
 	if (FMath::Abs(Local.X) > UnscaledExtent.X + BoundsTolerance) return false;
 	if (FMath::Abs(Local.Y) > UnscaledExtent.Y + BoundsTolerance) return false;
