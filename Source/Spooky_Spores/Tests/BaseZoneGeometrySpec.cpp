@@ -295,6 +295,23 @@ void FBaseZoneGeometrySpec::Define()
 			Cases.Add({ MakeTransform(FVector::ZeroVector, FRotator::ZeroRotator, FVector(Inf, 1, 1)), FVector(100, 100, 100) });
 			Cases.Add({ MakeTransform(FVector::ZeroVector, FRotator::ZeroRotator, FVector(1, 1, NaN)), FVector(100, 100, 100) });
 
+			// Non-finite TRANSFORM with a finite extent and scale: IsPointInZone rejects these, so a successful draw
+			// would break R1 ("every drawn point satisfies IsPointInZone").
+			const FVector FiniteExtent(100, 100, 100);
+			Cases.Add({ FTransform(FQuat::Identity, FVector(NaN, 0, 0), FVector::OneVector), FiniteExtent });
+			Cases.Add({ FTransform(FQuat::Identity, FVector(0, 0, NaN), FVector::OneVector), FiniteExtent });
+			Cases.Add({ FTransform(FQuat::Identity, FVector(Inf, 0, 0), FVector::OneVector), FiniteExtent });
+			Cases.Add({ FTransform(FQuat(NaN, NaN, NaN, NaN), FVector::ZeroVector, FVector::OneVector), FiniteExtent });
+
+			// Control: the same finite extent with a finite transform succeeds, so the "false" cases are caused by the non-finite input.
+			for (int32 HeightMode = 0; HeightMode < 2; ++HeightMode)
+			{
+				FVector ControlOut = FVector::ZeroVector;
+				TestTrue(FString::Printf(TEXT("control (ignoreHeight=%d): a finite transform draws successfully"), HeightMode),
+					ABaseZone::TryGetRandomPointInOrientedBox(MakeTransform(FVector::ZeroVector), FiniteExtent, HeightMode == 1, ControlOut));
+				TestFalse(TEXT("control: the drawn point is finite"), ControlOut.ContainsNaN());
+			}
+
 			for (int32 CaseIndex = 0; CaseIndex < Cases.Num(); ++CaseIndex)
 			{
 				for (int32 HeightMode = 0; HeightMode < 2; ++HeightMode)
@@ -307,6 +324,13 @@ void FBaseZoneGeometrySpec::Define()
 					{
 						// Invariant R1: a successful draw must be a finite member of the zone.
 						TestFalse(FString::Printf(TEXT("case %d: a true result must never carry a non-finite point"), CaseIndex), Out.ContainsNaN());
+					}
+
+					// Consistency: where the draw refuses, the membership test must refuse too (the center is inside any finite box).
+					if (CaseIndex >= 6)
+					{
+						TestFalse(FString::Printf(TEXT("case %d (ignoreHeight=%d): IsPointInOrientedBox is false for the same transform"), CaseIndex, HeightMode),
+							ABaseZone::IsPointInOrientedBox(Cases[CaseIndex].Key, Cases[CaseIndex].Value, FVector::ZeroVector, bIgnoreHeight));
 					}
 				}
 			}

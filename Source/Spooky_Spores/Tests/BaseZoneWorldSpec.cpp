@@ -345,7 +345,14 @@ void FBaseZoneWorldSpec::Define()
 			if (!RequireWorld()) { return; }
 			ABaseZone* Zone = SpawnZone(TEXT("BaseZoneInfExtent"));
 			if (!TestNotNull(TEXT("zone spawned"), Zone)) { return; }
-			Zone->GetZoneBox()->SetBoxExtent(FVector(std::numeric_limits<double>::infinity(), 300, 100), false);
+
+			// The value is injected by reflection on purpose: SetBoxExtent would run UpdateBounds on an infinite extent,
+			// which can raise an ensure in Debug builds. That is an engine infrastructure risk unrelated to the logic under test.
+			FStructProperty* ExtentProperty = FindFProperty<FStructProperty>(UBoxComponent::StaticClass(), TEXT("BoxExtent"));
+			if (!TestNotNull(TEXT("UBoxComponent::BoxExtent property found by reflection"), ExtentProperty)) { return; }
+			FVector* ExtentValue = ExtentProperty->ContainerPtrToValuePtr<FVector>(Zone->GetZoneBox());
+			if (!TestNotNull(TEXT("BoxExtent value pointer resolved"), ExtentValue)) { return; }
+			*ExtentValue = FVector(std::numeric_limits<double>::infinity(), 300, 100);
 
 			FCategoryLogCounter Counter(LogSpooky_Spores.GetCategoryName());
 			for (int32 HeightMode = 0; HeightMode < 2; ++HeightMode)
