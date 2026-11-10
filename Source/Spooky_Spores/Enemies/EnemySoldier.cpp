@@ -47,6 +47,12 @@ AEnemyPathSpline* AEnemySoldier::GetPathSplineActor() const
 	return PathSplineActor;
 }
 
+void AEnemySoldier::DebugKill()
+{
+	// Lethal damage instead of calling HandleDeath directly, so the whole death chain is exercised.
+	UGameplayStatics::ApplyDamage(this, TNumericLimits<float>::Max(), nullptr, nullptr, UDamageType::StaticClass());
+}
+
 void AEnemySoldier::HandleDeath()
 {
 	AResourceDrop::SpawnDrops(GetWorld(), Drops, GetActorLocation(), DropSpawnRadius);

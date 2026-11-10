@@ -30,6 +30,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Movement")
 	AEnemyPathSpline* GetPathSplineActor() const;
 
+	// TEMPORARY debug helper: kills the soldier through the regular damage path (health -> OnDeath -> drops).
+	// To remove once the player has a real way to kill soldiers.
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Debug")
+	void DebugKill();
+
 protected:
 	virtual void BeginPlay() override;
 

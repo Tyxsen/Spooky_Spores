@@ -186,13 +186,21 @@ UI : `WBP_ResourceEntry` (une ressource, filtrée par type via un nœud `Equal (
 
 ---
 
-## 7. Préparation de potions (Chaudron)
+## 7. Chaudron — recettes
 
 `ACauldron` (`Resources/Cauldron.h`) : acteur implémentant `IInteractable`, trois états (`ECauldronState`) pilotés, comme `AFieldPlot`, par un seul point d'entrée, `OnInteract_Implementation`, selon l'état courant.
 
-- **Idle** : vérifie que l'acteur qui interagit possède chaque ressource de `RequiredIngredients` (`TMap<EResourceType, int32>`) en quantité suffisante, **avant** d'en dépenser la moindre — une première boucle ne fait que vérifier, une seconde dépense réellement via `TrySpendResource`. Cette vérification en deux passes évite de consommer une partie de la recette puis d'échouer sur un ingrédient manquant (transaction atomique). Lance ensuite un `FTimerHandle` unique de `BrewDuration` secondes.
+**Recettes comme données** : le chaudron porte un tableau `TArray<FCauldronRecipe> Recipes`, rempli dans l'éditeur. Chaque `FCauldronRecipe` contient ses ingrédients (`TMap<EResourceType, int32>`), son résultat (`OutputType`, `OutputAmount`) et sa propre durée (`BrewDuration`). Ajouter une recette ne demande aucune ligne de C++.
+
+- **Idle** : `FindFirstAffordableRecipe` parcourt `Recipes` dans l'ordre et renvoie l'index de la première recette que le joueur peut payer (`CanAfford`). Les ingrédients de cette recette sont vérifiés **avant** d'en dépenser le moindre — la vérification (`CanAfford`) et la dépense (`TrySpendResource`) sont deux passes séparées, pour ne jamais consommer une partie de la recette puis échouer sur un ingrédient manquant (transaction atomique). Lance ensuite un `FTimerHandle` unique de la durée de la recette choisie.
 - **Brewing** : aucune action : le joueur ne peut rien faire tant que la préparation n'est pas terminée.
-- **Ready** : crédite directement `OutputAmount` unités de `OutputPotionType` via `UResourceCounterComponent::AddResource`, puis repasse à `Idle` — le chaudron, comme `AFieldPlot`, reste en place et réutilisable.
+- **Ready** : `CollectOutput` crédite le résultat de la recette en cours via `UResourceCounterComponent::AddResource`, puis repasse à `Idle` — le chaudron, comme `AFieldPlot`, reste en place et réutilisable.
+
+**Choix technique — mémoriser la recette par son index (`ActiveRecipeIndex`)** : la recette est choisie au lancement (`TryStartBrewing`) mais son résultat n'est livré qu'à une interaction ultérieure (`CollectOutput`), et la durée doit être connue entretemps par `GetBrewProgress`. Le chaudron retient donc l'index de la recette en cours, `INDEX_NONE` (-1) quand il est vide. Un pointeur vers l'élément du tableau a été écarté (un `TArray` peut réallouer sa mémoire et invalider le pointeur) ; une copie de la recette aurait fonctionné mais duplique la donnée. Chaque lecture est protégée par `Recipes.IsValidIndex`.
+
+**Choix technique — « la première recette réalisable gagne »** : quand le joueur peut payer plusieurs recettes, l'ordre du tableau décide. Compromis assumé en attendant une interface de sélection de recette (`TODO.md`) : simple et prévisible, au prix d'un risque de lancer une recette non voulue si les deux sont payables.
+
+**Garde-fous de configuration** : une recette sans ingrédient est ignorée (sinon une entrée ajoutée par erreur dans l'éditeur donnerait un résultat gratuit) ; une `BrewDuration` nulle termine immédiatement la préparation, car un `SetTimer` de durée nulle ne se déclenche jamais et le chaudron resterait bloqué en `Brewing`.
 
 **Choix technique — potion créditée directement, sans objet physique au sol** : contrairement aux ressources récoltées (`AHarvestableResource`, `AFieldPlot`), la potion ne fait pas apparaître de `AResourceDrop` à ramasser. Le résultat est crédité instantanément au compteur du joueur. Simplification assumée en l'absence d'un vrai système d'inventaire (repoussé après le Bloc 2, voir `CLAUDE.md` section 12) : fabriquer un pickup physique pour un objet qui finira de toute façon dans un inventaire structuré aurait été du travail jetable.
 
@@ -200,9 +208,15 @@ UI : `WBP_ResourceEntry` (une ressource, filtrée par type via un nœud `Equal (
 
 `WBP_CauldronProgress` interroge `GetBrewProgress()` dans son propre `Event Tick` (modèle *pull*, comme `WBP_StaminaBar`) pour afficher une barre de progression pendant le Brewing.
 
-**Recette actuelle** : 3 Bois + 1 Pierre + 2 Blé → 1 Potion (`EResourceType::Potion`, ajouté en fin d'énumération pour ne pas décaler les valeurs existantes — voir le piège correspondant section 11 du `CLAUDE.md`).
+**Recettes actuelles** (dans cet ordre) :
+1. 3 Bois + 1 Pierre + 2 Blé → 1 Potion
+2. Os + 1 Potion → 1 Necrospore — l'objet de résurrection (file d'attente, item 2), qui servira à faire apparaître un serviteur.
 
-**Limite assumée** : une seule recette par chaudron (`RequiredIngredients` réglé une fois dans l'éditeur). Une interface de sélection de recette n'a de sens qu'à partir d'au moins deux recettes différentes — reporté dans `TODO.md`.
+`Potion` et `Necrospore` ont été ajoutés en fin d'`EResourceType`, pour ne pas décaler les valeurs existantes.
+
+**Choix technique — la Necrospore est provisoirement une ressource comptée** : en l'absence de vrai inventaire (file d'attente, item 7), l'objet de résurrection est stocké dans `UResourceCounterComponent` comme n'importe quelle ressource. Le code qui le consommera (pose du serviteur) devra isoler cet accès en un seul endroit, pour que le passage à l'inventaire ne touche que cet endroit.
+
+**Outil de debug** : sphère au-dessus du chaudron (gris/rouge/vert selon l'état, mêmes couleurs que `AFieldPlot`) et texte indiquant la recette en cours et son avancement (ex. `Necrospore 42%`), dessinés au tick, désactivables par instance via `bShowDebug`. Le texte utilise `DrawDebugString` avec une durée de `0` (une seule frame) : une durée de `-1` le rendrait permanent et l'accumulerait à chaque tick.
 
 ---
 
@@ -238,6 +252,9 @@ Le champignon se fracture aussi bien sous l'effet de la gravité (chute) que d'u
 - **Bone colors de la Fracture Mode** : pendant le développement, chaque morceau du Geometry Collection est affiché dans une couleur distincte (`Show Bone Colors`) pour vérifier visuellement le résultat de la fracture avant de désactiver cet affichage de debug pour le rendu final.
 
 ![Présentation des 3 types de debug actuel du projet](Documentation_Documents/Debug.png)
+
+- **État des champs et du chaudron** : sphères colorées par état au-dessus de chaque `AFieldPlot` et `ACauldron` (sections 6 et 7), avec en plus, pour le chaudron, la recette en cours et son avancement.
+- **`AEnemySoldier::DebugKill`** (temporaire) : tue un soldat en lui infligeant des dégâts mortels via `ApplyDamage`, plutôt qu'en appelant directement `HandleDeath` — toute la chaîne réelle (santé → `OnDeath` → butin) est ainsi exercée. Appelable en Blueprint (touche de debug sur `BP_FirstPersonCharacter`) ou via le bouton `CallInEditor` du panneau Details. À supprimer quand le joueur aura un vrai moyen de tuer un soldat.
 
 **Panneau de contrôles** (`WBP_ControlsPanel`) : distinct des outils ci-dessus, pas destiné au développement mais à la consultation en jeu — un texte statique listant les touches actuelles (section 9 ci-dessus), togglé par la touche Entrée (`ASpooky_SporesCharacter::DoToggleControlsPanel` → event Blueprint `OnToggleControlsPanel`, même principe que `AStoryTrigger::OnStoryTriggered` : le C++ déclenche, le Blueprint décide de l'affichage). Pensé pour que les intervenants qui testent le jeu puissent consulter les touches sans dépendre de la documentation externe.
 
@@ -298,7 +315,7 @@ Machine à deux états dans `AEnemyAIController` (`EEnemyState::Transit` / `Enga
 
 **Mesure de distance pour l'attaque** : `UPrimitiveComponent::GetClosestPointOnCollision` donne le point le plus proche sur la **surface réelle** de la cible (pas son pivot), dont on soustrait le rayon de la capsule du soldat (`GetScaledCapsuleRadius()`) pour obtenir une distance bord-à-bord cohérente avec `AttackRange`. Mesurée en 2D (`FVector::Size2D()`, Z ignoré), par cohérence avec la façon dont le moteur évalue lui-même l'arrivée à destination ailleurs dans Unreal.
 
-**Référence à la spline, pas de recherche automatique** : `AEnemySoldier::PathSplineActor` (`EditInstanceOnly`) est assignée à la main sur l'instance placée dans le niveau, lue par le contrôleur dans `OnPossess`. Remplace une première version qui cherchait « le premier `AEnemyPathSpline` trouvé dans le monde » (`TActorIterator`) — fragile dès qu'il y a plusieurs splines dans le niveau, ou qu'une ancienne traîne encore dedans. Limite connue : ne fonctionne que pour un ennemi placé à la main ; un futur spawner de vagues devra assigner cette référence par code juste après `SpawnActor` (voir `TODO.md`).
+**Référence à la spline, pas de recherche automatique** : `AEnemySoldier::PathSplineActor` (`EditInstanceOnly`) est assignée à la main sur l'instance placée dans le niveau, lue par le contrôleur dans `OnPossess`. Remplace une première version qui cherchait « le premier `AEnemyPathSpline` trouvé dans le monde » (`TActorIterator`) — fragile dès qu'il y a plusieurs splines dans le niveau, ou qu'une ancienne traîne encore dedans. Limite connue : ne fonctionne que pour un ennemi placé à la main ; un futur spawner de vagues devra assigner cette référence par code, **en spawn différé** (`SpawnActorDeferred` → assignation → `FinishSpawning`) : le contrôleur lit la spline dans `OnPossess`, et avec `AutoPossessAI` la possession a lieu pendant `SpawnActor`, donc une assignation faite après arriverait trop tard (voir `TODO.md`, item 3b).
 
 **Rotation** : `AEnemySoldier` désactive `bUseControllerRotationYaw` et active `GetCharacterMovement()->bOrientRotationToMovement`, pour que le personnage tourne vers sa direction de déplacement réelle plutôt que vers la rotation du Controller (pensée par défaut pour un joueur qui regarde à la souris) — s'applique uniformément aux deux phases puisque les deux passent par `AddMovementInput`.
 
