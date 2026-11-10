@@ -66,7 +66,7 @@ L'orchestrateur ne mobilise que les agents utiles à la tâche.
 | Changement de valeur d'équilibrage | consistency-keeper uniquement (propage dans GDD, README, doc technique) |
 | Réécriture de `TODO.md` ou de docs | consistency-keeper uniquement |
 
-Cette table sera recopiée dans `CLAUDE.md` quand le workflow sera validé. Une délégation automatique par description existe dans Claude Code, mais la table explicite est préférée : plus prévisible.
+Cette table figure aussi dans `CLAUDE.md` section 13, avec les arrêts obligatoires. Une délégation automatique par description existe dans Claude Code, mais la table explicite est préférée : plus prévisible.
 
 ---
 
@@ -277,7 +277,7 @@ Les règles des sections précédentes ne sont pas toutes imposables par la conf
 7. **Rôles supplémentaires** (son, narration, UI) : à ajouter quand un besoin réel apparaît.
 8. **Worktrees parallèles** : démarrer en séquentiel, puis 2 ou 3 au maximum. À vérifier que `.claude/worktrees/` à l'intérieur du projet ne perturbe ni Unreal ni Rider. Avec un seul éditeur sur le checkout principal, l'intégration éditeur reste de toute façon séquentielle.
 9. **MCP Unreal** : éditeur détecté et `ue_project_info` fonctionnel le 2026-11-10 (5.8.3, niveau `Lvl_Principal`) ; `ue_status` indiquait `connected: false` juste avant la première commande, la connexion semble s'établir à la demande (à reconfirmer). Déclaré globalement (`uvx --with "mcp<2" uemcp`), version non épinglée. **Aucun outil ne couvre l'Event Graph ni les widgets UMG** (non vu dans la liste d'outils ; `ue_python`, exclu, le permettrait peut-être en partie, non vérifié) : ces étapes restent [HUMAIN] et la conception doit garder la logique en C++. `EngineWire` est aussi chargé dans l'éditeur : deux ponts vers Unreal, à arbitrer. `bRemoteExecution=True` est dans `Config/DefaultEngine.ini` (réglage de projet).
-10. **PR et `gh`** : `gh` (GitHub CLI) est destiné à l'ouverture des PR. Son authentification (`gh auth login`) est à faire par l'humain. Un jeton `gh` permet aussi `gh pr merge` : à interdire aux agents par une règle `deny` dans les réglages du projet (non faite, accord de l'humain requis) ; le ruleset GitHub de `dev` n'empêche pas, à lui seul, un agent de fusionner sa propre PR tant que 0 approbation est exigée.
+10. **PR et `gh`** : `gh` 2.103.3 est installé (2026-11-10) et authentifié par l'humain (droits ADMIN sur le dépôt, jeton avec le scope `repo`). Ce jeton permet aussi `gh pr merge` : `.claude/settings.json` refuse `Bash(gh pr merge *)` et `Bash(gh api *)`. C'est contournable (appel par chemin complet, autre outil) : un garde-fou, pas une frontière. Le ruleset de `dev` n'empêche pas non plus un agent de fusionner sa propre PR tant que 0 approbation est exigée : reste à régler côté GitHub une PR obligatoire sur `dev`.
 
 ---
 
