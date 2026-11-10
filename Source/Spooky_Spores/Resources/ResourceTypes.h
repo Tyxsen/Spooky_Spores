@@ -15,7 +15,8 @@ enum class EResourceType : uint8
 	Wood,
 	Stone,
 	Potion,
-	Bone
+	Bone,
+	Necrospore // Resurrection item; temporary counted resource until the real inventory exists
 };
 
 USTRUCT(BlueprintType)
