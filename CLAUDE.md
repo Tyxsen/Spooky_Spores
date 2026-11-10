@@ -76,12 +76,13 @@ La liste à jour des dossiers et fichiers est dans `documentation-technique.md` 
 
 - **Un nouveau domaine = un nouveau dossier.** Des sous-dossiers à l'intérieur d'un domaine seulement quand il dépasse 6 à 8 fichiers.
 - Les fichiers du module (`Spooky_Spores.h/.cpp/.Build.cs`) et `CollisionChannels.h` restent à la racine.
+- `Tests/` contient les Automation Specs (tests automatiques, un fichier par système testé) : ce n'est pas un domaine de gameplay. Lancement : clic droit sur le dossier dans Rider, « Run Unit Tests », ou panneau Automation de l'éditeur (filtre `SpookySpores`).
 
 ### Content Browser (`Content/Spooky_Spores/`)
 
 Organisation inspirée du [UE5 Style Guide d'Allar](https://github.com/Allar/ue5-style-guide) : `Core/` (Character, Controller, GameMode, Input) contient ce qu'on ne modifie pas à la légère ; `Placeables/` les instances concrètes, librement ajustables ; `UI/Widgets/`, `Maps/`. Détail dans `documentation-technique.md`.
 
-**Avertissement : `__ExternalActors__` et `__ExternalObjects__` ne sont pas des assets inutilisés.** Le projet utilise **One File Per Actor** : chaque acteur placé dans une map est un fichier séparé dans ces dossiers. Les supprimer viderait les niveaux. Seuls les sous-dossiers d'une map supprimée sont orphelins.
+**Avertissement : `__ExternalActors__` et `__ExternalObjects__` ne sont pas des assets inutilisés.** `Lvl_FirstPerson` utilise **One File Per Actor** : chaque acteur placé dans cette map est un fichier séparé dans ces dossiers. **`Lvl_Principal` ne l'utilise pas** : ses acteurs sont dans `Lvl_Principal.umap` (point chaud, à ne jamais modifier sur deux branches en parallèle). Supprimer ces dossiers viderait `Lvl_FirstPerson`. Seuls les sous-dossiers d'une map supprimée sont orphelins.
 
 ---
 
@@ -222,7 +223,7 @@ Question systématique : **à quel moment cette ligne s'exécute-t-elle ?**
 - `bStopOnOverlap` de `MoveToLocation` ajoute **automatiquement** le rayon de capsule de l'agent (arrêt et test d'arrivée) : l'ajouter à la main dans `AcceptanceRadius` le compte en double.
 - `Default Query Extent` (`Project Settings > Navigation System`) trop petit empêche de projeter un point situé dans la marge d'exclusion du NavMesh autour d'un obstacle : `MoveToLocation` échoue silencieusement (`Failed`) même avec `bProjectDestinationToNavigation = true`.
 - Un personnage déplacé via `MoveToLocation`/`PathFollowingComponent` n'alimente pas forcément l'Animation Blueprint comme `AddMovementInput` (l'ennemi glissait sans cycle de marche) : vérifier avec l'Anim Blueprint Debugger avant de chercher côté C++.
-- `TActorIterator<T>` ne garantit aucun ordre : ne jamais s'en servir pour choisir « le bon » acteur parmi plusieurs du même type ; préférer une référence explicite assignée à la main (`EditInstanceOnly`).
+- `TActorIterator<T>` ne garantit aucun ordre : ne jamais s'en servir pour choisir « le bon » acteur parmi plusieurs du même type ; préférer une référence explicite assignée à la main (`EditInstanceOnly`). Si le consommateur est créé par le code (serviteur spawné) ou par un `PlayerStart` (Character), aucune instance du niveau ne peut porter cette référence : passer par un `UWorldSubsystem` qui enregistre l'unique instance (modèle : `UBaseZoneSubsystem`, la première enregistrée gagne, un log d'erreur signale la seconde).
 
 ---
 
@@ -231,7 +232,7 @@ Question systématique : **à quel moment cette ligne s'exécute-t-elle ?**
 - **Pas de découpage par semaines** (depuis le 2026-11-09) : on déroule la file d'attente de `TODO.md` à son rythme. Timéo signale lui-même chaque deadline (rendu, oral, CDC) ; c'est à ce moment seulement qu'on recale la file. Ne raisonne pas en « semaine N » et ne suppose pas d'échéance non annoncée.
 - **Une mécanique par tâche, livrée entière** (branche fusionnée dans `dev`) avant de passer à la suivante. Quand une tâche déborde, **on coupe ou on repousse en fin de file**, on ne décale pas tout. Les tâches d'IA (ennemi, serviteur) et la conquête du village sont les plus optimistes : minimum viable, premiers candidats à la coupe.
 - Objectif de fond : la **boucle principale** jouable de bout en bout (récolter → planter → fabriquer une potion → combattre → récupérer des os → ressusciter un serviteur → le serviteur récolte), plutôt que le maximum de mécaniques annexes. Rien n'est « pour le Bloc 2 » par défaut.
-- **Avant toute Release** : retirer le code et les nœuds de debug listés dans la « Dette technique » de `TODO.md`. Tag et Release GitHub à chaque étape significative.
+- **Avant toute Release** : retirer le code et les nœuds de debug, et rétablir les réglages de développement (ex. `Hidden In Game`), listés dans la « Dette technique » de `TODO.md`. Tag et Release GitHub à chaque étape significative.
 
 ---
 

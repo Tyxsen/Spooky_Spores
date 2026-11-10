@@ -10,7 +10,8 @@
 - [x] Corriger les includes courts de `Enemies/EnemyAIController.cpp` et `Resources/ResourceCounterComponent.h`
 - [x] Item 2, étape 2.1 : chaudron multi-recettes + recette os + potion → Necrospore (ressource comptée provisoire) — terminé et testé sur `feature/cauldron-recipes`
 - [x] Item 2, étape 2.2a : pose de la Necrospore (touche L) → apparition d'un serviteur immobile — terminé et testé sur `feature/servant-placement`
-- [ ] Item 2, étape 2.2b : zone de base (`UBoxComponent`, « point dans la zone ? » / « point au hasard dans la zone », avec debug visuel)
+- [x] Item 2, étape 2.2b : zone de base (`ABaseZone` / `BP_BaseZone`, « point dans la zone ? » / « point au hasard dans la zone », boîte visible en jeu via `Hidden In Game`) — terminé et testé (53 Automation Specs, PIE, non-régression) sur `feature/base-zone`
+- [ ] Item 2, étape 2.2c : errance des serviteurs dans la zone de base (voir file d'attente, item 2)
 
 ## Divers à régler
  
@@ -34,13 +35,13 @@ Depuis le 2026-11-09 : **plus de découpage par semaines**. On avance à notre r
 
 **File d'attente après S2, dans l'ordre**
 1. [x] Un soldat ennemi simple : se déplace, attaque, meurt, laisse tomber des os au sol (nouvelle ressource `EResourceType::Bone`, paliers de rareté selon la force de l'ennemi — réutilise l'architecture `AResourceDrop`) — fusionné dans `dev` (PR #7)
-2. [ ] Résurrection : nouvelle recette au chaudron (os + potion) → objet posable (comme un œuf de monstre) → posé librement depuis le personnage, n'importe où → serviteur qui apparaît et erre sans tâche dans la zone de la base jusqu'à assignation (item 3) ; revient automatiquement dans la zone s'il est posé en dehors. Dépend d'un nouveau concept technique : la « zone de base » (volume délimité, probablement calé sur `BP_Fences`).
+2. [ ] Résurrection : nouvelle recette au chaudron (os + potion) → objet posable (comme un œuf de monstre) → posé librement depuis le personnage, n'importe où → serviteur qui apparaît et erre sans tâche dans la zone de la base jusqu'à assignation (item 3) ; revient automatiquement dans la zone s'il est posé en dehors. Dépend d'un nouveau concept technique : la « zone de base » (volume délimité : `BP_BaseZone`, boîte posée à la main qui englobe `BP_Fences`, sans dépendre de la clôture ; à recaler avec les items 13-14).
    **Stockage provisoire (décidé le 2026-11-09)** : en attendant le vrai inventaire (item 7), l'objet de résurrection est une ressource comptée dans `UResourceCounterComponent`. Tout accès à ce stockage (« en ai-je un ? », « en consommer un ») doit être isolé à **un seul endroit** du code de pose, pour que le passage à l'inventaire ne touche que cet endroit.
    Livré en branches successives, chacune testable et fusionnable seule :
    - [x] 2.1 Recette os + potion → Necrospore (chaudron multi-recettes) — `feature/cauldron-recipes`
    - [x] 2.2a Pose de l'objet (touche L) → apparition d'un serviteur immobile — `feature/servant-placement`
-   - [ ] 2.2b Zone de base : `UBoxComponent` qui fournit elle-même les points (tirés dans son espace local, donc valides même si la boîte est tournée). Les serviteurs l'interrogent à chaque décision, sans mémoriser ses dimensions, pour suivre un futur agrandissement de la base (items 13-14)
-   - [ ] 2.2c Errance dans la zone : destination tirée par la zone puis projetée sur le NavMesh (`ProjectPointToNavigation`, essais bornés), ce qui écarte les points tombés dans un arbre ou une clôture. Le retour d'un serviteur posé hors zone en découle sans mode dédié. À vérifier : arbres (Foliage, `Can Ever Affect Navigation`) et clôture découpent bien le NavMesh (touche P), cas d'un serviteur posé sans chemin vers la base
+   - [x] 2.2b Zone de base : `ABaseZone` (`UBoxComponent`) qui fournit elle-même les points (tirés dans son espace local, donc valides même si la boîte est tournée), retrouvée via `UBaseZoneSubsystem` (une zone par niveau). Les serviteurs l'interrogent à chaque décision, sans mémoriser ses dimensions, pour suivre un futur agrandissement de la base (items 13-14) — `feature/base-zone`
+   - [ ] 2.2c Errance dans la zone : destination tirée par la zone puis projetée sur le NavMesh (`ProjectPointToNavigation`, essais bornés), ce qui écarte les points tombés dans un arbre ou une clôture. API de la zone consommée : `UBaseZoneSubsystem::GetBaseZone()` à chaque décision, sans cache (`nullptr` = pas d'errance) ; `IsPointInZone` pour le retour hors zone ; `GetRandomPointInZone(OutPoint)` (faux = pas de destination) ; `GetZoneExtent().Z` pour l'extension verticale de la projection (le point tiré est au plan médian de la boîte, pas au sol). Le retour d'un serviteur posé hors zone en découle sans mode dédié. À vérifier : arbres (Foliage, `Can Ever Affect Navigation`) et clôture découpent bien le NavMesh (touche P), cas d'un serviteur posé sans chemin vers la base
 3. [ ] Assignation des tâches aux serviteurs : menu dédié (touche à définir), deux colonnes — serviteurs non assignés à gauche, catégories de tâche à droite (« attaque/défense », « récolte de champ »...). La récolte automatique devient une conséquence de l'assignation à « récolte de champ », pas un comportement indépendant. Ferme la boucle de jeu principale, combiné à l'item 2
    - [ ] 3.1 Menu d'assignation (deux colonnes, sans comportement derrière au début)
    - [ ] 3.2 Comportement « récolte de champ » (le serviteur interagit avec `AFieldPlot`)
@@ -76,6 +77,7 @@ Depuis le 2026-11-09 : **plus de découpage par semaines**. On avance à notre r
  
 - [ ] Supprimer `AEnemySoldier::DebugKill` (fonction de debug temporaire, ajoutée le 2026-11-10 pour tester le chaudron) **et la touche de debug qui l'appelle dans `BP_FirstPersonCharacter`** dès que le joueur a un vrai moyen de tuer un soldat — à ne pas laisser dans un build livré
 - [ ] Supprimer le nœud `Add Resource (Necrospore)` de test dans le `BeginPlay` de `BP_FirstPersonCharacter` (ajouté le 2026-11-10 pour tester la pose des serviteurs) — à ne pas laisser dans un build livré
+- [ ] Remettre `Hidden In Game` à `true` sur le composant `ZoneBox` de `BP_BaseZone` avant la première Release (la boîte de la zone de base est visible en jeu pendant le développement)
 - [ ] Déplacer la création de l'UI hors du personnage (PlayerController ou HUD) quand l'interface grossira
 - [ ] Faire disparaître les drops restés au sol après un délai (avant l'item 3.2, quand les serviteurs récolteront)
 - [ ] Vérifier / faire la factorisation du calcul de la cible dans `UGrabComponent` (`GetGrabTargetTransform`)
