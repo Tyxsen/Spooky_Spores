@@ -100,3 +100,7 @@ Plugins/**/Intermediate/*
 
 # Editor-only third-party plugins installed in the engine, not in the project (e.g. EngineWire MCP bridge)
 Plugins/Marketplace/
+
+# Blender backup files and Claude Code agent worktrees
+*.blend1
+.claude/worktrees/
