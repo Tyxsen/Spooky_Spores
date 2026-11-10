@@ -8,7 +8,9 @@
 - [x] GDD complet (`GDD.md`, 5 sections) — rédigé du 2026-10-26 au 2026-11-03. La file d'attente ci-dessous a été réorganisée en conséquence (items 1, 2, 3, 13, 14, 16, 17 mis à jour). Le point de passage obligatoire (`CLAUDE.md` section 12) est levé.
 - [x] Item 1 (soldat ennemi simple) : terminé, testé en PIE (suivi de spline, détection/approche du destructible le plus proche, attaque, mort, drop d'os via `AResourceDrop`), fusionné dans `dev` (PR #7)
 - [ ] Corriger les includes courts de `Enemies/EnemyAIController.cpp` : `"EnemyPathSpline.h"` → `"Enemies/EnemyPathSpline.h"`, `"EnemySoldier.h"` → `"Enemies/EnemySoldier.h"` (convention `CLAUDE.md` section 6)
-- [ ] Item 2, étape 1 : recette chaudron os + potion → objet de résurrection (nom à choisir), stocké provisoirement comme ressource comptée (voir item 2 ci-dessous)
+- [x] Corriger les includes courts de `Enemies/EnemyAIController.cpp` et `Resources/ResourceCounterComponent.h`
+- [x] Item 2, étape 2.1 : chaudron multi-recettes + recette os + potion → Necrospore (ressource comptée provisoire) — terminé et testé sur `feature/cauldron-recipes`
+- [ ] Item 2, étape 2.2 : pose de la Necrospore → apparition du serviteur + zone de base + errance
 
 ## Divers à régler
  
@@ -36,7 +38,7 @@ Depuis le 2026-11-09 : **plus de découpage par semaines**. On avance à notre r
 2. [ ] Résurrection : nouvelle recette au chaudron (os + potion) → objet posable (comme un œuf de monstre) → posé librement depuis le personnage, n'importe où → serviteur qui apparaît et erre sans tâche dans la zone de la base jusqu'à assignation (item 3) ; revient automatiquement dans la zone s'il est posé en dehors. Dépend d'un nouveau concept technique : la « zone de base » (volume délimité, probablement calé sur `BP_Fences`).
    **Stockage provisoire (décidé le 2026-11-09)** : en attendant le vrai inventaire (item 7), l'objet de résurrection est une ressource comptée dans `UResourceCounterComponent`. Tout accès à ce stockage (« en ai-je un ? », « en consommer un ») doit être isolé à **un seul endroit** du code de pose, pour que le passage à l'inventaire ne touche que cet endroit.
    Livré en branches successives, chacune testable et fusionnable seule :
-   - [ ] 2.1 Recette os + potion → objet de résurrection (réutilise le chaudron)
+   - [x] 2.1 Recette os + potion → Necrospore (chaudron multi-recettes) — `feature/cauldron-recipes`
    - [ ] 2.2 Pose de l'objet → apparition du serviteur + zone de base + errance dans la zone (retour automatique si posé hors zone)
 3. [ ] Assignation des tâches aux serviteurs : menu dédié (touche à définir), deux colonnes — serviteurs non assignés à gauche, catégories de tâche à droite (« attaque/défense », « récolte de champ »...). La récolte automatique devient une conséquence de l'assignation à « récolte de champ », pas un comportement indépendant. Ferme la boucle de jeu principale, combiné à l'item 2
    - [ ] 3.1 Menu d'assignation (deux colonnes, sans comportement derrière au début)
@@ -71,6 +73,7 @@ Depuis le 2026-11-09 : **plus de découpage par semaines**. On avance à notre r
 
 ## Dette technique
  
+- [ ] Supprimer `AEnemySoldier::DebugKill` (fonction de debug temporaire, ajoutée le 2026-11-10 pour tester le chaudron) **et la touche de debug qui l'appelle dans `BP_FirstPersonCharacter`** dès que le joueur a un vrai moyen de tuer un soldat — à ne pas laisser dans un build livré
 - [ ] Déplacer la création de l'UI hors du personnage (PlayerController ou HUD) quand l'interface grossira
 - [ ] Faire disparaître les drops restés au sol après un délai (avant les serviteurs)
 - [ ] Vérifier / faire la factorisation du calcul de la cible dans `UGrabComponent` (`GetGrabTargetTransform`)
