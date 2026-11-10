@@ -110,6 +110,7 @@ Core/
 Interaction/    Grabbable, Interactable, InteractionComponent, GrabComponent, PhysicsGrabbable
 Narrative/      StoryTrigger
 Resources/      ResourceTypes (header seul), ResourceCounterComponent, ResourceDrop, HarvestableResource
+Servants/       Servant
 ```
 Règle : **un nouveau domaine = un nouveau dossier**. On ne crée des sous-dossiers à l'intérieur d'un domaine que quand il dépasse 6 à 8 fichiers.
 
@@ -121,7 +122,8 @@ Core/          Character/, Controller/, GameMode/, Input/Actions/   ← briques 
 Placeables/    Interactables/ (BP_Rock), Narrative/ (BP_StoryTrigger_Entrance),
                Destructibles/ (GC_Mushroom),
                Resources/ (BP_Drop_Seed, BP_Drop_Stone, BP_Drop_Wood,
-                           BP_Harvestable_Plant, BP_Harvestable_Stone, BP_Harvestable_Wood)
+                           BP_Harvestable_Plant, BP_Harvestable_Stone, BP_Harvestable_Wood),
+               Servants/ (BP_Servant)
 UI/Widgets/    WBP_StoryText, WBP_ResourceEntry, WBP_ResourceCounter
 Characters/Mannequins/...   ← contenu du template
 Maps/
@@ -366,6 +368,7 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 - Après un renommage ou un déplacement de classe C++, ou une modification de `UFUNCTION`/`UINTERFACE` : fermer l'éditeur, régénérer les fichiers de projet, et faire un **Rebuild complet** (pas Live Coding).
 - Supprimer des assets **uniquement depuis le Content Browser** (vérification des références), puis Fix Up Redirectors. Jamais depuis l'explorateur Windows.
 - Commit perdu après un `reset --hard` : `git reflog` puis `git cherry-pick <hash>`.
+- **Plugins d'outillage tiers (ex. EngineWire, pont MCP) : installés dans le moteur, jamais dans `Plugins/` du projet.** Dans le projet, ils sont recompilés avec lui (EngineWire : ~1 200 `.cpp`, plus d'une heure) et finissent suivis par Git. Procédure : `RunUAT.bat BuildPlugin -Plugin=<...>.uplugin -Package=<dossier hors projet> -TargetPlatforms=Win64`, copie du résultat dans `C:\Program Files\Epic Games\UE_5.8\Engine\Plugins\Marketplace\` (droits admin), entrée `"Optional": true` dans le `.uproject` (le projet s'ouvre sans le plugin). `Plugins/Marketplace/` est ignoré par Git. À refaire sur chaque machine, sur le même hotfix (copier le plugin compilé suffit). Fait le 2026-11-10 sur une seule des deux machines ; **l'autre reste à faire** (dossier compilé conservé dans `C:\Projects\Unreal Projects\_PluginBuilds\EngineWire`). RiderLink reste dans `Plugins/Developer/` (géré par Rider).
 - Messages de commit préfixés : `[ADD]`, `[FIX]`, `[CHORE]`, `[DOC]`, **rédigés en anglais** (depuis le 2026-10-01 ; les commits antérieurs en français ne sont pas à reprendre rétroactivement).
 
 ---
@@ -416,7 +419,8 @@ main  ← versions validées uniquement (rendus), jamais de commit direct
 - **Dette connue laissée par cette feature** : bug de logique inversée dans `AStoryTrigger::OnBoxOverlap` (`bTriggerOnce`/`bHasTriggered`, voir section 11), debug `DrawDebugLine` de `UInteractionComponent` commenté en dur (pas un interrupteur), dossier `Content/RockEnv_Pack/Meshes/Small_Rocks/` gardant 7 meshes au lieu des 3 réellement utilisés. À vérifier si toujours d'actualité.
 - **Soldat ennemi simple (file d'attente, item 1)** : terminé et testé en PIE sur `feature/enemy-soldier` (suivi de spline, détection/approche du destructible le plus proche, attaque, mort, drop d'os via `AResourceDrop`). Documenté dans `documentation-technique.md` section 13. **Fusionné dans `dev`** (PR #7, confirmé le 2026-11-09). Dette laissée : `AEnemySoldier::PathSplineActor` est `EditInstanceOnly`, assignable seulement sur une instance déjà placée dans le niveau — un futur spawner de vagues devra l'assigner par code, **en spawn différé** car `AEnemyAIController::OnPossess` lit la spline pendant `SpawnActor` (voir `TODO.md`, item 3b). Includes courts à corriger dans `EnemyAIController.cpp`.
 - **Résurrection (item 2)** : décidé le 2026-11-09 — l'objet de résurrection est stocké provisoirement comme ressource comptée dans `UResourceCounterComponent` (pas d'inventaire avant l'item 7). L'accès à ce stockage doit rester isolé à un seul endroit du code de pose, pour que le passage à l'inventaire soit local. Items 2 et 3 découpés en sous-étapes fusionnables séparément (voir `TODO.md`).
-- **Chaudron multi-recettes + Necrospore (item 2, étape 2.1)** : terminé, testé, fusionné dans `dev` (PR #8, le 2026-11-10). Documenté dans `documentation-technique.md` section 7. Branche supprimée. Laisse une fonction de debug temporaire, `AEnemySoldier::DebugKill`, appelée par une touche de debug dans `BP_FirstPersonCharacter` (à retirer avant toute Release, voir `TODO.md`). Prochaine étape : 2.2 (pose de la Necrospore → serviteur + zone de base + errance).
+- **Chaudron multi-recettes + Necrospore (item 2, étape 2.1)** : terminé, testé, fusionné dans `dev` (PR #8, le 2026-11-10). Documenté dans `documentation-technique.md` section 7. Branche supprimée. Laisse une fonction de debug temporaire, `AEnemySoldier::DebugKill`, appelée par une touche de debug dans `BP_FirstPersonCharacter` (à retirer avant toute Release, voir `TODO.md`). Étape 2.2 découpée en 2.2a / 2.2b / 2.2c (voir `TODO.md`).
+- **Pose de la Necrospore → serviteur (item 2, étape 2.2a)** : terminé, testé, fusionné dans `dev` (PR #10, le 2026-11-10). Documenté dans `documentation-technique.md` section 14. Touche L, `AServant` sans comportement, trace de pose dédié dans `UInteractionComponent`, unique accès au stockage de la Necrospore dans `DoPlaceServant`. Durcissement de `UResourceCounterComponent` au passage (`ResourceCounts` privé, montants ≤ 0 refusés). Laisse un nœud `Add Resource (Necrospore)` de test dans le `BeginPlay` de `BP_FirstPersonCharacter` (dette, à retirer avant toute Release). Prochaine étape : 2.2b (zone de base), puis 2.2c (errance).
 
 ### Rythme de travail (depuis le 2026-11-09)
 
