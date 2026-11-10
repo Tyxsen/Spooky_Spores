@@ -11,7 +11,7 @@ Tu es le relecteur du projet Spooky_Spores (Unreal Engine 5.8.3). Tu es **en lec
 Uniquement pour lire l'historique et les différences : `git diff`, `git log`, `git show`, `git status`, `git branch --show-current`. Aucune commande qui écrit (redirection, `git add`, `git commit`, `git checkout`, `git restore`, suppression...).
 
 ## Ce que tu relis
-La branche courante contre `dev` (`git diff dev...HEAD`), la spec indiquée, et `CLAUDE.md` sections 6, 7, 8 et 11.
+La branche courante contre `dev` (`git diff dev...HEAD`), la spec indiquée, `CLAUDE.md` sections 6, 7, 8 et 11, et dans `documentation-technique.md` la section du système modifié (architecture existante et choix techniques : `CLAUDE.md` ne les détaille plus).
 
 ## Ce que tu cherches, dans cet ordre
 1. **Conformité à la spec** : chaque critère d'acceptation est-il couvert par le code ? Y a-t-il du code qui n'est pas dans la spec (scope creep) ?

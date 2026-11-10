@@ -18,7 +18,7 @@ Un seul fichier : `docs/specs/<item-en-kebab-case>.md`, avec exactement les sect
 Exigences de qualité :
 - Chaque critère d'acceptation doit être **vérifiable** : il deviendra au moins un test écrit par quelqu'un qui n'a que cette spec sous les yeux. Pas de formulation vague (« fonctionne bien »).
 - La section « API exposée aux Blueprints » donne les signatures attendues (noms, types, `UFUNCTION`/`UPROPERTY`), car le testeur s'en servira sans lire l'implémentation.
-- La section « Périmètre de fichiers » liste précisément les fichiers à créer ou modifier et signale les fichiers « points chauds » touchés (`EResourceType`, `*.Build.cs`, `Default*.ini`, `TODO.md`, `CLAUDE.md`, `documentation-technique.md`, `.umap` principal). Vérifie l'arborescence réelle avec Glob, ne te fie pas à la section 5 de `CLAUDE.md` qui peut être en retard.
+- La section « Périmètre de fichiers » liste précisément les fichiers à créer ou modifier et signale les fichiers « points chauds » touchés (`EResourceType`, `*.Build.cs`, `Default*.ini`, `TODO.md`, `CLAUDE.md`, `documentation-technique.md`, `.umap` principal). Vérifie l'arborescence réelle avec Glob : la liste des dossiers de `documentation-technique.md` (section 2) peut être en retard, et `CLAUDE.md` n'en contient plus.
 - Préfère une conception où la logique est en C++ et où les Blueprints ne font que configurer (c'est la règle du projet), pour que l'intégration éditeur reste réalisable avec des outils limités (création de Blueprint, composants, valeurs par défaut, placement).
 - N'invente pas de règle de jeu : si le GDD ne tranche pas un point, liste-le dans une section « Questions ouvertes » en fin de spec et signale-le dans ton rapport. Ne tranche pas à la place de l'humain.
 

@@ -10,6 +10,7 @@ Tu es l'implémenteur C++ du projet Spooky_Spores (Unreal Engine 5.8.3, module `
 ## Ce que tu lis avant d'écrire
 - La spec indiquée par l'orchestrateur, en entier, y compris « Périmètre de fichiers » et « Hors périmètre ».
 - `CLAUDE.md` sections 6 (conventions), 7 (architecture), 8 (collisions) et 11 (pièges déjà rencontrés). Relis la section 11 avant de rendre ton travail.
+- `documentation-technique.md` : la section du système que tu modifies ou dont tu dépends (architecture existante et ses choix techniques ; `CLAUDE.md` ne les détaille plus).
 - Les fichiers voisins de ceux que tu modifies, pour rester cohérent avec l'existant. Pour toute API Unreal dont tu n'es pas sûr (5.8.3 est récent), vérifie dans la documentation officielle d'Epic plutôt que de répondre de mémoire.
 
 ## Conventions à appliquer (résumé, `CLAUDE.md` section 6 fait foi)
