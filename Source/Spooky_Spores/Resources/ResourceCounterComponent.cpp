@@ -2,6 +2,7 @@
 
 
 #include "Resources/ResourceCounterComponent.h"
+#include "Spooky_Spores.h"
 
 // Sets default values for this component's properties
 UResourceCounterComponent::UResourceCounterComponent()
@@ -11,6 +12,13 @@ UResourceCounterComponent::UResourceCounterComponent()
 
 void UResourceCounterComponent::AddResource(EResourceType Type, int32 Amount)
 {
+	// A negative amount would silently remove resources without any check: spending goes through TrySpendResource
+	if (Amount <= 0)
+	{
+		UE_LOG(LogSpooky_Spores, Warning, TEXT("AddResource called with a non-positive amount (%d), ignored"), Amount);
+		return;
+	}
+
 	int32& ActualTypeAmount = ResourceCounts.FindOrAdd(Type);
 	ActualTypeAmount += Amount;
 	
@@ -25,6 +33,13 @@ int32 UResourceCounterComponent::GetResourceCount(EResourceType Type) const
 
 bool UResourceCounterComponent::TrySpendResource(EResourceType Type, int32 Amount)
 {
+	// A negative amount would pass the check below and then add resources instead of spending them
+	if (Amount <= 0)
+	{
+		UE_LOG(LogSpooky_Spores, Warning, TEXT("TrySpendResource called with a non-positive amount (%d), ignored"), Amount);
+		return false;
+	}
+
 	int32* Found = ResourceCounts.Find(Type);
 	if (!Found || *Found < Amount) return false;
 

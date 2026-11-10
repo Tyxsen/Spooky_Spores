@@ -31,10 +31,12 @@ public:
 
 // -----------PROPERTIES-----------
 public:
-	UPROPERTY(BlueprintReadOnly, Category = "Resources")
-	TMap<EResourceType, int32> ResourceCounts;
-
 	UPROPERTY(BlueprintAssignable, Category = "Resources")
 	FOnResourceChanged OnResourceChanged;
+
+private:
+	// Private so every change goes through AddResource/TrySpendResource and broadcasts OnResourceChanged
+	UPROPERTY(BlueprintReadOnly, Category = "Resources", meta = (AllowPrivateAccess = "true"))
+	TMap<EResourceType, int32> ResourceCounts;
 
 };

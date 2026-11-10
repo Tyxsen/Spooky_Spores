@@ -53,6 +53,7 @@ Interaction/    Grabbable, Interactable, InteractionComponent, GrabComponent, Ph
 Narrative/      StoryTrigger
 Resources/      ResourceTypes, ResourceCounterComponent, ResourceDrop, HarvestableResource
 Movement/       StaminaComponent
+Servants/       Servant
 ```
 Un nouveau domaine fonctionnel = un nouveau dossier.
 
@@ -62,7 +63,8 @@ Core/          Character/, Controller/, GameMode/, Input/Actions/
 Placeables/    Interactables/ (BP_Rock), Narrative/ (BP_StoryTrigger_Entrance),
                Destructibles/ (GC_Mushroom),
                Resources/ (BP_Drop_Seed, BP_Drop_Stone, BP_Drop_Wood,
-                           BP_Harvestable_Plant, BP_Harvestable_Stone, BP_Harvestable_Wood)
+                           BP_Harvestable_Plant, BP_Harvestable_Stone, BP_Harvestable_Wood),
+               Servants/ (BP_Servant)
 UI/Widgets/    WBP_StoryText, WBP_ResourceEntry, WBP_ResourceCounter, WBP_StaminaBar
 Characters/Mannequins/...
 Maps/
@@ -141,7 +143,9 @@ Une seule touche contextuelle (`E` / `DoInteractAction`) arbitre entre reposer, 
 
 `EResourceType` (`Resources/ResourceTypes.h`) énumère les types de ressources (`Seed`, `Wood`, `Stone`).
 
-`UResourceCounterComponent` : `TMap<EResourceType, int32>` tenant le compte par type, fonction `AddResource(Type, Amount)` (récupère l'entrée via `FindOrAdd` **par référence** pour que l'incrémentation soit réellement stockée), `GetResourceCount(Type)`, et un délégué `FOnResourceChanged` (`BlueprintAssignable`) diffusé à chaque ajout — modèle *push*, adapté à une donnée qui ne change que ponctuellement (contraste avec la section 5).
+`UResourceCounterComponent` : `TMap<EResourceType, int32>` tenant le compte par type, fonction `AddResource(Type, Amount)` (récupère l'entrée via `FindOrAdd` **par référence** pour que l'incrémentation soit réellement stockée), `GetResourceCount(Type)`, `TrySpendResource(Type, Amount)` (renvoie `false` sans rien retirer si le stock est insuffisant), et un délégué `FOnResourceChanged` (`BlueprintAssignable`) diffusé à chaque changement — modèle *push*, adapté à une donnée qui ne change que ponctuellement (contraste avec la section 5).
+
+La `TMap` est `private` (lisible en Blueprint via `AllowPrivateAccess`) : toute modification passe par `AddResource`/`TrySpendResource`, donc l'UI est toujours prévenue. Les deux fonctions refusent un montant nul ou négatif (warning dans le log) : sans ce garde-fou, `TrySpendResource(Type, -5)` passait la vérification de stock puis **ajoutait** 5.
 
 `AHarvestableResource` : nœud récoltable, implémente `IInteractable`. `OnInteract_Implementation` coupe d'abord la collision du nœud, fait apparaître ses drops (un par entrée de `TArray<FResourceDropEntry>`, position aléatoire dans un rayon `DropSpawnRadius`), puis détruit le nœud.
 
@@ -323,6 +327,29 @@ Machine à deux états dans `AEnemyAIController` (`EEnemyState::Transit` / `Enga
 
 ---
 
-## 14. Limitations connues et dette technique
+## 14. Serviteurs — pose depuis une Necrospore
+
+`Servants/` : `AServant` (Character). Pour l'instant sans comportement : il apparaît et reste immobile. Pas de classe de base commune avec `AEnemySoldier` : les deux n'ont pas le même rôle (l'ennemi attaque la base, le serviteur la développe), et une seule implémentation ne justifie pas encore d'abstraction.
+
+**Pose (touche L, `DoPlaceServant` dans le Character)**, dans cet ordre :
+1. `UInteractionComponent::GetPlacementPoint` cherche un point au sol devant le joueur.
+2. `UResourceCounterComponent::TrySpendResource(Necrospore, 1)` consomme l'objet de résurrection.
+3. Spawn de `ServantClass` (assignée à `BP_Servant` dans `BP_FirstPersonCharacter`).
+
+L'ordre garantit qu'une pose impossible (viser le ciel ou un mur) ne coûte jamais de Necrospore.
+
+**Choix technique — un trace dédié, à la demande** : le trace de détection (section 3) ne voit que le type d'objet `Interactable`, donc pas le sol. `GetPlacementPoint` fait son propre `LineTraceSingleByChannel` sur `ECC_Visibility`, depuis le même point de vue, uniquement à l'appui sur la touche (pas à chaque frame). `UInteractionComponent` reste un composant de détection : il répond à une question de plus (« quel sol le joueur vise-t-il ? »), sans changer la détection existante.
+
+**Validation de la surface** : la pose est refusée si rien n'est touché dans `PlacementRange` (300, portée d'interaction du 3C) ou si la composante Z de la normale est inférieure à `MinPlacementNormalZ` (0.7). Z vaut le cosinus de la pente : 1 sur un sol plat, 0 sur un mur, environ 0.7 à 45°. Le seuil correspond à l'angle de sol marchable par défaut du `CharacterMovementComponent` (environ 44.8°) : on ne pose un serviteur que là où il peut tenir debout. Même règle que `MinGroundNormalZ` pour les drops (section 4). Limite connue : le dessus plat d'une pierre récoltable est accepté.
+
+**Positionnement** : l'origine d'un Character est le centre de sa capsule. Le point de spawn est donc remonté de la demi-hauteur de capsule, lue sur l'objet par défaut de `ServantClass` (`GetDefaultObject`), pour que les pieds touchent le sol. Le serviteur est tourné vers le joueur (yaw seul).
+
+**Spawn toujours garanti** : `ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn` décale le serviteur s'il chevauche quelque chose (le joueur, un obstacle) au lieu d'annuler le spawn. La Necrospore déjà dépensée n'a donc jamais à être remboursée. Un échec reste possible sur une erreur de programmation (monde en cours de destruction) : il est tracé dans le log (`LogSpooky_Spores`).
+
+**Stockage provisoire de la Necrospore** : en attendant l'inventaire (item 7 de `TODO.md`), c'est une ressource comptée. L'unique accès à ce stockage est l'appel à `TrySpendResource` dans `DoPlaceServant`, commenté comme tel : le passage à l'inventaire ne touchera que cette ligne.
+
+---
+
+## 15. Limitations connues et dette technique
 
 Centralisées dans [`TODO.md`](TODO.md), pour éviter une double liste qui diverge avec le temps.
