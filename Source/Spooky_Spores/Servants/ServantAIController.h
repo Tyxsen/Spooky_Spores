@@ -32,6 +32,7 @@ class SPOOKY_SPORES_API AServantAIController : public AAIController
 
 // -----------FUNCTIONS-----------
 public:
+	// Resets the failed-return counter and schedules the first decision. No effect if already wandering.
 	UFUNCTION(BlueprintCallable, Category = "Servant|Wander")
 	void StartWandering();
 

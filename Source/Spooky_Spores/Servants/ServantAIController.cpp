@@ -16,6 +16,12 @@
 
 void AServantAIController::StartWandering()
 {
+	// Already wandering: restarting would interrupt the current move (Aborted) and count fake failed returns
+	if (bIsWandering)
+	{
+		return;
+	}
+
 	bIsWandering = true;
 	FailedReturnAttempts = 0;
 	// A Return from a previous cycle must not count as a failed return in the new one
@@ -97,9 +103,16 @@ void AServantAIController::OnUnPossess()
 
 void AServantAIController::MakeDecision()
 {
-	const APawn* ControlledPawn = GetPawn();
-	if (!bIsWandering || !ControlledPawn)
+	if (!bIsWandering)
 	{
+		return;
+	}
+
+	const APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn)
+	{
+		// Nothing to move: stop the cycle so that IsWandering() tells the truth
+		bIsWandering = false;
 		return;
 	}
 
@@ -197,24 +210,28 @@ void AServantAIController::MoveToZonePoint(const ABaseZone& Zone)
 void AServantAIController::TeleportIntoZone(const ABaseZone& Zone)
 {
 	ACharacter* ControlledCharacter = GetCharacter();
-	FVector TargetPoint;
-	const bool bHasTeleported = ControlledCharacter
-		&& TryFindNavPointInZone(Zone, TargetPoint)
-		&& ControlledCharacter->TeleportTo(
-			TargetPoint + FVector(0.0, 0.0, ControlledCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()),
-			ControlledCharacter->GetActorRotation());
 
-	if (bHasTeleported)
+	FVector TargetPoint;
+	if (!TryFindNavPointInZone(Zone, TargetPoint))
 	{
-		UE_LOG(LogSpooky_Spores, Warning, TEXT("Servant %s teleported into the base zone after %d failed returns."),
-			*GetNameSafe(ControlledCharacter), FailedReturnAttempts);
-		FailedReturnAttempts = 0;
-		ScheduleDecision(FMath::FRandRange(MinWanderPause, MaxWanderPause));
-	}
-	else
-	{
-		UE_LOG(LogSpooky_Spores, Warning, TEXT("Servant %s could not be teleported into the base zone (no navigable point found)."),
+		UE_LOG(LogSpooky_Spores, Warning, TEXT("Servant %s could not be teleported into the base zone: no navigable point found."),
 			*GetNameSafe(ControlledCharacter));
 		ScheduleDecision(RetryDelay);
+		return;
 	}
+
+	if (!ControlledCharacter || !ControlledCharacter->TeleportTo(
+			TargetPoint + FVector(0.0, 0.0, ControlledCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()),
+			ControlledCharacter->GetActorRotation()))
+	{
+		UE_LOG(LogSpooky_Spores, Warning, TEXT("Servant %s could not be teleported into the base zone: TeleportTo failed."),
+			*GetNameSafe(ControlledCharacter));
+		ScheduleDecision(RetryDelay);
+		return;
+	}
+
+	UE_LOG(LogSpooky_Spores, Warning, TEXT("Servant %s teleported into the base zone after %d failed returns."),
+		*GetNameSafe(ControlledCharacter), FailedReturnAttempts);
+	FailedReturnAttempts = 0;
+	ScheduleDecision(FMath::FRandRange(MinWanderPause, MaxWanderPause));
 }
