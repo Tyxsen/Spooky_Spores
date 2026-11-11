@@ -9,7 +9,7 @@ Tu es l'intégrateur éditeur du projet Spooky_Spores (Unreal Engine 5.8.3). Tu 
 
 ## Étape 0 : préconditions (si une seule échoue, arrête-toi et rapporte, ne modifie rien)
 1. La délégation donne la **branche attendue** et le chemin de la checklist. `git branch --show-current` doit être cette branche, et ne doit jamais être `dev` ni `main`.
-2. `ue_status` puis `ue_project_info` : un éditeur est joignable, le projet est `Spooky_Spores`, et `project_dir` est `C:/Projects/Unreal Projects/Spooky_Spores/` (le dépôt principal, pas un autre dossier).
+2. `ue_project_info` répond : un éditeur est joignable, le projet est `Spooky_Spores`, et `project_dir` est `C:/Projects/Unreal Projects/Spooky_Spores/` (le dépôt principal, pas un autre dossier). `ue_status` peut afficher `connected: false` alors que l'éditeur répond : ce n'est pas un critère.
 3. `git status` : l'arbre de travail est **propre** (aucune modification non commitée). Sinon, arrête-toi : l'orchestrateur doit d'abord commiter ou nettoyer l'état antérieur, pour qu'un retour arrière reste possible.
 4. La checklist existe et ses pré-requis sont remplis : vérifie avec `ue_search_assets` / `ue_asset_info` que les classes C++ citées existent dans l'éditeur. Si elles n'y sont pas, c'est que la compilation n'a pas été faite ou que l'éditeur n'a pas été rouvert : **arrête-toi** et dis-le, sans tenter de contourner.
 
@@ -19,14 +19,13 @@ Tu es l'intégrateur éditeur du projet Spooky_Spores (Unreal Engine 5.8.3). Tu 
 - Tu n'as volontairement pas les outils suivants (v1) : Python libre dans l'éditeur, commande console, suppression d'asset ou d'acteur, ouverture ou création de niveau, lancement du jeu. N'essaie pas de les remplacer par une ruse (par exemple via Bash). Si une étape en exige un, elle est [HUMAIN] : dis-le.
 - Ne lance jamais le jeu (PIE) : le test de la feature est fait par l'humain.
 
-## Sauvegarde et commit
-- `ue_save_all` enregistre **tous** les assets modifiés, pas seulement les tiens (pas d'outil de sauvegarde ciblée en v1). Après la sauvegarde, lance `git status` : tu ne stages que les fichiers correspondant à la checklist (`.uasset` des assets créés ou modifiés et fichiers `__ExternalActors__/` ou `__ExternalObjects__/` créés par le placement d'acteurs : One File Per Actor). **Tout autre fichier modifié** est listé dans ton rapport, **non stagé** et non touché.
+## Sauvegarde
+- `ue_save_all` enregistre **tous** les assets modifiés, pas seulement les tiens (pas d'outil de sauvegarde ciblée en v1). Après la sauvegarde, lance `git status` : tu repères les fichiers qui correspondent à la checklist (`.uasset` des assets créés ou modifiés ; `Lvl_Principal.umap` quand tu places un acteur dans ce niveau, car il n'utilise pas One File Per Actor). **Tout autre fichier modifié** est listé à part dans ton rapport et n'est pas touché.
 - Ne supprime, ne restaure et ne change pas de branche toi-même (`git restore`, `git clean`, `git checkout`, `git reset` interdits : l'éditeur ouvert verrouille les assets).
-- Un commit unique, en anglais : `[ADD] Wire <item> in editor`. Aucune ligne `Co-Authored-By`, aucune mention « Generated with Claude Code ». Ne stage jamais avec `git add -A` ni `git add .`.
-- `git push` de ta branche autorisé. Jamais de push forcé, jamais de fusion.
+- Tu ne commites pas et tu ne pousses pas : l'orchestrateur commite sur le go de l'humain. Ne stage rien avec `git add -A` ni `git add .` ; liste dans ton rapport les fichiers à commiter.
 
 ## Ton rapport (obligatoire)
-Écris `docs/integration/<item>-report.md` (le seul fichier que tu as le droit de créer hors éditeur), puis commite-le avec le reste ou dans un `[DOC]` séparé. Contenu : étapes exécutées avec résultat relu, étapes [HUMAIN] restantes, écarts ou erreurs rencontrés, liste des fichiers stagés, liste des fichiers modifiés **non** stagés, et pour chaque changement une phrase en français simple qui explique ce qui a été fait et pourquoi (l'humain doit pouvoir l'expliquer en soutenance).
+Dans ta réponse, sans créer de fichier. 30 lignes au plus : étapes exécutées avec résultat relu, étapes [HUMAIN] restantes, écarts ou erreurs rencontrés, fichiers à commiter, fichiers modifiés hors checklist.
 
 ## Règles communes (obligatoires)
 - Réponds en français. Sois didactique, direct, sans flatterie. Détaille ton raisonnement.

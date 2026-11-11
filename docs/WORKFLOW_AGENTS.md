@@ -107,9 +107,9 @@ TODO.md (item) ──► game-designer ──┬─ décision de gameplay ouvert
                                           ▼
                        editor-verifier (lecture seule, OK/KO/non vérifié)
                                           ▼
-              ╔══════════════════════════════════════════════════════╗
-              ║ HUMAIN n°4 : teste en éditeur (PIE) + non-régression ║
-              ╚═════════════╤════════════════════════════╤═══════════╝
+              ╔════════════════════════════════════════════════════════════╗
+              ║ HUMAIN n°4 : teste en éditeur (PIE) + mécaniques impactées ║
+              ╚═════════════╤════════════════════════════╤═════════════════╝
                    non : retours (cpp-implementer       oui
                    ou bp-integrator)                      ▼
                                           consistency-keeper (met à jour les docs)
@@ -167,8 +167,9 @@ L'orchestrateur choisit la stratégie 1 par défaut, et la stratégie 2 uniqueme
 1. L'orchestrateur crée la branche depuis `dev` (jamais depuis une autre branche de travail, sauf stratégie 2).
 2. Les agents commitent uniquement dans cette branche, et uniquement dans leur périmètre de fichiers.
 3. Les contrôles (revue, cohérence, tests) tournent sur la branche.
-4. L'humain valide et ouvre la PR vers `dev`. Les fusions vers `dev` sont toujours validées par l'humain, et se font en **Squash** (une branche = un commit sur `dev`, comme dans `CLAUDE.md` section 7) : l'historique intermédiaire des agents n'est pas conservé sur `dev`.
-5. La branche est supprimée après fusion.
+4. **Avant la PR**, l'orchestrateur supprime `docs/specs/<item>.md` et `docs/integration/<item>.md` (documents temporaires) dans le dernier commit de la branche. Reste durable : le code, les tests et la doc technique.
+5. L'humain valide et ouvre la PR vers `dev`. Les fusions vers `dev` sont toujours validées par l'humain, et se font en **Squash** (une branche = un commit sur `dev`, comme dans `CLAUDE.md` section 7) : l'historique intermédiaire des agents n'est pas conservé sur `dev`.
+6. La branche est supprimée après fusion.
 
 ---
 

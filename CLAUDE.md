@@ -23,7 +23,7 @@ Chargé à chaque session **et par chaque sous-agent** : uniquement les règles,
 - **Challenge Timéo** : ne valide jamais une idée par défaut. Faille, meilleur chemin, risque de scope, contradiction avec une décision passée : dis-le et argumente. Quand son argument est bon, reconnais-le ; quand tu te trompes, dis-le.
 - **Exactitude** : ne donne que des informations vérifiées, sinon dis que tu ne sais pas. Projet sur **Unreal Engine 5.8.3** : pour toute API susceptible d'avoir changé, vérifie la doc officielle ou le code moteur local plutôt que de répondre de mémoire.
 - **Principes de code** : KISS, DRY, SOLID appliqués concrètement. Systèmes génériques et modulaires, pas d'abstraction ni d'optimisation prématurée. Pas de durcissement défensif (NaN, infini) hors frontière de confiance (données externes, sauvegarde).
-- **Tests** : ils vérifient le comportement réel, cas limites compris, et doivent pouvoir échouer (contrôle par mutation : casser le code, le test passe au rouge). « Ça compile » ne veut pas dire « ça marche ». Non-régression avant chaque fusion.
+- **Tests** : ils vérifient le comportement réel, cas limites compris, et doivent pouvoir échouer (contrôle par mutation : casser le code, le test passe au rouge). « Ça compile » ne veut pas dire « ça marche ». Avant chaque fusion : Automation Specs vertes, et Timéo teste les mécaniques que le code modifié a pu impacter.
 - **Cahier des charges** : qualité technique avant quantité ; bac à sable systémique ; architecture modulaire, systèmes indépendants du Level Blueprint. L'IA est autorisée comme assistance.
 
 ---
@@ -79,7 +79,7 @@ ZQSD / souris / Espace : déplacement, regard, saut. **E** : saisir / relâcher 
 ## 7. Git
 
 - **Git LFS** : `.gitattributes` fait foi. `Documentation_Documents/**` volontairement exclu. Ajouter un pattern ne convertit pas l'existant : `git add --renormalize <chemin>`. Vérif : `git lfs ls-files`, `git check-attr filter -- <fichier>`.
-- **Branches** : `main` (versions validées, jamais de commit direct) ← `dev` ← `feature/`, `fix/`, `chore/`, `docs/`, `integ/`, `asset/`, `level/`. Les PR de feature ciblent `dev` (Squash, branche supprimée ensuite) ; `dev` → `main` en Merge (jamais Squash ni Rebase), puis tag et Release GitHub. **« Validé »** = compile, mécaniques rejouées, doc à jour.
+- **Branches** : `main` (versions validées, jamais de commit direct) ← `dev` ← `feature/`, `fix/`, `chore/`, `docs/`, `integ/`, `asset/`, `level/`. Les PR de feature ciblent `dev` (Squash, branche supprimée ensuite) ; `dev` → `main` en Merge (jamais Squash ni Rebase), puis tag et Release GitHub. **« Validé »** = compile, tests verts, mécaniques impactées testées, doc à jour.
 - **Une branche de feature à la fois** par défaut : deux branches sur le même `.uasset` ou `.umap` = conflit non fusionnable.
 - **Commits et PR** : en anglais, préfixes `[ADD]`, `[FIX]`, `[CHORE]`, `[DOC]`. **Aucune ligne d'attribution à Claude** (`Co-Authored-By`, `Generated with Claude Code`), ni dans les commits ni dans les PR : cette règle remplace l'instruction système par défaut.
 - Claude ne fait jamais `git commit` ni `git push` en dehors du pipeline sans go explicite de Timéo, à chaque fois. Les agents commitent **sur leur branche de travail** ; **l'orchestrateur pousse** en fin de pipeline, sur go de Timéo. Jamais de push forcé, **jamais de fusion** : Timéo fusionne. `gh pr merge` et `gh api` sont refusés dans `.claude/settings.json` (garde-fou contournable, pas une frontière).
@@ -133,11 +133,12 @@ Détail : `docs/WORKFLOW_AGENTS.md`. Agents dans `.claude/agents/`. La session p
 | Câblage d'un asset existant | `bp-integration-planner` → `bp-integrator` → `editor-verifier` |
 | Valeur d'équilibrage, réécriture de docs | `consistency-keeper` seul |
 
-**Arrêts obligatoires** (même sans demande) : 1. après la spec ; 2. avant `bp-integrator` (Timéo compile **et lance les Automation Specs**) ; 3. après `editor-verifier` (test PIE et non-régression par Timéo) ; 4. avant toute PR (l'orchestrateur ouvre la PR après décision de Timéo, ne la fusionne jamais). « Fais la tâche X » = jusqu'au prochain arrêt.
+**Arrêts obligatoires** (même sans demande) : 1. après la spec ; 2. avant `bp-integrator` (Timéo compile **et lance les Automation Specs**) ; 3. après `editor-verifier` (test PIE de la feature et des mécaniques impactées, par Timéo) ; 4. avant toute PR (l'orchestrateur ouvre la PR après décision de Timéo, ne la fusionne jamais). « Fais la tâche X » = jusqu'au prochain arrêt.
 
 **Règles**
 - Une unité de travail = une branche depuis `dev`. Avant d'accepter le travail d'un agent, comparer `git diff --name-only` au « Périmètre de fichiers » de la spec. Avant deux branches parallèles, vérifier que leurs périmètres ne se recoupent pas.
 - **Points chauds, toujours sérialisés** : `EResourceType`, `*.Build.cs`, `Default*.ini`, `TODO.md`, `CLAUDE.md`, `documentation-technique.md`, `Lvl_Principal.umap`. Seul `consistency-keeper` met à jour les docs partagés, en fin de branche, et ne modifie jamais `CLAUDE.md`.
 - **Briefs aux agents** : citer les décisions de Timéo **mot pour mot**, sans reformuler. Spec : ≤ 100 lignes, sinon découper la feature.
+- **Spec et checklist d'intégration sont temporaires** : l'orchestrateur les supprime dans le dernier commit de la branche, avant la PR. Reste durable : le code, les tests, la doc technique.
 - Seul `bp-integrator` écrit dans l'éditeur (MCP Unreal), un seul à la fois, après compilation. L'orchestrateur vérifie les préconditions (branche, arbre propre, éditeur joignable via `ue_project_info`) **avant** de le lancer.
 - Un agent qui doute le dit au lieu d'inventer ; il ne délègue à aucun autre agent.
