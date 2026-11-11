@@ -73,7 +73,11 @@ Cette table figure aussi dans `CLAUDE.md` section 10, avec les arrêts obligatoi
 ## 4. Le pipeline d'une mécanique
 
 ```
-TODO.md (item) ──► game-designer ──► docs/specs/<item>.md
+TODO.md (item) ──► game-designer ──┬─ décision de gameplay ouverte : note de cadrage
+                                   │   (problème → proposition) ─► l'HUMAIN tranche ─┐
+                                   └─ aucune décision ouverte ───────────────────────┤
+                                                                                     ▼
+                                              docs/specs/<item>.md (100 lignes max)
                                           │
               ╔═══════════════════════════╧══════════════════════════╗
               ║ HUMAIN n°1 : relit la spec (OK / corrections)        ║
@@ -93,7 +97,9 @@ TODO.md (item) ──► game-designer ──► docs/specs/<item>.md
               ╔══════════════════════════════════════════════════════╗
               ║ HUMAIN n°2 (facultatif) : parcourt la checklist      ║
               ║ HUMAIN n°3 (obligatoire) : compile (ferme l'éditeur, ║
-              ║   rebuild dans Rider, rouvre sur la branche)         ║
+              ║   rebuild dans Rider, rouvre sur la branche), puis   ║
+              ║   lance les Automation Specs (clic droit sur Tests/  ║
+              ║   > Run Unit Tests) : tout vert avant de continuer   ║
               ╚═══════════════════════════╤══════════════════════════╝
                                           ▼
                        bp-integrator (préconditions, puis étapes [MCP],
@@ -110,6 +116,8 @@ TODO.md (item) ──► game-designer ──► docs/specs/<item>.md
                                                           ▼
                                     PR vers dev : l'HUMAIN fusionne (Squash)
 ```
+
+La note de cadrage n'est pas un arrêt de plus : c'est un point de décision à l'intérieur de l'arrêt n°1. Seules les décisions de gameplay ou de direction sont posées à l'humain ; les choix purement techniques sont tranchés par l'agent et notés en une ligne dans la spec.
 
 Le parallélisme existe seulement là où il est sûr : les trois contrôles finaux (lecture seule ou fichiers distincts), et des unités de travail indépendantes sur des branches séparées (section 5).
 
@@ -280,40 +288,38 @@ Les règles des sections précédentes ne sont pas toutes imposables par la conf
 
 ---
 
-## Annexe A — Modèle de spec (`docs/specs/_template.md`)
+## Annexe A — Modèle de spec
+
+Plafond : **100 lignes**. Au-delà, découper la feature. Les détails de test, les alternatives écartées et les vérifications dans le code moteur n'ont pas leur place ici (une ligne au plus).
+
+**Si une décision de gameplay ou de direction est ouverte**, `game-designer` écrit d'abord une **note de cadrage** (~20 lignes, statut « cadrage ») : l'objectif et chaque décision au format « Voilà le problème → je propose X → qu'en penses-tu ? ». La spec suit une fois les décisions prises.
 
 ```markdown
-# Spec — <nom de l'item>
+# Spec — <item>
+Item TODO : <numéro et titre> | Branche : feature/<nom> | Statut : cadrage | brouillon | validée | implémentée
 
-**Item TODO** : <numéro et titre>
-**Branche** : feature/<nom>
-**Statut** : brouillon | validée | implémentée
+## Objectif
+2-3 lignes : ce que la mécanique apporte au joueur (lien avec le GDD). Dépendances éventuelles en une phrase.
 
-## 1. Objectif
-Une ou deux phrases : ce que la mécanique apporte au joueur (lien avec le GDD).
+## Comportement
+Puces courtes. Les choix techniques tranchés par l'agent : une ligne chacun.
 
-## 2. Comportement attendu
-Description précise, étape par étape.
-
-## 3. Critères d'acceptation
-Liste vérifiable (chacun devient au moins un test).
+## Critères d'acceptation
+10 au plus, une phrase chacun, vérifiables (chacun devient au moins un test).
 - [ ] ...
 
-## 4. Cas limites
-Que se passe-t-il si... (inventaire plein, ressource absente, etc.)
+## API exposée
+Signatures UFUNCTION / UPROPERTY / événements attendus.
 
-## 5. Paramètres d'équilibrage
-Valeurs modifiables par le designer, avec valeur par défaut.
+## Valeurs réglables
+`Nom` : valeur par défaut (une ligne chacune).
 
-## 6. API exposée aux Blueprints
-UFUNCTION / UPROPERTY / événements attendus.
+## Cas limites
+5 au plus, seulement les non évidents.
 
-## 7. Périmètre de fichiers
-Fichiers et dossiers que la branche peut modifier. Fichiers points chauds touchés (à sérialiser).
+## Périmètre de fichiers
+À créer / à modifier / points chauds touchés (à sérialiser).
 
-## 8. Dépendances
-Autres items ou branches dont celle-ci dépend.
-
-## 9. Hors périmètre
-Ce que cette spec ne fait volontairement pas.
+## Hors périmètre
+3-5 puces.
 ```
