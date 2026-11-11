@@ -69,12 +69,15 @@ void FServantWanderLogicSpec::Define()
 			         Default->AutoPossessAI == EAutoPossessAI::PlacedInWorldOrSpawned);
 			TestTrue(TEXT("A2: AIControllerClass == AServantAIController"),
 			         Default->AIControllerClass.Get() == AServantAIController::StaticClass());
+			// The controller must not drive the yaw, otherwise bOrientRotationToMovement is overridden (servant walks sideways).
+			TestFalse(TEXT("A2: bUseControllerRotationYaw == false"), Default->bUseControllerRotationYaw);
 
 			const UCharacterMovementComponent* Movement = Default->GetCharacterMovement();
 			if (TestNotNull(TEXT("A2: the CDO has a CharacterMovement component"), Movement))
 			{
 				TestTrue(TEXT("A2: NavMovementProperties.bUseAccelerationForPaths == true"),
 				         Movement->GetNavMovementProperties().bUseAccelerationForPaths);
+				TestTrue(TEXT("A2: bOrientRotationToMovement == true"), Movement->bOrientRotationToMovement);
 			}
 		});
 
