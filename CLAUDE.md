@@ -133,7 +133,7 @@ Détail : `docs/WORKFLOW_AGENTS.md`. Agents dans `.claude/agents/`. La session p
 | Câblage d'un asset existant | `bp-integration-planner` → `bp-integrator` → `editor-verifier` |
 | Valeur d'équilibrage, réécriture de docs | `consistency-keeper` seul |
 
-**Arrêts obligatoires** (même sans demande) : 1. après la spec ; 2. avant `bp-integrator` (Timéo compile **et lance les Automation Specs**) ; 3. après `editor-verifier` (test PIE de la feature et des mécaniques impactées, par Timéo) ; 4. avant toute PR (l'orchestrateur ouvre la PR après décision de Timéo, ne la fusionne jamais). « Fais la tâche X » = jusqu'au prochain arrêt.
+**Arrêts obligatoires** (même sans demande) : 1. après la spec ; 2. avant `bp-integrator` (Timéo compile **et lance les Automation Specs**) ; 3. après `editor-verifier` (test PIE de la feature et des mécaniques impactées, par Timéo) ; 4. avant le push (l'orchestrateur pousse la branche sur go de Timéo ; Timéo ouvre la PR et la fusionne, l'orchestrateur ne le fait jamais). « Fais la tâche X » = jusqu'au prochain arrêt.
 
 **Règles**
 - Une unité de travail = une branche depuis `dev`. Avant d'accepter le travail d'un agent, comparer `git diff --name-only` au « Périmètre de fichiers » de la spec. Avant deux branches parallèles, vérifier que leurs périmètres ne se recoupent pas.

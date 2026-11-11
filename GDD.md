@@ -90,7 +90,7 @@ S'il choisit de terminer, une cinématique montre le joueur et son armée conqu�
 
 **Choix de conception — quelques variantes à seuils, pas une variation continue** : la cinématique varie selon la performance (nombre de serviteurs, vagues survécues), avec davantage d'alliés visibles et davantage de victimes montrées côté village pour une run plus aboutie — ça renforce le ton antagoniste posé plus haut. Mais plutôt qu'une population dynamique de la séquence pilotée en direct par les données de sauvegarde (lourd techniquement, et toujours du ressort du Bloc 3), on vise un **petit nombre de variantes distinctes** (ex : petite / moyenne / grande armée), choisies par un seuil.
 
-**Conséquence sur la file d'attente** : la zone de fin et la condition de victoire (`TODO.md`) semblent largement simplifiés par cette décision : plus besoin de construire un village jouable ni des patrouilles de soldats, seulement une zone de déclenchement et une cinématique. À confirmer et à répercuter sur la file d'attente une fois la section 4 (mécaniques et dépendances) traitée.
+**Conséquence** : pas de village jouable ni de patrouilles de soldats à construire, seulement une zone de déclenchement et une cinématique.
 
 ---
 
@@ -108,7 +108,7 @@ Les ressources sont réparties de façon globalement uniforme sur toute la carte
 
 Il n'existe qu'un seul chemin reliant la cabane au village (celui déjà sculpté dans le Landscape, voir `documentation-technique.md` section 12), et ça restera le cas — pas de pluralité de fronts à défendre prévue. Ce chemin doit rester **impossible à bloquer entièrement** par une construction du joueur : le murer reviendrait à neutraliser toutes les vagues sans effort, ce qui viderait le combat de son enjeu.
 
-**Choix de conception — système de construction en grille** : le futur système de construction (vue top-down, `TODO.md`) reposera sur une grille de cases virtuelles, comme dans un city-builder. Les cases correspondant au chemin seront marquées non constructibles en permanence (affichées en rouge dans l'interface de placement) — pas de règle de « largeur minimale à préserver » à vérifier au cas par cas : la contrainte est déjà résolue par la grille elle-même, une case est soit constructible, soit non, sans dégradé possible. **Dépendance à reporter en section 4** : ce choix de grille doit être répercuté dans la description de la construction de base quand cette section sera rédigée.
+**Choix de conception — système de construction en grille** : le futur système de construction (vue top-down, `TODO.md`) reposera sur une grille de cases virtuelles, comme dans un city-builder. Les cases correspondant au chemin seront marquées non constructibles en permanence (affichées en rouge dans l'interface de placement) — pas de règle de « largeur minimale à préserver » à vérifier au cas par cas : la contrainte est déjà résolue par la grille elle-même, une case est soit constructible, soit non, sans dégradé possible.
 
 ### Une colline, pas un monde ouvert
 
@@ -120,7 +120,7 @@ L'espace explorable reste borné à la colline et ses abords immédiats — asse
 
 ## 4. Mécaniques et leurs dépendances
 
-Liste des mécaniques déjà en place et à venir, et comment elles dépendent les unes des autres. Cette section tranche aussi les deux points laissés ouverts en sections 1 et 2 (lieu du rituel de résurrection, seuil de déblocage de la fin), et corrige une incohérence repérée avec la file d'attente existante.
+Liste des mécaniques déjà en place et à venir, et comment elles dépendent les unes des autres. Cette section tranche aussi les deux points laissés ouverts en sections 1 et 2 (lieu du rituel de résurrection, seuil de déblocage de la fin).
 
 ### Déjà en place (détail complet : `documentation-technique.md`)
 
@@ -128,7 +128,7 @@ Interaction et manipulation physique (grab/lancer), récolte de ressources (nœu
 
 ### De la mort du soldat au serviteur assigné
 
-**Incohérence corrigée par rapport à la file d'attente (`TODO.md`, résurrection)** : l'idée initiale (« potion + cadavre = serviteur », interaction directe sur le cadavre) ne tient plus depuis que la section 1 fait des os une ressource à paliers de rareté, stockable et convertible — une ressource qu'on stocke ne peut pas aussi être une interaction instantanée. Chaîne retenue :
+**Chaîne de résurrection** : l'idée initiale (« potion + cadavre = serviteur », interaction directe sur le cadavre) ne tient plus depuis que la section 1 fait des os une ressource à paliers de rareté, stockable et convertible — une ressource qu'on stocke ne peut pas aussi être une interaction instantanée. Chaîne retenue :
 
 1. Un soldat ennemi vaincu (soldat ennemi, déjà en place) laisse tomber des **os** au sol : une nouvelle entrée dans `EResourceType` (aux côtés de Seed, Wood, Stone), qui réutilise telle quelle l'architecture de récolte déjà en place (`AResourceDrop`) — aucun nouveau système, juste un type de plus.
 2. Au chaudron, une **recette dédiée** transforme des os + une potion en un objet de résurrection. Le palier exact de serviteur obtenu selon la quantité/qualité des os utilisés est un détail d'équilibrage à définir au moment de l'implémentation, pas maintenant.
@@ -142,7 +142,7 @@ Interaction et manipulation physique (grab/lancer), récolte de ressources (nœu
 
 Menu dédié (touche à définir), deux colonnes : à gauche les serviteurs non assignés, à droite une section par catégorie de tâche (« attaque/défense », « récolte de champ », d'autres à ajouter au fil des besoins), chacune listant les serviteurs qui lui sont actuellement affectés. Glisser-déposer un serviteur d'une colonne à l'autre change son affectation.
 
-**Conséquence sur la file d'attente** : la tâche « serviteur qui récolte la ressource la plus proche » doit être reformulé — le comportement de récolte automatique devient une conséquence de l'assignation à la catégorie « récolte de champ », pas un comportement indépendant sans supervision du joueur. La résurrection et l'assignation des tâches forment désormais un seul bloc de travail (`TODO.md`).
+**Conséquence** : la récolte automatique découle de l'assignation à la catégorie « récolte de champ », pas d'un comportement indépendant sans supervision du joueur.
 
 ### Vue de gestion top-down et construction de base
 
@@ -153,16 +153,6 @@ Menu dédié (touche à définir), deux colonnes : à gauche les serviteurs non 
 ### Déblocage de la zone de fin
 
 Condition de déblocage : un **nombre de vagues survécues** (valeur exacte non fixée ici, à régler par playtest une fois le rythme des vagues calibré). Le nombre de serviteurs au moment du déclenchement ne conditionne pas ce déblocage, il sert uniquement à choisir la variante de cinématique (petite/moyenne/grande armée, voir section 2) — un seul levier à équilibrer plutôt que deux à combiner.
-
----
-
-**Résumé des conséquences à reporter dans `TODO.md`** (déjà reportées dans `TODO.md`) :
-- Nouvelle ressource `EResourceType::Bone` (os), avec paliers de rareté.
-- Résurrection à réécrire entièrement selon la chaîne ci-dessus (chaudron → objet posable → serviteur errant).
-- Récolte automatique à fusionner avec la résurrection et le système d'assignation de tâches.
-- Vue de gestion et construction à traiter comme un seul bloc de travail.
-- Nouveau concept technique à prévoir : la zone de base (volume englobant la clôture).
-- Seuil de déblocage de fin (zone de fin) : valeur à déterminer par playtest, pas par design a priori.
 
 ---
 
