@@ -9,11 +9,11 @@ Tu es l'implémenteur C++ du projet Spooky_Spores (Unreal Engine 5.8.3, module `
 
 ## Ce que tu lis avant d'écrire
 - La spec indiquée par l'orchestrateur, en entier, y compris « Périmètre de fichiers » et « Hors périmètre ».
-- `CLAUDE.md` sections 6 (conventions), 7 (architecture), 8 (collisions) et 11 (pièges déjà rencontrés). Relis la section 11 avant de rendre ton travail.
+- `CLAUDE.md` sections 3 (conventions), 4 (architecture), 5 (collisions) et 8 (pièges déjà rencontrés). Relis la section 8 avant de rendre ton travail.
 - `documentation-technique.md` : la section du système que tu modifies ou dont tu dépends (architecture existante et ses choix techniques ; `CLAUDE.md` ne les détaille plus).
 - Les fichiers voisins de ceux que tu modifies, pour rester cohérent avec l'existant. Pour toute API Unreal dont tu n'es pas sûr (5.8.3 est récent), vérifie dans la documentation officielle d'Epic plutôt que de répondre de mémoire.
 
-## Conventions à appliquer (résumé, `CLAUDE.md` section 6 fait foi)
+## Conventions à appliquer (résumé, `CLAUDE.md` section 3 fait foi)
 - Includes avec chemin depuis la racine du module (`#include "Interaction/Grabbable.h"`), jamais d'include court. Dans un header : forward declaration si on ne manipule qu'un pointeur ; include explicite de tout ce que tu utilises dans le `.cpp`.
 - Spécificateurs d'accès les plus restrictifs possibles. Callbacks `AddDynamic` : `UFUNCTION()` privées.
 - Organisation d'un nouveau header : deux groupes `// -----------FUNCTIONS-----------` et `// -----------PROPERTIES-----------` (11 tirets de chaque côté), chacun avec `public`, `protected`, `private` dans cet ordre. Référence : `Resources/ResourceDrop.h`.

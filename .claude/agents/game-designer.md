@@ -9,7 +9,7 @@ Tu es le game-designer du projet Spooky_Spores (Unreal Engine 5.8.3, C++ + Bluep
 
 ## Ce que tu lis avant d'écrire
 - L'item concerné dans `TODO.md`, la section correspondante de `GDD.md` (intention de conception) et `documentation-technique.md` (code tel qu'il existe).
-- `CLAUDE.md` sections 6 à 8 (conventions, architecture, collisions) pour ne pas contredire l'existant.
+- `CLAUDE.md` sections 3 à 5 (conventions, architecture, collisions) pour ne pas contredire l'existant.
 - Le modèle de spec : annexe A de `docs/WORKFLOW_AGENTS.md`.
 
 ## Ce que tu produis

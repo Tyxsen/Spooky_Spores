@@ -5,7 +5,7 @@
 - [x] Panneau de contrôles en lecture seule (affichage des touches actuelles, toggle Entrée, pas de remappage pour l'instant) — terminé, testé, fusionné dans `dev`
 - [x] Composant de santé + frapper les arbres et pierres + premier sort avec mana — terminé et testé (non-régression comprise), sur `feature/health-and-combat`, prêt à fusionner dans `dev`
 - [x] Semaine de cours S2 : environnement du joueur (colline, cabane) livré, Release `V1.0.1` — fusionné dans `dev`
-- [x] GDD complet (`GDD.md`, 5 sections) — rédigé du 2026-10-26 au 2026-11-03. La file d'attente ci-dessous a été réorganisée en conséquence (items 1, 2, 3, 13, 14, 16, 17 mis à jour). Le point de passage obligatoire (`CLAUDE.md` section 12) est levé.
+- [x] GDD complet (`GDD.md`, 5 sections) — rédigé du 2026-10-26 au 2026-11-03. La file d'attente ci-dessous a été réorganisée en conséquence (items 1, 2, 3, 13, 14, 16, 17 mis à jour). Le point de passage obligatoire (`CLAUDE.md` section 9) est levé.
 - [x] Item 1 (soldat ennemi simple) : terminé, testé en PIE (suivi de spline, détection/approche du destructible le plus proche, attaque, mort, drop d'os via `AResourceDrop`), fusionné dans `dev` (PR #7)
 - [x] Corriger les includes courts de `Enemies/EnemyAIController.cpp` et `Resources/ResourceCounterComponent.h`
 - [x] Item 2, étape 2.1 : chaudron multi-recettes + recette os + potion → Necrospore (ressource comptée provisoire) — terminé et testé sur `feature/cauldron-recipes`
@@ -20,7 +20,7 @@
 
 ## Planning
 
-Depuis le 2026-11-09 : **plus de découpage par semaines**. On avance à notre rythme dans la file ci-dessous ; Timéo signale lui-même chaque deadline (rendu, oral) quand elle se présente, et on recale la file à ce moment-là. Règles conservées : une mécanique par tâche, livrée entière et fusionnée dans `dev` ; si une tâche déborde, on coupe ou on repousse en fin de file. Détail dans `CLAUDE.md` section 12.
+Depuis le 2026-11-09 : **plus de découpage par semaines**. On avance à notre rythme dans la file ci-dessous ; Timéo signale lui-même chaque deadline (rendu, oral) quand elle se présente, et on recale la file à ce moment-là. Règles conservées : une mécanique par tâche, livrée entière et fusionnée dans `dev` ; si une tâche déborde, on coupe ou on repousse en fin de file. Détail dans `CLAUDE.md` section 9.
 
 **Déjà fait**
 - [x] Sprint et endurance (valeurs du 3C)
@@ -81,7 +81,7 @@ Depuis le 2026-11-09 : **plus de découpage par semaines**. On avance à notre r
 - [ ] Déplacer la création de l'UI hors du personnage (PlayerController ou HUD) quand l'interface grossira
 - [ ] Faire disparaître les drops restés au sol après un délai (avant l'item 3.2, quand les serviteurs récolteront)
 - [ ] Vérifier / faire la factorisation du calcul de la cible dans `UGrabComponent` (`GetGrabTargetTransform`)
-- [ ] Adopter `TObjectPtr` pour les membres `UPROPERTY` dans `Interaction/` et `Core/Character/` (déjà fait dans tout `Resources/` ; adoption par domaine, pas une bascule globale — voir `CLAUDE.md` section 6)
+- [ ] Adopter `TObjectPtr` pour les membres `UPROPERTY` dans `Interaction/` et `Core/Character/` (déjà fait dans tout `Resources/` ; adoption par domaine, pas une bascule globale — voir `CLAUDE.md` section 3)
 - [ ] Nettoyage optionnel des assets inutilisés du template (animations `Pistol`...) : branche `chore/`, suppression via le Content Browser en vérifiant les références
 
 ## Limites connues (acceptées pour l'instant)

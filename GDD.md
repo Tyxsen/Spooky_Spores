@@ -4,7 +4,7 @@ Document de conception complet du jeu : pourquoi chaque mécanique existe, comme
 
 Contrairement à [`documentation-technique.md`](documentation-technique.md), qui décrit le code et les systèmes **tels qu'ils existent**, ce document décrit **l'intention** derrière le jeu — la fiction, le monde, la progression du joueur, et les règles qui doivent trancher une décision de conception sans avoir à improviser à chaque fois.
 
-**Statut** : rédaction terminée (démarrée le 2026-10-26, close le 2026-11-03). Le point de passage obligatoire défini dans [`CLAUDE.md`](CLAUDE.md) section 12 est donc levé — la file d'attente des mécaniques peut reprendre, après réorganisation (voir `TODO.md`).
+**Statut** : rédaction terminée (démarrée le 2026-10-26, close le 2026-11-03). Le point de passage obligatoire défini dans [`CLAUDE.md`](CLAUDE.md) section 9 est donc levé — la file d'attente des mécaniques peut reprendre, après réorganisation (voir `TODO.md`).
 
 **Document complet et autonome** : ce GDD doit pouvoir se lire seul, sans avoir à ouvrir d'autres fichiers pour comprendre le jeu. Le 3C ([`README.md`](README.md)) et l'architecture technique actuelle ([`documentation-technique.md`](documentation-technique.md)) sont donc recopiés ici quand ils sont nécessaires à une section, même si l'information existe déjà ailleurs. Ces deux fichiers restent les sources canoniques de leurs propres domaines : en cas de changement d'une valeur (vitesse, FOV, implémentation...), il faut répercuter la mise à jour dans les documents concernés.
 
@@ -16,7 +16,7 @@ Non dupliqué : le backlog et le planning ([`TODO.md`](TODO.md)) — ce n'est pa
 
 ### Le tutoriel comme première boucle complète
 
-Le joueur apparaît dans la cabane abandonnée en exilé ordinaire, sans pouvoir — pas encore nécromancien. Une zone d'exploration courte et linéaire (rien d'autre à y faire, pas besoin de bloquer techniquement les systèmes de jeu) le mène jusqu'au sous-sol caché (voir section 2), où il découvre l'objet maudit. Cette découverte, racontée avec les outils déjà en place (`AStoryTrigger`/`WBP_StoryText`, du texte pour l'instant — pas une cinématique montée, qui reste du ressort du Bloc 3, voir `CLAUDE.md` section 2), le fait devenir nécromancien et débloque le tutoriel.
+Le joueur apparaît dans la cabane abandonnée en exilé ordinaire, sans pouvoir — pas encore nécromancien. Une zone d'exploration courte et linéaire (rien d'autre à y faire, pas besoin de bloquer techniquement les systèmes de jeu) le mène jusqu'au sous-sol caché (voir section 2), où il découvre l'objet maudit. Cette découverte, racontée avec les outils déjà en place (`AStoryTrigger`/`WBP_StoryText`, du texte pour l'instant — pas une cinématique montée, qui reste du ressort du Bloc 3), le fait devenir nécromancien et débloque le tutoriel.
 
 Une série de quêtes guide ensuite le joueur à travers un **premier passage complet de la boucle de jeu principale** : récolter une première ressource à la main, planter, préparer une première potion au chaudron, puis affronter la toute première vague d'ennemis (déclenchée à la fin du tutoriel), récupérer les os laissés au sol, ressusciter un premier serviteur, et lui assigner une tâche.
 
@@ -90,7 +90,7 @@ S'il choisit de terminer, une cinématique montre le joueur et son armée conqu�
 
 **Choix de conception — quelques variantes à seuils, pas une variation continue** : la cinématique varie selon la performance (nombre de serviteurs, vagues survécues), avec davantage d'alliés visibles et davantage de victimes montrées côté village pour une run plus aboutie — ça renforce le ton antagoniste posé plus haut. Mais plutôt qu'une population dynamique de la séquence pilotée en direct par les données de sauvegarde (lourd techniquement, et toujours du ressort du Bloc 3), on vise un **petit nombre de variantes distinctes** (ex : petite / moyenne / grande armée), choisies par un seuil.
 
-**Conséquence sur la file d'attente** : les items 16 et 17 (`CLAUDE.md` section 12 — disposition du village + patrouilles, condition de victoire + clôture narrative) semblent largement simplifiés par cette décision : plus besoin de construire un village jouable ni des patrouilles de soldats, seulement une zone de déclenchement et une cinématique. À confirmer et à répercuter sur la file d'attente une fois la section 4 (mécaniques et dépendances) traitée.
+**Conséquence sur la file d'attente** : les items 16 et 17 (`CLAUDE.md` section 9 — disposition du village + patrouilles, condition de victoire + clôture narrative) semblent largement simplifiés par cette décision : plus besoin de construire un village jouable ni des patrouilles de soldats, seulement une zone de déclenchement et une cinématique. À confirmer et à répercuter sur la file d'attente une fois la section 4 (mécaniques et dépendances) traitée.
 
 ---
 
@@ -122,7 +122,7 @@ L'espace explorable reste borné à la colline et ses abords immédiats — asse
 
 Liste des mécaniques déjà en place et à venir, et comment elles dépendent les unes des autres. Cette section tranche aussi les deux points laissés ouverts en sections 1 et 2 (lieu du rituel de résurrection, seuil de déblocage de la fin), et corrige une incohérence repérée avec la file d'attente existante.
 
-### Déjà en place (détail complet : `CLAUDE.md` section 7 et `documentation-technique.md`)
+### Déjà en place (détail complet : `CLAUDE.md` section 4 et `documentation-technique.md`)
 
 Interaction et manipulation physique (grab/lancer), récolte de ressources (nœuds → drops), plantation (`AFieldPlot`), chaudron (une recette : ressources → potion), composant de santé générique, mana et premier sort, panneau de contrôles, environnement de base (colline, cabane, clôture délimitant le territoire).
 
@@ -156,7 +156,7 @@ Condition de déblocage : un **nombre de vagues survécues** (valeur exacte non 
 
 ---
 
-**Résumé des conséquences à reporter dans `TODO.md`** (la file d'attente elle-même n'est pas encore réécrite, ce sera fait une fois le GDD complet, voir `CLAUDE.md` section 12) :
+**Résumé des conséquences à reporter dans `TODO.md`** (la file d'attente elle-même n'est pas encore réécrite, ce sera fait une fois le GDD complet, voir `CLAUDE.md` section 9) :
 - Nouvelle ressource `EResourceType::Bone` (os), avec paliers de rareté.
 - Item 2 à réécrire entièrement selon la chaîne ci-dessus (chaudron → objet posable → serviteur errant).
 - Item 3 à fusionner avec l'item 2 et le système d'assignation de tâches.

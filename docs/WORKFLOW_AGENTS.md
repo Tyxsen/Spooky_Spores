@@ -34,7 +34,7 @@ Pour que le travail dans l'éditeur se réduise à du câblage, l'implémenteur 
 | Rôle | Mission | Produit | Droits d'écriture |
 |---|---|---|---|
 | **game-designer** | Transforme un item de `TODO.md` en spec précise, fidèle au GDD | `docs/specs/<item>.md` | `docs/specs/` uniquement |
-| **cpp-implementer** | Implémente la spec en C++ avec une API exposée aux Blueprints, en respectant les conventions de `CLAUDE.md` section 6 (recopiées dans son prompt) | Code dans `Source/` | `Source/` uniquement |
+| **cpp-implementer** | Implémente la spec en C++ avec une API exposée aux Blueprints, en respectant les conventions de `CLAUDE.md` section 3 (recopiées dans son prompt) | Code dans `Source/` | `Source/` uniquement |
 | **qa-test-writer** | Écrit les tests **à partir de la spec seule**, sans lire l'implémentation | Tests Automation Spec (ou Functional) | Dossiers de tests uniquement |
 | **asset-creator** | Crée ou modifie un modèle 3D source via le MCP Blender, selon un brief | `.blend`, export `.fbx`, textures | `Art/Source/<asset>/` uniquement |
 | **bp-integration-planner** | Prépare la checklist d'intégration éditeur (Blueprints, import d'assets) : étapes [MCP] pour `bp-integrator`, étapes [HUMAIN] pour le reste, scénario de test | Checklist `docs/integration/<item>.md` | `docs/integration/` uniquement ; lecture seule dans l'éditeur |
@@ -66,7 +66,7 @@ L'orchestrateur ne mobilise que les agents utiles à la tâche.
 | Changement de valeur d'équilibrage | consistency-keeper uniquement (propage dans GDD, README, doc technique) |
 | Réécriture de `TODO.md` ou de docs | consistency-keeper uniquement |
 
-Cette table figure aussi dans `CLAUDE.md` section 13, avec les arrêts obligatoires. Une délégation automatique par description existe dans Claude Code, mais la table explicite est préférée : plus prévisible.
+Cette table figure aussi dans `CLAUDE.md` section 10, avec les arrêts obligatoires. Une délégation automatique par description existe dans Claude Code, mais la table explicite est préférée : plus prévisible.
 
 ---
 
@@ -151,7 +151,7 @@ L'orchestrateur choisit la stratégie 1 par défaut, et la stratégie 2 uniqueme
 ### Règles de nommage et de commit
 
 - Nom : `<préfixe>/<item-en-kebab-case>`, relié à un item de `TODO.md` ou à une spec.
-- Message de commit : format du projet (`CLAUDE.md` section 10), **en anglais** : préfixe `[ADD]`, `[FIX]`, `[CHORE]` ou `[DOC]` suivi d'un résumé, par exemple `[ADD] Bone resource type`. **Aucune ligne d'attribution** (`Co-Authored-By`, mention « Generated with Claude Code ») dans les commits ni dans les descriptions de PR, y compris celles des sous-agents.
+- Message de commit : format du projet (`CLAUDE.md` section 7), **en anglais** : préfixe `[ADD]`, `[FIX]`, `[CHORE]` ou `[DOC]` suivi d'un résumé, par exemple `[ADD] Bone resource type`. **Aucune ligne d'attribution** (`Co-Authored-By`, mention « Generated with Claude Code ») dans les commits ni dans les descriptions de PR, y compris celles des sous-agents.
 - Un commit = une intention. Pas de commit « divers ».
 
 ### Cycle de vie d'une branche
@@ -159,7 +159,7 @@ L'orchestrateur choisit la stratégie 1 par défaut, et la stratégie 2 uniqueme
 1. L'orchestrateur crée la branche depuis `dev` (jamais depuis une autre branche de travail, sauf stratégie 2).
 2. Les agents commitent uniquement dans cette branche, et uniquement dans leur périmètre de fichiers.
 3. Les contrôles (revue, cohérence, tests) tournent sur la branche.
-4. L'humain valide et ouvre la PR vers `dev`. Les fusions vers `dev` sont toujours validées par l'humain, et se font en **Squash** (une branche = un commit sur `dev`, comme dans `CLAUDE.md` section 10) : l'historique intermédiaire des agents n'est pas conservé sur `dev`.
+4. L'humain valide et ouvre la PR vers `dev`. Les fusions vers `dev` sont toujours validées par l'humain, et se font en **Squash** (une branche = un commit sur `dev`, comme dans `CLAUDE.md` section 7) : l'historique intermédiaire des agents n'est pas conservé sur `dev`.
 5. La branche est supprimée après fusion.
 
 ---
@@ -183,7 +183,7 @@ Pour la documentation, la règle est simple : **seul le consistency-keeper met �
 ### Fichiers binaires et Git LFS
 
 Les `.uasset`, `.umap`, `.blend`, `.fbx` et textures ne sont pas fusionnables. Conséquences :
-- **Git LFS est en place** (vérifié le 2026-11-10). Patterns suivis : `*.uasset`, `*.umap`, `*.png`, `*.jpg`, `*.wav`, `*.fbx`, `*.psd` ; `Documentation_Documents/**` est volontairement exclu. **Non suivis à ce jour** : `.blend` et `.tga` (14 fichiers `.TGA` du pack `RockEnv_Pack`, environ 50 Mo, sont déjà commités hors LFS), et `.blend1` (sauvegarde Blender) n'est pas ignoré par `.gitignore`. Ces correctifs sont prévus sur une branche `chore/` séparée, pas dans ce document. Ajouter un pattern ne convertit pas les fichiers déjà commités (voir `git add --renormalize`, `CLAUDE.md` section 10).
+- **Git LFS est en place** (vérifié le 2026-11-10). Patterns suivis : `*.uasset`, `*.umap`, `*.png`, `*.jpg`, `*.wav`, `*.fbx`, `*.psd` ; `Documentation_Documents/**` est volontairement exclu. **Non suivis à ce jour** : `.blend` et `.tga` (14 fichiers `.TGA` du pack `RockEnv_Pack`, environ 50 Mo, sont déjà commités hors LFS), et `.blend1` (sauvegarde Blender) n'est pas ignoré par `.gitignore`. Ces correctifs sont prévus sur une branche `chore/` séparée, pas dans ce document. Ajouter un pattern ne convertit pas les fichiers déjà commités (voir `git add --renormalize`, `CLAUDE.md` section 7).
 - Un asset binaire n'est modifié que par **une seule branche à la fois**.
 - Les agents commitent des fichiers **sources** (`.blend`, `.fbx`, textures) uniquement dans les branches `asset/`, jamais dans une branche `feature/`.
 - Les `.uasset` sont créés ou modifiés par `bp-integrator` via le MCP Unreal, sur la branche `feature/` (ou `integ/` s'il n'y a pas de nouveau C++), uniquement pour les assets de la checklist. L'humain traite à la main les étapes [HUMAIN]. Un import par script Python libre reste exclu en v1.
@@ -242,7 +242,6 @@ Ils pourront être assouplis item par item, jamais par défaut.
 ## 9. Garde-fous communs à tous les agents
 
 - Commit et push autorisés **uniquement sur sa propre branche de travail**. Jamais de commit ni de push sur `dev` ou `main`, jamais de push forcé, jamais de fusion : les fusions vers `dev` restent à l'humain.
-- Ne jamais écrire dans `Rendus/` ni rédiger un statement d'intention IA : ils sont de la main de l'humain.
 - Aucune fusion de PR par un agent (`git merge`, `gh pr merge` interdits) : l'humain fusionne.
 - Rester dans son périmètre de fichiers : toute modification hors périmètre est signalée à l'orchestrateur, pas appliquée.
 - **Avant toute action** (modification, commande, génération) : expliquer ce qui va être fait et comment. Cette règle de travail s'applique aussi aux sous-agents via leur prompt.
@@ -260,7 +259,7 @@ Les règles des sections précédentes ne sont pas toutes imposables par la conf
 - **Périmètre de fichiers** : aucun champ du frontmatter d'un agent ne limite l'écriture à un dossier. Leviers : règles `Edit(chemin)` dans les permissions (les redirections `>` sont contrôlées, pas `cp` ni `mv`), hook `PreToolUse`, retrait de `Write`/`Edit` pour les agents en lecture seule. Ce n'est pas une frontière : **avant d'accepter le travail d'un agent, l'orchestrateur compare `git diff --name-only` au « Périmètre de fichiers » de la spec**. À tester : les règles `Edit` s'appliquent-elles bien aux sous-agents.
 - **Profondeur de délégation** : la valeur par défaut est de 3 niveaux. Pour imposer la profondeur 1 de la section 9, définir `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`.
 - **Worktrees** : par défaut, un worktree d'agent part de la branche par défaut du dépôt (`main`), pas de `dev`. Soit régler `worktree.baseRef` sur `"head"` depuis `dev`, soit créer les worktrees à la main avec `git worktree add` depuis `dev`. Un worktree n'a ni `Binaries/` ni `Intermediate/` (recompilation complète) et contient des pointeurs LFS tant que `git lfs pull` n'y est pas fait. Un sous-agent en worktree lit le `CLAUDE.md` du checkout principal. `.claude/worktrees/` doit être ajouté au `.gitignore`.
-- **Éditeur et MCP Unreal** (état au 2026-11-10) : un seul éditeur, qui travaille sur le **checkout principal**, quelle que soit la branche — donc un seul `bp-integrator` à la fois, et l'humain ne touche pas à l'éditeur pendant son passage. Outils **exclus** en v1 (décision de l'humain, à reconsidérer plus tard) : `ue_python` (Python libre, hors de toute règle de permission), `ue_console_command`, `ue_delete_asset`, `ue_destroy_actor`, `ue_new_level`, `ue_open_level`, ainsi que `ue_play` et `ue_stop_play` (le test en jeu est humain). Conséquence : sans Python, pas de sauvegarde ciblée ; `bp-integrator` utilise `ue_save_all` (qui enregistre aussi des assets sans rapport) et **ne stage que les fichiers de la checklist** ; le reste est listé dans son rapport. `bp-integrator` vérifie avant de commencer la branche, le projet ouvert et la propreté de l'arbre de travail ; le commit de l'état précédent est fait avant son passage, donc un retour arrière est un retour au commit précédent, **éditeur fermé** (voir `CLAUDE.md` section 10). La compilation C++ n'est pas couverte par les outils : elle reste une étape humaine.
+- **Éditeur et MCP Unreal** (état au 2026-11-10) : un seul éditeur, qui travaille sur le **checkout principal**, quelle que soit la branche — donc un seul `bp-integrator` à la fois, et l'humain ne touche pas à l'éditeur pendant son passage. Outils **exclus** en v1 (décision de l'humain, à reconsidérer plus tard) : `ue_python` (Python libre, hors de toute règle de permission), `ue_console_command`, `ue_delete_asset`, `ue_destroy_actor`, `ue_new_level`, `ue_open_level`, ainsi que `ue_play` et `ue_stop_play` (le test en jeu est humain). Conséquence : sans Python, pas de sauvegarde ciblée ; `bp-integrator` utilise `ue_save_all` (qui enregistre aussi des assets sans rapport) et **ne stage que les fichiers de la checklist** ; le reste est listé dans son rapport. `bp-integrator` vérifie avant de commencer la branche, le projet ouvert et la propreté de l'arbre de travail ; le commit de l'état précédent est fait avant son passage, donc un retour arrière est un retour au commit précédent, **éditeur fermé** (voir `CLAUDE.md` section 7). La compilation C++ n'est pas couverte par les outils : elle reste une étape humaine.
 - **Liste d'outils des agents** : les sous-agents héritent des outils MCP de la session principale (d'après la doc consultée) ; chaque agent a donc une liste `tools` explicite, et seuls `bp-integration-planner` (lecture), `bp-integrator` (écriture restreinte) et `editor-verifier` (lecture) reçoivent des outils Unreal. À tester : que la liste blanche filtre bien les noms `mcp__unreal__*`.
 - **Workflows scriptés** (`.claude/workflows/`) : ils n'acceptent aucune saisie humaine en cours de route ; une validation entre deux étapes impose deux workflows séparés. Ils ne sont pas retenus pour le moment : on démarre avec des agents et une table de routage simples.
 

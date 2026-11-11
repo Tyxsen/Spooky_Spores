@@ -2,7 +2,7 @@
 
 **Moteur :** Unreal Engine 5.8.3
 
-Ce document décrit l'architecture **actuelle** du projet, organisée par système plutôt que par semaine de développement. Pour l'historique des rendus notés (avec leur statement d'intention IA respectif), voir le dossier [`Rendus/`](Rendus/).
+Ce document décrit l'architecture **actuelle** du projet, organisée par système plutôt que par semaine de développement.
 
 ---
 
@@ -217,7 +217,7 @@ UI : `WBP_ResourceEntry` (une ressource, filtrée par type via un nœud `Equal (
 
 **Garde-fous de configuration** : une recette sans ingrédient est ignorée (sinon une entrée ajoutée par erreur dans l'éditeur donnerait un résultat gratuit) ; une `BrewDuration` nulle termine immédiatement la préparation, car un `SetTimer` de durée nulle ne se déclenche jamais et le chaudron resterait bloqué en `Brewing`.
 
-**Choix technique — potion créditée directement, sans objet physique au sol** : contrairement aux ressources récoltées (`AHarvestableResource`, `AFieldPlot`), la potion ne fait pas apparaître de `AResourceDrop` à ramasser. Le résultat est crédité instantanément au compteur du joueur. Simplification assumée en l'absence d'un vrai système d'inventaire (repoussé après le Bloc 2, voir `CLAUDE.md` section 12) : fabriquer un pickup physique pour un objet qui finira de toute façon dans un inventaire structuré aurait été du travail jetable.
+**Choix technique — potion créditée directement, sans objet physique au sol** : contrairement aux ressources récoltées (`AHarvestableResource`, `AFieldPlot`), la potion ne fait pas apparaître de `AResourceDrop` à ramasser. Le résultat est crédité instantanément au compteur du joueur. Simplification assumée en l'absence d'un vrai système d'inventaire (repoussé après le Bloc 2, voir `CLAUDE.md` section 9) : fabriquer un pickup physique pour un objet qui finira de toute façon dans un inventaire structuré aurait été du travail jetable.
 
 **Choix technique — progression par temps écoulé, pas par décompte au tick** : `GetBrewProgress()` (`BlueprintPure`) ne décrémente pas une valeur à chaque frame comme `UStaminaComponent`. Elle calcule un ratio à partir de `GetWorld()->GetTimeSeconds() - BrewStartTime`, sur le même principe que la pousse d'un `AFieldPlot` (section 6) : une échéance fixe à surveiller, pas une valeur qui évolue en continu indépendamment de toute interrogation.
 
