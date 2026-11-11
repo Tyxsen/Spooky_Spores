@@ -122,7 +122,7 @@ L'espace explorable reste borné à la colline et ses abords immédiats — asse
 
 Liste des mécaniques déjà en place et à venir, et comment elles dépendent les unes des autres. Cette section tranche aussi les deux points laissés ouverts en sections 1 et 2 (lieu du rituel de résurrection, seuil de déblocage de la fin), et corrige une incohérence repérée avec la file d'attente existante.
 
-### Déjà en place (détail complet : `CLAUDE.md` section 4 et `documentation-technique.md`)
+### Déjà en place (détail complet : `documentation-technique.md`)
 
 Interaction et manipulation physique (grab/lancer), récolte de ressources (nœuds → drops), plantation (`AFieldPlot`), chaudron (une recette : ressources → potion), composant de santé générique, mana et premier sort, panneau de contrôles, environnement de base (colline, cabane, clôture délimitant le territoire).
 
