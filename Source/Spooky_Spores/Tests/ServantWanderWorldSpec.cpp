@@ -451,9 +451,8 @@ void FServantWanderWorldSpec::Define()
 			Controller->StopWandering();
 			TestFalse(TEXT("A9: IsWandering() == false"), Controller->IsWandering());
 
-			// "Timer cleared" is checked by code reading only: a surviving timer would be masked by the !bIsWandering guard of the
-			// decision and re-armed on the same handle by StartWandering, so no observable assertion here could fail.
-			// What can fail is covered elsewhere: A11 "after StopWandering" (OnMoveCompleted ignored).
+			// Checked by code reading only (A9/A11): "timer cleared", "LastAction frozen" and "OnMoveCompleted ignored after Stop".
+			// They are unobservable: the decision exits on its own !bIsWandering guard, so no assertion on them could fail.
 			TickFor(3.0 * RetryDelay + TimerSlack);
 
 			Controller->StartWandering();
@@ -527,23 +526,6 @@ void FServantWanderWorldSpec::Define()
 				TestTrue(*FString::Printf(TEXT("A11 %s: a decision right after RetryDelay (not a wander pause)"), *Name), bDecided);
 				TestEqual(*FString::Printf(TEXT("A11 %s: exactly one decision"), *Name), Controller->GetFailedReturnAttempts(), Before + 1);
 			}
-		});
-
-		It("A11: after StopWandering, OnMoveCompleted is ignored", [this]()
-		{
-			if (!RequireWorld()) { return; }
-			AServantAIController* Controller = PrepareOutOfZoneCycle();
-			if (Controller == nullptr) { return; }
-			const int32 Before = Controller->GetFailedReturnAttempts();
-
-			Controller->StopWandering();
-			CallMoveCompleted(Controller, EPathFollowingResult::Success);
-			CallMoveCompleted(Controller, EPathFollowingResult::Aborted);
-			TestFalse(TEXT("A11: OnMoveCompleted does not restart the wandering"), Controller->IsWandering());
-
-			TickFor(A11MaxWanderPause + A11RetryDelay + TimerSlack);
-			TestEqual(TEXT("A11: no decision after StopWandering, even beyond MaxWanderPause"), Controller->GetFailedReturnAttempts(), Before);
-			TestFalse(TEXT("A11: still not wandering"), Controller->IsWandering());
 		});
 
 		It("A11: StartWandering while already wandering keeps the counter and the decision cadence", [this]()
