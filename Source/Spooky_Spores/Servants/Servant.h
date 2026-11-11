@@ -7,7 +7,7 @@
 #include "Servant.generated.h"
 
 // Resurrected servant spawned by the player from a Necrospore.
-// Step 2.2a: no behaviour yet, it only exists in the world. Wandering comes in step 2.2c.
+// Possessed by an AServantAIController as soon as it is spawned or placed: it wanders in the base zone.
 UCLASS()
 class SPOOKY_SPORES_API AServant : public ACharacter
 {
