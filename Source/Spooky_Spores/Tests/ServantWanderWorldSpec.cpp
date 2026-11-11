@@ -247,7 +247,7 @@ void FServantWanderWorldSpec::Define()
 			AServantAIController* Controller = RequireController(Servant);
 			if (Controller == nullptr) { return; }
 
-			// 123 differs from the spec default (200) and from the AServant CDO speed, so only a read of the instance property can give it.
+			// 123 differs from the spec default and from the engine MaxWalkSpeed default, so only a read of the instance property can give it.
 			constexpr double CustomSpeed = 123.0;
 			Controller->StopWandering();
 			if (!TestTrue(TEXT("harness: WanderWalkSpeed written by reflection"),
