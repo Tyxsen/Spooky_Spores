@@ -4,7 +4,7 @@ Document de conception complet du jeu : pourquoi chaque mécanique existe, comme
 
 Contrairement à [`documentation-technique.md`](documentation-technique.md), qui décrit le code et les systèmes **tels qu'ils existent**, ce document décrit **l'intention** derrière le jeu — la fiction, le monde, la progression du joueur, et les règles qui doivent trancher une décision de conception sans avoir à improviser à chaque fois.
 
-**Statut** : rédaction terminée (démarrée le 2026-10-26, close le 2026-11-03). Le point de passage obligatoire défini dans [`CLAUDE.md`](CLAUDE.md) section 9 est donc levé — la file d'attente des mécaniques peut reprendre, après réorganisation (voir `TODO.md`).
+**Statut** : rédaction terminée (démarrée le 2026-10-26, close le 2026-11-03). La file d'attente des mécaniques est dans `TODO.md`.
 
 **Document complet et autonome** : ce GDD doit pouvoir se lire seul, sans avoir à ouvrir d'autres fichiers pour comprendre le jeu. Le 3C ([`README.md`](README.md)) et l'architecture technique actuelle ([`documentation-technique.md`](documentation-technique.md)) sont donc recopiés ici quand ils sont nécessaires à une section, même si l'information existe déjà ailleurs. Ces deux fichiers restent les sources canoniques de leurs propres domaines : en cas de changement d'une valeur (vitesse, FOV, implémentation...), il faut répercuter la mise à jour dans les documents concernés.
 
@@ -54,7 +54,7 @@ Le joueur est **invincible** : les ennemis n'attaquent jamais le joueur lui-mêm
 
 Principe : une ressource ne doit jamais devenir totalement inutile une fois son besoin initial comblé — mais chaque ressource règle ce problème à sa manière, plutôt que via un système générique unique :
 - **Bois / pierre** : la reconstruction des bâtiments détruits par les vagues est un puits de consommation continu — pas besoin de mécanique dédiée.
-- **Graines** : à revérifier une fois l'inventaire limité en place (file d'attente, item 7) — un surplus de graines ne coûte rien au joueur tant que l'inventaire reste illimité.
+- **Graines** : à revérifier une fois l'inventaire limité en place (vrai inventaire, voir `TODO.md`) — un surplus de graines ne coûte rien au joueur tant que l'inventaire reste illimité.
 - **Os** : les ennemis plus forts (plus rares) donnent des os de meilleure qualité, qui servent à ressusciter des serviteurs plus efficaces — c'est la voie principale. En complément, un surplus de petits os peut être converti vers l'équivalent d'un os de meilleure qualité, mais à un taux volontairement défavorable : cette conversion est un pis-aller pour qu'un stock de petits os ne devienne jamais un pur déchet, pas un substitut à la chasse aux ennemis forts (sinon la rareté des bons os perdrait tout son sens). Chaque conversion produit un **nouveau serviteur indépendant** (pas une amélioration rétroactive d'un serviteur existant). **Détail d'implémentation restant (lieu de la conversion — chaudron ou mécanique séparée) à trancher en section 4, voir dépendance avec l'UI de sélection de recette.**
   **Sacrifice volontaire d'un serviteur** : en complément, le joueur peut aussi sacrifier de son plein gré un serviteur existant (hors combat, à son initiative) contre un remboursement partiel en os — toujours inférieur au coût de création initial. Objectif : pouvoir se débarrasser d'un serviteur jugé trop faible sans que ce soit gratuit, sans pour autant être aussi punitif qu'une mort au combat (qui ne redonne jamais rien). Les deux règles coexistent volontairement, avec deux intentions différentes : empêcher un farming d'os sans coût (mort au combat) d'un côté, permettre un vrai choix de gestion de son armée à un coût réel (sacrifice volontaire) de l'autre.
 
@@ -90,7 +90,7 @@ S'il choisit de terminer, une cinématique montre le joueur et son armée conqu�
 
 **Choix de conception — quelques variantes à seuils, pas une variation continue** : la cinématique varie selon la performance (nombre de serviteurs, vagues survécues), avec davantage d'alliés visibles et davantage de victimes montrées côté village pour une run plus aboutie — ça renforce le ton antagoniste posé plus haut. Mais plutôt qu'une population dynamique de la séquence pilotée en direct par les données de sauvegarde (lourd techniquement, et toujours du ressort du Bloc 3), on vise un **petit nombre de variantes distinctes** (ex : petite / moyenne / grande armée), choisies par un seuil.
 
-**Conséquence sur la file d'attente** : les items 16 et 17 (`CLAUDE.md` section 9 — disposition du village + patrouilles, condition de victoire + clôture narrative) semblent largement simplifiés par cette décision : plus besoin de construire un village jouable ni des patrouilles de soldats, seulement une zone de déclenchement et une cinématique. À confirmer et à répercuter sur la file d'attente une fois la section 4 (mécaniques et dépendances) traitée.
+**Conséquence sur la file d'attente** : la zone de fin et la condition de victoire (`TODO.md`) semblent largement simplifiés par cette décision : plus besoin de construire un village jouable ni des patrouilles de soldats, seulement une zone de déclenchement et une cinématique. À confirmer et à répercuter sur la file d'attente une fois la section 4 (mécaniques et dépendances) traitée.
 
 ---
 
@@ -108,7 +108,7 @@ Les ressources sont réparties de façon globalement uniforme sur toute la carte
 
 Il n'existe qu'un seul chemin reliant la cabane au village (celui déjà sculpté dans le Landscape, voir `documentation-technique.md` section 12), et ça restera le cas — pas de pluralité de fronts à défendre prévue. Ce chemin doit rester **impossible à bloquer entièrement** par une construction du joueur : le murer reviendrait à neutraliser toutes les vagues sans effort, ce qui viderait le combat de son enjeu.
 
-**Choix de conception — système de construction en grille** : le futur système de construction (vue top-down, `TODO.md` items 14-15) reposera sur une grille de cases virtuelles, comme dans un city-builder. Les cases correspondant au chemin seront marquées non constructibles en permanence (affichées en rouge dans l'interface de placement) — pas de règle de « largeur minimale à préserver » à vérifier au cas par cas : la contrainte est déjà résolue par la grille elle-même, une case est soit constructible, soit non, sans dégradé possible. **Dépendance à reporter en section 4** : ce choix de grille doit être répercuté dans la description de l'item 14 (construction de base) quand cette section sera rédigée.
+**Choix de conception — système de construction en grille** : le futur système de construction (vue top-down, `TODO.md`) reposera sur une grille de cases virtuelles, comme dans un city-builder. Les cases correspondant au chemin seront marquées non constructibles en permanence (affichées en rouge dans l'interface de placement) — pas de règle de « largeur minimale à préserver » à vérifier au cas par cas : la contrainte est déjà résolue par la grille elle-même, une case est soit constructible, soit non, sans dégradé possible. **Dépendance à reporter en section 4** : ce choix de grille doit être répercuté dans la description de la construction de base quand cette section sera rédigée.
 
 ### Une colline, pas un monde ouvert
 
@@ -128,9 +128,9 @@ Interaction et manipulation physique (grab/lancer), récolte de ressources (nœu
 
 ### De la mort du soldat au serviteur assigné
 
-**Incohérence corrigée par rapport à la file d'attente (`TODO.md`, item 2)** : l'idée initiale (« potion + cadavre = serviteur », interaction directe sur le cadavre) ne tient plus depuis que la section 1 fait des os une ressource à paliers de rareté, stockable et convertible — une ressource qu'on stocke ne peut pas aussi être une interaction instantanée. Chaîne retenue :
+**Incohérence corrigée par rapport à la file d'attente (`TODO.md`, résurrection)** : l'idée initiale (« potion + cadavre = serviteur », interaction directe sur le cadavre) ne tient plus depuis que la section 1 fait des os une ressource à paliers de rareté, stockable et convertible — une ressource qu'on stocke ne peut pas aussi être une interaction instantanée. Chaîne retenue :
 
-1. Un soldat ennemi vaincu (file d'attente, item 1) laisse tomber des **os** au sol : une nouvelle entrée dans `EResourceType` (aux côtés de Seed, Wood, Stone), qui réutilise telle quelle l'architecture de récolte déjà en place (`AResourceDrop`) — aucun nouveau système, juste un type de plus.
+1. Un soldat ennemi vaincu (soldat ennemi, déjà en place) laisse tomber des **os** au sol : une nouvelle entrée dans `EResourceType` (aux côtés de Seed, Wood, Stone), qui réutilise telle quelle l'architecture de récolte déjà en place (`AResourceDrop`) — aucun nouveau système, juste un type de plus.
 2. Au chaudron, une **recette dédiée** transforme des os + une potion en un objet de résurrection. Le palier exact de serviteur obtenu selon la quantité/qualité des os utilisés est un détail d'équilibrage à définir au moment de l'implémentation, pas maintenant.
 3. Le résultat de la recette est un **objet ajouté à l'inventaire du joueur** (comme un œuf de monstre dans Minecraft) — pas un serviteur qui apparaît directement dans le monde.
 4. Le joueur le pose librement, n'importe où, directement depuis le personnage — pas via la grille de construction des bâtiments (vue top-down, voir plus bas) : un serviteur se déplace tout seul une fois posé, une grille rigide n'a pas de sens pour lui.
@@ -142,13 +142,13 @@ Interaction et manipulation physique (grab/lancer), récolte de ressources (nœu
 
 Menu dédié (touche à définir), deux colonnes : à gauche les serviteurs non assignés, à droite une section par catégorie de tâche (« attaque/défense », « récolte de champ », d'autres à ajouter au fil des besoins), chacune listant les serviteurs qui lui sont actuellement affectés. Glisser-déposer un serviteur d'une colonne à l'autre change son affectation.
 
-**Conséquence sur la file d'attente** : l'item 3 (« serviteur qui récolte la ressource la plus proche ») doit être reformulé — le comportement de récolte automatique devient une conséquence de l'assignation à la catégorie « récolte de champ », pas un comportement indépendant sans supervision du joueur. Les items 2 et 3 se recouvrent maintenant largement et devront être réorganisés en un seul bloc de travail une fois le GDD complet.
+**Conséquence sur la file d'attente** : la tâche « serviteur qui récolte la ressource la plus proche » doit être reformulé — le comportement de récolte automatique devient une conséquence de l'assignation à la catégorie « récolte de champ », pas un comportement indépendant sans supervision du joueur. La résurrection et l'assignation des tâches forment désormais un seul bloc de travail (`TODO.md`).
 
 ### Vue de gestion top-down et construction de base
 
 À l'entrée dans cette vue, **le jeu se met en pause** — la gestion de la base (construction, assignation des tâches) ne se fait jamais sous la pression d'une vague en cours.
 
-**Choix de conception — construction façon city-builder (Planet Coaster)** : complète le pilier B de la section 3 (grille de cases, chemin verrouillé en non constructible). Depuis cette vue, le joueur place un bâtiment avec un aperçu de validité (vert/rouge selon la case), peut le faire pivoter, et peut déplacer ou retirer un bâtiment déjà posé. Les items 13 (vue top-down) et 14 (construction de base) de la file d'attente sont donc indissociables : la vue top-down n'a de sens qu'avec ce système de construction, et inversement — à traiter comme un seul bloc.
+**Choix de conception — construction façon city-builder (Planet Coaster)** : complète le pilier B de la section 3 (grille de cases, chemin verrouillé en non constructible). Depuis cette vue, le joueur place un bâtiment avec un aperçu de validité (vert/rouge selon la case), peut le faire pivoter, et peut déplacer ou retirer un bâtiment déjà posé. La vue top-down et la construction de base (file d'attente) sont donc indissociables : la vue top-down n'a de sens qu'avec ce système de construction, et inversement — à traiter comme un seul bloc.
 
 ### Déblocage de la zone de fin
 
@@ -156,13 +156,13 @@ Condition de déblocage : un **nombre de vagues survécues** (valeur exacte non 
 
 ---
 
-**Résumé des conséquences à reporter dans `TODO.md`** (la file d'attente elle-même n'est pas encore réécrite, ce sera fait une fois le GDD complet, voir `CLAUDE.md` section 9) :
+**Résumé des conséquences à reporter dans `TODO.md`** (déjà reportées dans `TODO.md`) :
 - Nouvelle ressource `EResourceType::Bone` (os), avec paliers de rareté.
-- Item 2 à réécrire entièrement selon la chaîne ci-dessus (chaudron → objet posable → serviteur errant).
-- Item 3 à fusionner avec l'item 2 et le système d'assignation de tâches.
-- Items 13 et 14 à traiter comme un seul bloc de travail.
+- Résurrection à réécrire entièrement selon la chaîne ci-dessus (chaudron → objet posable → serviteur errant).
+- Récolte automatique à fusionner avec la résurrection et le système d'assignation de tâches.
+- Vue de gestion et construction à traiter comme un seul bloc de travail.
 - Nouveau concept technique à prévoir : la zone de base (volume englobant la clôture).
-- Seuil de déblocage de fin (item 17) : valeur à déterminer par playtest, pas par design a priori.
+- Seuil de déblocage de fin (zone de fin) : valeur à déterminer par playtest, pas par design a priori.
 
 ---
 
