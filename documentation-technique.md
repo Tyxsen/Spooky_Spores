@@ -36,7 +36,7 @@ Movement/    StaminaComponent
 Health/      HealthComponent
 Spells/      ManaComponent, SpellCastingComponent
 Enemies/     EnemySoldier, EnemyAIController, EnemyPathSpline, Destructible
-Servants/    Servant
+Servants/    Servant, ServantAIController
 Base/        BaseZone, BaseZoneSubsystem
 Tests/       Automation Specs (code de test du module, pas un domaine de gameplay)
 ```
@@ -158,7 +158,7 @@ La vitesse (`MaxWalkSpeed`) n'est modifiée qu'à un endroit, `HandleSprintState
 - **`Transit`** : suit la spline via un accumulateur `DistanceAlongSpline` (`MoveSpeed`) en visant un point en avance (`LookAheadDistance`, évite les à-coups). Passe en `Engage` au bout de la spline.
 - **`Engage`** : `FindNearestDestructible` (acteurs implémentant l'interface, rayon `TargetSearchRadius`), avance tant que la distance dépasse `AttackRange`, sinon attaque toutes les `AttackInterval`.
 
-**`AddMovementInput`, pas `MoveToLocation`** : la navigation NavMesh s'est révélée fragile (voir `CLAUDE.md` section 8) et n'alimentait pas l'Animation Blueprint. Limite assumée : marche en ligne droite, sans contourner. `bUseControllerRotationYaw` désactivé et `bOrientRotationToMovement` activé.
+**`AddMovementInput`, pas `MoveToLocation`** : la navigation NavMesh s'est révélée fragile (voir `CLAUDE.md` section 8) et n'alimentait pas l'Animation Blueprint. Le glissement observé venait très probablement de `bUseAccelerationForPaths = false` (corrigé et confirmé sur le serviteur, section 12). Limite assumée : marche en ligne droite, sans contourner. `bUseControllerRotationYaw` désactivé et `bOrientRotationToMovement` activé.
 
 **Distance d'attaque** : `GetClosestPointOnCollision` (surface réelle de la cible) moins `GetScaledCapsuleRadius()`, en 2D (`Size2D`), comme le moteur mesure l'arrivée.
 
@@ -168,9 +168,9 @@ La vitesse (`MaxWalkSpeed`) n'est modifiée qu'à un endroit, `HandleSprintState
 
 ---
 
-## 12. Serviteurs : pose
+## 12. Serviteurs : pose et errance
 
-`Servants/AServant` (Character), sans comportement pour l'instant ; pas de classe commune avec `AEnemySoldier` (rôles différents, une seule implémentation ne justifie pas d'abstraction).
+`Servants/` : `AServant` (Character) et `AServantAIController` (errance) ; pas de classe commune avec `AEnemySoldier` (rôles différents, une seule implémentation ne justifie pas d'abstraction).
 
 **Pose (touche L, `DoPlaceServant`)**, dans cet ordre : 1. `UInteractionComponent::GetPlacementPoint` (point au sol devant le joueur) ; 2. `TrySpendResource(Necrospore, 1)` ; 3. spawn de `ServantClass` (`BP_Servant`). Une pose impossible ne coûte donc jamais de Necrospore.
 
@@ -180,11 +180,22 @@ La vitesse (`MaxWalkSpeed`) n'est modifiée qu'à un endroit, `HandleSprintState
 - **Spawn garanti** : `AdjustIfPossibleButAlwaysSpawn` (pas de remboursement à prévoir) ; un échec est tracé dans `LogSpooky_Spores`.
 - **Stockage provisoire** : la Necrospore est une ressource comptée en attendant l'inventaire ; **l'unique accès est le `TrySpendResource` de `DoPlaceServant`** (commenté), pour que le passage à l'inventaire ne touche que cette ligne.
 
+**Errance (`AServantAIController`)** : pas de `Tick`, pas de Behavior Tree. Un timer de décision et `OnMoveCompleted` (seul endroit qui planifie la suite d'un déplacement) pilotent le serviteur.
+- **Décision** (`MakeDecision`, règle pure `DecideNextAction`, `EServantWanderAction`) : `Wait` (pas de zone ou zone invalide, nouvel essai après `RetryDelay`), `Wander` (dans la zone : point tiré, projeté sur le NavMesh, pause de `MinWanderPause` à `MaxWanderPause` après l'arrivée), `Return` (hors zone : `MoveToLocation` vers un point de la zone), `Teleport`. La zone est relue via `UBaseZoneSubsystem` à chaque décision, sans cache.
+- **Point de destination** : `GetRandomPointInZone` puis `ProjectPointToNavigation` (extension verticale = `GetZoneExtent().Z` + `ProjectionVerticalMargin`), au plus `MaxProjectionAttempts` essais ; un point projeté hors zone compte comme un échec.
+- **Retour et téléportation** : tout retour raté (pas de point, `Failed`, `Aborted`, `Blocked`, arrêt sur le bord) incrémente `FailedReturnAttempts` ; un retour réussi le remet à 0. À `MaxFailedReturnAttempts` (3), `TeleportTo` dans la zone (le serviteur n'est ni laissé dehors ni la pose bloquée) ; un échec de téléportation est tracé.
+- **API pour l'assignation (item 2 du `TODO.md`)** : `StartWandering` (remet le compteur à 0, sans effet si déjà en errance) et `StopWandering` (arrête le déplacement, efface le timer ; un `OnMoveCompleted` tardif est ignoré). Lancé par `OnPossess`.
+- **Possession** : `AutoPossessAI = PlacedInWorldOrSpawned` (le défaut `PlacedInWorld` ne possède pas un serviteur spawné par la pose).
+- **Vitesse** : `WanderWalkSpeed` (275, sur le contrôleur) est appliquée à `MaxWalkSpeed` par `StartWandering`, errance et retour compris : la vitesse appartient au comportement, pas au défaut d'`AServant`.
+- **Animation et rotation** : `bUseAccelerationForPaths = true` sur `AServant` (l'`ABP_Unarmed` calcule `Should Move` depuis `GetCurrentAcceleration` ; sans cela il glissait sans cycle de marche). `bUseControllerRotationYaw` désactivé, `bOrientRotationToMovement` activé.
+- **Dépendances** : module `NavigationSystem` dans `Spooky_Spores.Build.cs`. `AcceptanceRadius` (50) n'inclut pas le rayon de capsule (`bStopOnOverlap` l'ajoute).
+- **Limite** : le NavMesh de `Lvl_Principal` a été réduit à la base (volume resserré à la main) ; un consommateur de navigation hors base (récolte de champ, défense) devra vérifier ou agrandir le `NavMeshBoundsVolume`.
+
 ---
 
 ## 13. Zone de base
 
-`Base/` : `ABaseZone` (acteur) + `UBaseZoneSubsystem` (registre). Répond à « ce point est-il dans la base ? » et « un point au hasard dans la base ». Consommateurs prévus : errance des serviteurs, vue de gestion et construction.
+`Base/` : `ABaseZone` (acteur) + `UBaseZoneSubsystem` (registre). Répond à « ce point est-il dans la base ? » et « un point au hasard dans la base ». Consommateur : l'errance des serviteurs (`AServantAIController`). Consommateurs prévus : vue de gestion et construction.
 
 - **Acteur dédié** : racine `UBoxComponent` (`ZoneBox`), pas un composant de `BP_Fences` (la zone doit survivre à un agrandissement). `BP_BaseZone` (`Placeables/Base/`, sans logique) est dans `Lvl_Principal.umap`, boîte calée à la main autour de la clôture.
 - **Calcul en espace local** : point monde → local (`InverseTransformPosition`), comparé à `GetUnscaledBoxExtent` (l'échelle, même négative ou non uniforme, est dans la transformation). Le tirage est local puis retransformé en monde (densité uniforme, boîte tournée respectée). Rien n'est mémorisé : un `SetBoxExtent`, une échelle ou un déplacement comptent à l'appel suivant. Fonctions statiques publiques (`IsPointInOrientedBox`, `TryGetRandomPointInOrientedBox`, `IsOrientedBoxValid`), testables sans `UWorld`.
