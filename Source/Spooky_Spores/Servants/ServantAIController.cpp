@@ -9,6 +9,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "NavigationSystem.h"
 #include "Spooky_Spores.h"
@@ -20,6 +21,12 @@ void AServantAIController::StartWandering()
 	if (bIsWandering)
 	{
 		return;
+	}
+
+	// The speed belongs to the behaviour, not to the servant's defaults. No pawn: the first decision stops wandering.
+	if (ACharacter* ControlledCharacter = GetCharacter())
+	{
+		ControlledCharacter->GetCharacterMovement()->MaxWalkSpeed = WanderWalkSpeed;
 	}
 
 	bIsWandering = true;

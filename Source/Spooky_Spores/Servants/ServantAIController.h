@@ -102,6 +102,10 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Servant|Wander", meta = (AllowPrivateAccess = "true", ClampMin = "1"))
 	int32 MaxFailedReturnAttempts = 3;
 
+	// Applied to the pawn's MaxWalkSpeed when wandering starts (wander and return moves): a walk, not a run.
+	UPROPERTY(EditAnywhere, Category = "Servant|Wander", meta = (AllowPrivateAccess = "true", ClampMin = "10.0"))
+	float WanderWalkSpeed = 200.0f;
+
 	UPROPERTY(VisibleInstanceOnly, Category = "Servant|Wander", meta = (AllowPrivateAccess = "true"))
 	bool bIsWandering = false;
 
