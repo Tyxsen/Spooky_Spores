@@ -227,6 +227,38 @@ void FServantWanderWorldSpec::Define()
 
 			TestTrue(TEXT("A3: IsWandering() == true right after spawn"), Controller->IsWandering());
 			TestTrue(TEXT("A3: the controller possesses this very servant"), Controller->GetPawn() == Servant);
+
+			double WanderWalkSpeed = 0.0;
+			if (!TestTrue(TEXT("A3: WanderWalkSpeed is a reflected numeric property (name from the spec)"),
+			              ServantWanderTest::ReadNumber(Controller, TEXT("WanderWalkSpeed"), WanderWalkSpeed))) { return; }
+			const UCharacterMovementComponent* DefaultMovement = GetDefault<AServant>()->GetCharacterMovement();
+			if (!TestNotNull(TEXT("A3: AServant CDO has a CharacterMovement"), DefaultMovement)) { return; }
+			// Without this precondition, a servant that simply kept its class default speed would pass the next assertion.
+			if (!TestNotEqual(TEXT("A3 precondition: WanderWalkSpeed differs from the AServant CDO MaxWalkSpeed"),
+			                  WanderWalkSpeed, static_cast<double>(DefaultMovement->MaxWalkSpeed))) { return; }
+			TestEqual(TEXT("A3: the possessed servant walks at WanderWalkSpeed"),
+			          static_cast<double>(Servant->GetCharacterMovement()->MaxWalkSpeed), WanderWalkSpeed, 0.01);
+		});
+
+		It("A3: StartWandering applies the instance value of WanderWalkSpeed, not a constant", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			AServant* Servant = SpawnServant(TEXT("ServantSpeed"), ZoneCenter);
+			AServantAIController* Controller = RequireController(Servant);
+			if (Controller == nullptr) { return; }
+
+			// 123 differs from the spec default (200) and from the AServant CDO speed, so only a read of the instance property can give it.
+			constexpr double CustomSpeed = 123.0;
+			Controller->StopWandering();
+			if (!TestTrue(TEXT("harness: WanderWalkSpeed written by reflection"),
+			              ServantWanderTest::WriteNumber(Controller, TEXT("WanderWalkSpeed"), CustomSpeed))) { return; }
+			if (!TestNotEqual(TEXT("precondition: the current speed is not already 123"),
+			                  static_cast<double>(Servant->GetCharacterMovement()->MaxWalkSpeed), CustomSpeed)) { return; }
+
+			Controller->StartWandering();
+			TestTrue(TEXT("restarted"), Controller->IsWandering());
+			TestEqual(TEXT("A3: MaxWalkSpeed == the WanderWalkSpeed of this controller instance"),
+			          static_cast<double>(Servant->GetCharacterMovement()->MaxWalkSpeed), CustomSpeed, 0.01);
 		});
 
 		It("First decision only after InitialDecisionDelay, so a zone spawned after the servant is seen", [this]()

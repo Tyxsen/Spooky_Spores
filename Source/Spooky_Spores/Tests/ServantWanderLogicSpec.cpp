@@ -102,6 +102,7 @@ void FServantWanderLogicSpec::Define()
 				{ TEXT("ProjectionVerticalMargin"), 100.0 },
 				{ TEXT("AcceptanceRadius"), 50.0 },
 				{ TEXT("MaxFailedReturnAttempts"), 3.0 },
+				{ TEXT("WanderWalkSpeed"), 200.0 },
 			};
 			for (const FExpectedValue& Entry : Expected)
 			{
