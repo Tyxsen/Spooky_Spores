@@ -17,4 +17,9 @@ AServant::AServant()
 
 	// Path following drives the movement through acceleration, like player input (walk cycle in the Anim Blueprint)
 	GetCharacterMovement()->GetNavMovementProperties()->bUseAccelerationForPaths = true;
+
+	// Face movement direction instead of control rotation: with bCanStrafe = false the controller
+	// focuses the next path point and the pawn would snap at every corner.
+	bUseControllerRotationYaw = false;
+	GetCharacterMovement()->bOrientRotationToMovement = true;
 }
