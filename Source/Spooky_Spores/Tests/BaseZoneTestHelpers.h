@@ -1,4 +1,4 @@
-// Shared helpers for the base zone Automation Specs (spec: docs/specs/base-zone.md).
+// Shared helpers for the base zone Automation Specs (criteria from the base zone spec, removed at merge: see commit a5a85da).
 
 #pragma once
 

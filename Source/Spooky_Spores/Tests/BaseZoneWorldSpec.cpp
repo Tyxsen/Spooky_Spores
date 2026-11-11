@@ -1,5 +1,5 @@
 // Automation Spec for ABaseZone and UBaseZoneSubsystem inside a minimal test world.
-// Source of truth: docs/specs/base-zone.md, criteria A8, A10 (member part), R7, D1-D2 (member part), C4, S1-S4,
+// Source of truth: the base zone spec (removed at merge, see commit a5a85da), criteria A8, A10 (member part), R7, D1-D2 (member part), C4, S1-S4,
 // plus integration tests that go through the real actor so the static maths are not the only thing exercised.
 //
 // The world comes from FTestWorldWrapper (Engine module, Tests/AutomationCommon.h): a transient Game world with a

@@ -1,5 +1,5 @@
 // Automation Spec for the construction of ABaseZone, read on the class default object (no UWorld).
-// Source of truth: docs/specs/base-zone.md, criteria C1-C3.
+// Source of truth: the base zone spec (removed at merge, see commit a5a85da), criteria C1-C3.
 
 #include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"

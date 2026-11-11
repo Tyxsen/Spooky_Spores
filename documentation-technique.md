@@ -1,83 +1,47 @@
 # Documentation technique — Spooky_Spores
 
-**Moteur :** Unreal Engine 5.8.3
-
-Ce document décrit l'architecture **actuelle** du projet, organisée par système plutôt que par semaine de développement. Pour l'historique des rendus notés (avec leur statement d'intention IA respectif), voir le dossier [`Rendus/`](Rendus/).
+Unreal Engine 5.8.3. Architecture **actuelle**, par système (pas d'historique). Règles et pièges : `CLAUDE.md`. 3C (contrôles, caméra, valeurs) : `README.md`. Intention de conception : `GDD.md`. Reste à faire : `TODO.md`.
 
 ---
 
-## 1. Contexte du projet
+## 1. Contexte
 
-*Spooky_Spores* est un jeu bac à sable dans lequel le joueur incarne un nécromancien qui vit dans une cabane abandonnée aux abords d'une forêt et d'un village. Il interagit avec les objets de son environnement, expérimente avec des mécaniques de manipulation physique (magie de télékinésie) et de récolte, avant de développer sa base et de défendre son territoire contre les PNJ du village voisin.
-
-3C complet (contrôles, caméra, personnage) : voir le `README.md`.
-
-**Cartes :** `Lvl_Principal` (carte par défaut du projet) ; `Lvl_FirstPerson` reste un niveau de test.
+*Spooky_Spores* : bac à sable où le joueur, nécromancien dans une cabane aux abords d'une forêt et d'un village, manipule des objets (télékinésie), récolte, développe sa base et la défend contre le village voisin. Cartes : `Lvl_Principal` (par défaut), `Lvl_FirstPerson` (test).
 
 ---
 
 ## 2. Architecture globale
 
-Le projet suit une séparation en couches, du joueur jusqu'à l'environnement :
-
 ```
 Player (ASpooky_SporesCharacter)
-   │
    ├── UInteractionComponent     → détecte ce que le joueur regarde
    ├── UGrabComponent            → manipule physiquement l'objet détecté
-   ├── UResourceCounterComponent → comptabilise les ressources récoltées
-   └── UStaminaComponent         → gère la ressource d'endurance (sprint)
-              │
-              ▼
-Interactive Objects (implémentent IGrabbable et/ou IInteractable)
-   │
-   ▼
-Physics Systems (UPrimitiveComponent + Chaos)
-   │
-   ▼
-Environment (niveau, triggers, décor)
+   ├── UResourceCounterComponent → compte les ressources
+   ├── UStaminaComponent         → endurance (sprint)
+   ├── UHealthComponent          → santé
+   └── UManaComponent + USpellCastingComponent → sorts
+Objets interactifs (IGrabbable et/ou IInteractable) → Physique (Chaos) → Environnement
 ```
 
-Cette séparation garantit qu'aucun système ne connaît les détails d'implémentation d'un autre : le Character ignore comment un objet est saisi, un composant ignore l'existence des autres, et les objets eux-mêmes ignorent qui les manipule. Quand deux composants doivent se coordonner (ex. relâcher un objet tenu avant d'interagir), c'est le Character qui arbitre — jamais un composant qui appelle directement un autre.
+Aucun système ne connaît l'implémentation d'un autre. Quand deux composants doivent se coordonner (relâcher un objet avant d'interagir), le Character arbitre.
 
-### Organisation des dossiers
-
-**Code source** (`Source/Spooky_Spores/`), rangé par domaine fonctionnel :
+**Code** (`Source/Spooky_Spores/`), un dossier par domaine :
 ```
-CollisionChannels.h          → alias lisibles pour les canaux de collision custom
-Core/
-  Character/    Spooky_SporesCharacter, Spooky_SporesCameraManager
-  Controller/   Spooky_SporesPlayerController
-  GameMode/     Spooky_SporesGameMode
-Interaction/    Grabbable, Interactable, InteractionComponent, GrabComponent, PhysicsGrabbable
-Narrative/      StoryTrigger
-Resources/      ResourceTypes, ResourceCounterComponent, ResourceDrop, HarvestableResource,
-                Cauldron, FieldPlot
-Movement/       StaminaComponent
-Health/         HealthComponent
-Spells/         ManaComponent, SpellCastingComponent
-Enemies/        EnemySoldier, EnemyAIController, EnemyPathSpline, Destructible
-Servants/       Servant
-Base/           BaseZone, BaseZoneSubsystem
-Tests/          BaseZoneTestHelpers, BaseZoneGeometrySpec, BaseZoneCdoSpec, BaseZoneWorldSpec
-                (Automation Specs : ce n'est pas un domaine de gameplay, mais le code de test du module)
-```
-Un nouveau domaine fonctionnel = un nouveau dossier.
-
-**Content Browser** (`Content/Spooky_Spores/`) :
-```
-Core/          Character/, Controller/, GameMode/, Input/Actions/
-Placeables/    Base/ (BP_BaseZone), Interactables/ (BP_Rock), Narrative/ (BP_StoryTrigger_Entrance),
-               Destructibles/ (GC_Mushroom),
-               Resources/ (BP_Drop_Seed, BP_Drop_Stone, BP_Drop_Wood,
-                           BP_Harvestable_Plant, BP_Harvestable_Stone, BP_Harvestable_Wood),
-               Servants/ (BP_Servant)
-UI/Widgets/    WBP_StoryText, WBP_ResourceEntry, WBP_ResourceCounter, WBP_StaminaBar
-Characters/Mannequins/...
-Maps/
+CollisionChannels.h   alias des canaux de collision custom
+Core/        Character/ (Spooky_SporesCharacter, CameraManager), Controller/, GameMode/
+Interaction/ Grabbable, Interactable, InteractionComponent, GrabComponent, PhysicsGrabbable
+Narrative/   StoryTrigger
+Resources/   ResourceTypes, ResourceCounterComponent, ResourceDrop, HarvestableResource, Cauldron, FieldPlot
+Movement/    StaminaComponent
+Health/      HealthComponent
+Spells/      ManaComponent, SpellCastingComponent
+Enemies/     EnemySoldier, EnemyAIController, EnemyPathSpline, Destructible
+Servants/    Servant
+Base/        BaseZone, BaseZoneSubsystem
+Tests/       Automation Specs (code de test du module, pas un domaine de gameplay)
 ```
 
-L'organisation suit la logique du [UE5 Community Style Guide](https://github.com/Allar/ue5-style-guide) : `Core/` contient les briques structurantes à ne pas modifier à la légère, `Placeables/` contient les instances concrètes librement ajustables par niveau.
+**Content** (`Content/Spooky_Spores/`) : `Core/` (briques structurantes : Character, Controller, GameMode, Input), `Placeables/` (instances concrètes : Base, Interactables, Narrative, Destructibles, Resources, Servants), `UI/Widgets/`, `Characters/Mannequins/`, `Maps/`. Inspiré du [style guide d'Allar](https://github.com/Allar/ue5-style-guide).
 
 ![Organisation du Content Browser du projet](Documentation_Documents/Content_Browser_Organization.png)
 
@@ -85,306 +49,162 @@ L'organisation suit la logique du [UE5 Community Style Guide](https://github.com
 
 ## 3. Interaction et manipulation physique
 
-### Classes et composants principaux
+| Classe | Rôle |
+|---|---|
+| `IGrabbable` | Objet saisissable ; `GetGrabbableComponent()` renvoie le `UPrimitiveComponent` à manipuler (`nullptr` par défaut) |
+| `IInteractable` | Comportement générique sans manipulation ; `OnInteract(AActor* InteractingActor)` |
+| `UInteractionComponent` | Détection (un trace par frame) |
+| `UGrabComponent` | Grab, maintien, lancer via `UPhysicsHandleComponent` |
+| `APhysicsGrabbable` | Objet physique concret (ex. `BP_Rock`) |
 
-| Classe | Type | Rôle |
-|---|---|---|
-| `IGrabbable` | Interface C++ | Marque un objet comme physiquement saisissable ; expose son composant physique |
-| `IInteractable` | Interface C++ | Marque un objet comme réagissant à une interaction générique (non physique) |
-| `UInteractionComponent` | Actor Component | Détecte ce que le joueur regarde (trace), distingue Grabbable/Interactable par portée |
-| `UGrabComponent` | Actor Component | Gère le grab, le maintien, le lancer via `UPhysicsHandleComponent` |
-| `APhysicsGrabbable` | Actor | Objet physique concret implémentant `IGrabbable` (ex. `BP_Rock`) |
-| `ASpooky_SporesCharacter` | Character | Orchestre tous les composants, gère les inputs |
+Un objet implémente l'une des interfaces, l'autre ou les deux (ségrégation des interfaces).
 
 ![Composants du character blueprint pour interagir et grab les objets](Documentation_Documents/Character_Blueprint_Components.png)
 
-### Détection
-
-Deux interfaces séparées, chacune avec une seule responsabilité (principe SOLID de ségrégation des interfaces) :
-
-- **`IGrabbable`** — une seule méthode, `GetGrabbableComponent()`, qui renvoie le `UPrimitiveComponent` à manipuler physiquement (ou `nullptr` par défaut si l'objet n'est pas réellement saisissable).
-- **`IInteractable`** — une seule méthode, `OnInteract(AActor* InteractingActor)`, pour un comportement générique déclenché sans manipulation physique (établi, ressource à récolter...).
-
-Un objet peut implémenter l'une, l'autre, ou les deux, sans jamais forcer les autres objets à connaître un comportement qui ne les concerne pas.
-
-`UInteractionComponent` effectue un **unique** trace par frame (`LineTraceSingleByObjectType` sur le canal custom `Interactable`), depuis le point de vue réel de la caméra (voir section 5). Il calcule la distance réelle à la cible touchée et expose deux fonctions :
-
-- `IsGrabbableTarget(OutComponent)` → vrai si la cible implémente `IGrabbable` **et** est à portée de `GrabRange` (400 unités)
-- `IsInteractableTarget()` → vrai si la cible implémente `IInteractable` **et** est à portée de `InteractRange` (200 unités)
-
-**Choix technique :** une seule trace, à la plus grande des deux portées, plutôt que deux traces séparées, évite la duplication de la logique physique (DRY) pour un coût CPU négligeable.
-
-**Choix technique — « aucune cible » :** `CurrentTargetDistance` vaut `TNumericLimits<float>::Max()` quand rien n'est détecté (et non 0), pour qu'une comparaison de distance échoue naturellement sans cible. La cible courante (`ActualTarget`) est un `TWeakObjectPtr<AActor>`.
+**Détection** : un unique `LineTraceSingleByObjectType` (canal `Interactable`) par frame, depuis la vraie caméra, à la plus grande des portées plutôt que deux traces (DRY, coût négligeable). Fonctions : `IsGrabbableTarget(OutComponent)` (`GrabRange` 400), `IsInteractableTarget()` (`InteractRange` 200), `IsAttackableTarget(OutTarget)` (`AttackRange` 200), `GetPlacementPoint` (section 12). Sans cible, `CurrentTargetDistance` vaut `TNumericLimits<float>::Max()` (pas 0) pour qu'une comparaison échoue naturellement ; la cible est un `TWeakObjectPtr<AActor>`.
 
 ![Debug Line du trace partant de la caméra jusqu'à l'objet détecté](Documentation_Documents/Videos/Detection_DebugLine.gif)
 
-### Grab, Push, Pull, Launch
+**Grab / Release / Launch** : `Grab()` maintient l'objet devant la caméra (`HoldDistance` 200) via `SetTargetLocationAndRotation` au tick, sans raideur ajoutée (impression de poids). `Release()` ne neutralise pas la vélocité (l'inertie de la caméra se transmet, c'est voulu). `Launch()` applique une impulsion en mode vélocité (`LaunchImpulseStrength` 1000, indépendante de la masse) dans le regard, puis relâche. Push a été fusionné dans Release. La masse reste au calcul automatique de Chaos.
 
-`UGrabComponent` encapsule un `UPhysicsHandleComponent`, l'outil natif d'Unreal pour maintenir un objet physique en place devant la caméra.
-
-| Verbe du CDC | Implémentation |
-|---|---|
-| **Pull** | `Grab()` — attrape l'objet détecté et le maintient devant la caméra à chaque frame |
-| *(reposer)* | `Release()` — relâche la contrainte physique |
-| **Launch** | `Launch()` — applique une impulsion (`LaunchImpulseStrength` = 1000, en mode vélocité pour un comportement cohérent quelle que soit la masse) dans la direction du regard, puis relâche |
-
-**Choix technique — Push transformé en Release :** plutôt qu'une quatrième action séparée, Push a été fusionné dans Release : relâcher l'objet permet de s'en séparer sans forcément le repousser (Launch étant déjà utilisé pour cela).
-
-**Choix technique — vélocité conservée au relâchement :** `Release()` ne neutralise pas la vélocité de l'objet au moment où il est lâché. Ce comportement est volontaire : il traduit fidèlement l'inertie du mouvement de caméra au moment du relâchement (cohérent avec l'idée d'un objet manipulé par télékinésie), et reste distinct du mécanisme `Launch()` qui, lui, applique une force contrôlée et réglable.
-
-**Choix technique — pas de raideur ajoutée au physics handle :** l'objet ne se recentre pas brutalement à `HoldDistance` (200) ; on préserve ainsi l'impression de poids. Le tick met à jour la cible avec `SetTargetLocationAndRotation`.
-
-Une seule touche contextuelle (`E` / `DoInteractAction`) arbitre entre reposer, saisir, et interagir, selon l'état courant :
-1. Si un objet est déjà tenu → le reposer.
-2. Sinon si la cible est grabbable → la saisir.
-3. Sinon si la cible est interactable → déclencher l'interaction générique.
+**Touche E** (`DoInteractAction`) arbitre : objet tenu → le reposer ; sinon cible grabbable → saisir ; sinon interactable → `OnInteract`.
 
 ![Présentation du grab, release et launch d'un objet](Documentation_Documents/Videos/Push_Release_Launch.gif)
 
-### Canaux et profils de collision
-
-- **Canal de collision custom `Interactable`** (`Project Settings > Collision`), aliasé en C++ via `CollisionChannels.h` (`COLLISION_INTERACTABLE`) pour éviter de coder en dur le numéro de `ECC_GameTraceChannelN` dans plusieurs fichiers.
-- **Profil de collision `PhysicsInteractable`** appliqué aux objets physiques, avec `Collision Enabled: Query and Physics` (nécessaire pour que le trace et la simulation physique fonctionnent tous les deux).
-- **Masse** : non codée en dur, laissée au calcul automatique de Chaos à partir du volume/densité du mesh, ajustable par Blueprint enfant si besoin.
-- **Correction de point de vue** : `ASpooky_SporesCharacter` override `GetActorEyesViewPoint()` pour renvoyer la position/rotation réelle de `FirstPersonCameraComponent`, plutôt que le calcul par défaut (`GetActorLocation() + BaseEyeHeight`) qui ne correspond pas à une caméra attachée à un socket avec un offset custom. Tous les systèmes de trace (interaction, grab) s'appuient sur cette source unique et correcte.
+**Collision** : canal `Interactable` aliasé en `COLLISION_INTERACTABLE` (`CollisionChannels.h`) ; preset `PhysicsInteractable` (Query and Physics, requis pour le trace et la simulation). `ASpooky_SporesCharacter` override `GetActorEyesViewPoint()` pour renvoyer la vraie caméra (le défaut `Location + BaseEyeHeight` est faux avec un socket décalé) : tous les traces s'en servent.
 
 ---
 
-## 4. Récolte de ressources
+## 4. Ressources
 
-`EResourceType` (`Resources/ResourceTypes.h`) énumère les types de ressources (`Seed`, `Wood`, `Stone`).
+`EResourceType` (`Resources/ResourceTypes.h`) : `Seed`, `Wheat`, `Wood`, `Stone`, `Potion`, `Bone`, `Necrospore` (dans cet ordre). Un nouveau type s'ajoute **en fin** pour ne pas décaler les valeurs existantes ; il demande aussi une entrée dans `WBP_ResourceCounter`.
 
-`UResourceCounterComponent` : `TMap<EResourceType, int32>` tenant le compte par type, fonction `AddResource(Type, Amount)` (récupère l'entrée via `FindOrAdd` **par référence** pour que l'incrémentation soit réellement stockée), `GetResourceCount(Type)`, `TrySpendResource(Type, Amount)` (renvoie `false` sans rien retirer si le stock est insuffisant), et un délégué `FOnResourceChanged` (`BlueprintAssignable`) diffusé à chaque changement — modèle *push*, adapté à une donnée qui ne change que ponctuellement (contraste avec la section 5).
+**`UResourceCounterComponent`** : `TMap<EResourceType, int32>` privée (lisible en Blueprint), `AddResource`, `GetResourceCount`, `TrySpendResource` (faux sans rien retirer si le stock manque ; utilise `Find`, jamais `FindOrAdd`), délégué `FOnResourceChanged` (modèle *push*, la donnée change ponctuellement). Montant nul ou négatif refusé avec warning (sinon `TrySpendResource(Type, -5)` ajouterait 5).
 
-La `TMap` est `private` (lisible en Blueprint via `AllowPrivateAccess`) : toute modification passe par `AddResource`/`TrySpendResource`, donc l'UI est toujours prévenue. Les deux fonctions refusent un montant nul ou négatif (warning dans le log) : sans ce garde-fou, `TrySpendResource(Type, -5)` passait la vérification de stock puis **ajoutait** 5.
+**`AHarvestableResource`** (`IInteractable`) : coupe sa collision, fait apparaître ses drops (`TArray<FResourceDropEntry>`, position aléatoire dans `DropSpawnRadius`), se détruit. S'il porte un `UHealthComponent`, la récolte au E est désactivée et le nœud se récolte à sa mort (`OnDeath`) : `BP_Harvestable_Wood` et `_Stone` le portent, `_Plant` non. Aucun code pour décider qu'un nœud est « vivant ».
 
-`AHarvestableResource` : nœud récoltable, implémente `IInteractable`. `OnInteract_Implementation` coupe d'abord la collision du nœud, fait apparaître ses drops (un par entrée de `TArray<FResourceDropEntry>`, position aléatoire dans un rayon `DropSpawnRadius`), puis détruit le nœud.
+**Spawn différé** : `AResourceDrop::SpawnDrops` (statique, partagée par nœuds, champs et butin ennemi) utilise `SpawnActorDeferred` → `InitializeDrop(Type, Amount)` → `FinishSpawning`, car `SpawnActor` exécute `BeginPlay` et les overlaps avant de rendre la main (un drop était ramassé avant d'avoir ses données). `FResourceDropEntry` vit dans `ResourceTypes.h` (évite un include circulaire).
 
-**Choix technique — spawn différé (`SpawnActorDeferred`) :** `SpawnActor` classique exécute `BeginPlay` et les premiers overlaps **avant** de rendre la main à l'appelant. Un drop apparu dans la capsule du joueur était donc ramassé avant que `InitializeDrop(Type, Amount)` n'ait pu lui donner ses vraies données (bug observé en développement : du bois donnait une graine). Le spawn différé (`SpawnActorDeferred` → `InitializeDrop` → `FinishSpawning`) garantit que les données sont posées avant que `BeginPlay` ne s'exécute.
+**`AResourceDrop`** : preset `ResourceDrop` (les drops s'ignorent entre eux). `BeginPlay` : saut initial (`VRandCone`, vélocité), puis `PickupDelay` pendant lequel les overlaps sont ignorés. Atterrissage (normale `Z >= MinGroundNormalZ` 0.7) : physique coupée, yaw conservé, position recalée via les `Bounds` du mesh (fonctionne sur pente). `TryCollect` renvoie un `bool` (pas de double ramassage) et exige un `UResourceCounterComponent` sur le ramasseur (un ennemi n'en a pas).
 
-`AResourceDrop` : l'objet ramassable au sol.
-- Profil de collision `ResourceDrop`, un canal custom séparé d'`Interactable`, pour que les drops s'ignorent entre eux plutôt que de se bloquer avec des vitesses d'expulsion importantes à l'apparition.
-- Au `BeginPlay` : saut initial (`FMath::VRandCone` autour de la verticale, impulsion en mode vélocité), puis délai de ramassage (`PickupDelay`) pendant lequel les overlaps sont ignorés, pour qu'un drop ne se ramasse pas lui-même avant d'avoir fini d'apparaître.
-- **Atterrissage** : au premier contact avec une surface dont la normale a `Z >= MinGroundNormalZ` (0.7), la physique est coupée, seule la rotation en yaw est conservée, et la position est corrigée verticalement via les `Bounds` du mesh pour que sa base touche le sol — y compris sur une pente.
-- `TryCollect` renvoie un `bool` pour empêcher un double ramassage, et vérifie la présence d'un `UResourceCounterComponent` sur l'acteur qui tente de ramasser (un ennemi est aussi un Pawn, mais n'a pas ce composant).
-
-UI : `WBP_ResourceEntry` (une ressource, filtrée par type via un nœud `Equal (Enum)` — une égalité numérique classique ne peut pas se brancher sur un enum) et `WBP_ResourceCounter` (une entrée par type). Le widget **reçoit** le compteur (`InitializeCounter(Counter)`) plutôt que d'aller le chercher lui-même, pour ne pas dépendre de l'ordre d'initialisation entre le Character et son UI.
+**UI** : `WBP_ResourceEntry` (une ressource, filtrée par `Equal (Enum)`) et `WBP_ResourceCounter` reçoivent le compteur (`InitializeCounter`) au lieu de le chercher, pour ne pas dépendre de l'ordre d'initialisation Character/UI.
 
 ---
 
-## 5. Mouvement — Sprint et endurance
+## 5. Sprint et endurance
 
-`UStaminaComponent` (`Movement/StaminaComponent.h`) modélise la ressource d'endurance, indépendamment de la vitesse de déplacement — le Character reste seul à arbitrer la vitesse, comme il arbitre déjà entre `GrabComponent` et `InteractionComponent`.
+`UStaminaComponent` : l'endurance, indépendante de la vitesse (le Character arbitre). `TryStartSprint()` refuse si `CurrentStamina <= 0` ; le tick décrémente en sprint et régénère après `RegenDelay` (4 s). Le délégué `FOnSprintStateChanged` signale aussi l'arrêt **forcé** par épuisement.
 
-- `TryStartSprint()` refuse de démarrer si `CurrentStamina <= 0`.
-- `TickComponent` décrémente l'endurance pendant le sprint, et la régénère après un délai sans sprint (`RegenDelay`, 4 s selon le 3C) tant que `CurrentStamina < MaxStamina`.
-- Un délégué `FOnSprintStateChanged` (`BlueprintAssignable`) informe le Character de chaque changement d'état de sprint — y compris un arrêt **forcé** par épuisement de l'endurance, pas seulement un relâchement volontaire du joueur.
-
-**Choix technique — un seul point de changement de vitesse :** `DoSprintStart`/`DoSprintStop` du Character se contentent de transmettre l'intention au composant (`TryStartSprint`/`StopSprint`). La vitesse (`MaxWalkSpeed`) n'est modifiée qu'à un seul endroit, `HandleSprintStateChanged`, lié au délégué. Résultat : que le sprint s'arrête volontairement ou par manque d'endurance, la vitesse est remise à jour de la même façon, sans dupliquer la logique.
-
-**Choix technique — push (délégué) pour l'état, pull (tick) pour l'affichage :** le changement d'état de sprint (discret, rare) est diffusé par délégué, comme `OnResourceChanged`. La valeur d'endurance elle-même (continue, change à chaque frame) est en revanche interrogée directement par le widget `WBP_StaminaBar` dans son propre `Event Tick` (`GetStaminaRatio()`), plutôt que diffusée en continu — un délégué broadcasté à chaque frame n'aurait fait que déplacer un tick sans bénéfice réel.
-
-`WBP_StaminaBar` : une `Progress Bar` minimale, sans habillage (même logique que `WBP_ResourceCounter`) — le visuel réel est prévu au Bloc 2.
+La vitesse (`MaxWalkSpeed`) n'est modifiée qu'à un endroit, `HandleSprintStateChanged` (lié au délégué) : arrêt volontaire ou forcé, même chemin. Push pour l'état (discret), pull pour l'affichage : `WBP_StaminaBar` lit `GetStaminaRatio()` dans son `Event Tick` (un délégué par frame ne ferait que déplacer le tick).
 
 ---
 
-## 6. Plantation et récolte des champs
+## 6. Champs et chaudron
 
-`AFieldPlot` (`Resources/FieldPlot.h`) : emplacement plantable et **réutilisable**, à l'inverse de `AHarvestableResource` qui se détruit après récolte. Trois états (`EFieldState`) : `Empty` → `Growing` → `Grown`, pilotés uniquement par `OnInteract_Implementation` selon l'état courant — une seule touche contextuelle, comme partout ailleurs dans le projet.
+**`AFieldPlot`** (`IInteractable`, réutilisable) : états `Empty` → `Growing` → `Grown` pilotés par `OnInteract` (une touche contextuelle). Planter : `TrySpendResource(SeedCost)` puis un `SetTimer` unique de `GrowthDuration` (pas de tick : une échéance, pas une valeur continue). Récolter : spawn des drops (graines + `Wheat`), retour à `Empty`.
 
-- **Planter** (état `Empty`) : dépense `SeedCost` graines via `UResourceCounterComponent::TrySpendResource` (utilise `Find`, pas `FindOrAdd` — dépenser une ressource jamais possédée doit échouer proprement, pas créer une entrée à 0), puis lance un `SetTimer` unique de `GrowthDuration` secondes. Pas de `Tick` nécessaire pour la pousse elle-même : une échéance simple, pas une valeur continue à faire évoluer (contraste avec `UStaminaComponent`).
-- **Récolter** (état `Grown`) : spawn les drops configurés (graines + une nouvelle ressource, `Wheat`), puis repasse à `Empty` — le champ reste en place, replantable à l'infini.
+**`ACauldron`** (`IInteractable`, réutilisable) : états `Idle` → `Brewing` → `Ready`, un seul point d'entrée `OnInteract`.
+- **Recettes = données** : `TArray<FCauldronRecipe> Recipes` éditable (ingrédients `TMap<EResourceType,int32>`, `OutputType`, `OutputAmount`, `BrewDuration`). Ajouter une recette ne demande aucun C++.
+- **Idle** : `FindFirstAffordableRecipe` prend la **première recette payable** dans l'ordre du tableau (simple, prévisible ; risque de lancer une recette non voulue tant qu'il n'y a pas d'UI de sélection). `CanAfford` puis dépense en deux passes (jamais de consommation partielle). Lance un `FTimerHandle`.
+- **Brewing** : aucune action. **Ready** : `CollectOutput` crédite le résultat, retour à `Idle`.
+- `ActiveRecipeIndex` (`INDEX_NONE` si vide) mémorise la recette choisie : un pointeur dans le `TArray` pourrait être invalidé, une copie dupliquerait la donnée. Lectures protégées par `IsValidIndex`.
+- **Garde-fous** : recette sans ingrédient ignorée (sinon résultat gratuit) ; `BrewDuration` nulle termine immédiatement (un `SetTimer` de durée 0 ne se déclenche jamais).
+- `GetBrewProgress()` (pure) calcule un ratio depuis `GetTimeSeconds() - BrewStartTime` ; `WBP_CauldronProgress` l'interroge au tick (pull).
+- **La potion est créditée directement**, sans drop physique : un pickup pour un objet qui finira dans un inventaire serait du travail jetable.
 
-**Choix technique — spawn de drops factorisé** : la boucle de spawn différé, dupliquée au départ entre `AHarvestableResource` et `AFieldPlot`, a été extraite dans une fonction statique partagée, `AResourceDrop::SpawnDrops`. `FResourceDropEntry` a été déplacée de `HarvestableResource.h` vers `ResourceTypes.h` pour éviter un include circulaire. Prête à être réutilisée pour le butin des ennemis (section 12 du `CLAUDE.md`).
+**Recettes actuelles** : 1. 3 Bois + 1 Pierre + 2 Blé → 1 Potion. 2. Os + 1 Potion → 1 Necrospore (objet de résurrection, section 12).
 
-**Outil de debug** : une sphère colorée (`DrawDebugSphere`, non persistante, recalculée à chaque tick) au-dessus du champ — gris/rouge/vert selon l'état. Remplacera un vrai matériau au Bloc 2.
-
----
-
-## 7. Chaudron — recettes
-
-`ACauldron` (`Resources/Cauldron.h`) : acteur implémentant `IInteractable`, trois états (`ECauldronState`) pilotés, comme `AFieldPlot`, par un seul point d'entrée, `OnInteract_Implementation`, selon l'état courant.
-
-**Recettes comme données** : le chaudron porte un tableau `TArray<FCauldronRecipe> Recipes`, rempli dans l'éditeur. Chaque `FCauldronRecipe` contient ses ingrédients (`TMap<EResourceType, int32>`), son résultat (`OutputType`, `OutputAmount`) et sa propre durée (`BrewDuration`). Ajouter une recette ne demande aucune ligne de C++.
-
-- **Idle** : `FindFirstAffordableRecipe` parcourt `Recipes` dans l'ordre et renvoie l'index de la première recette que le joueur peut payer (`CanAfford`). Les ingrédients de cette recette sont vérifiés **avant** d'en dépenser le moindre — la vérification (`CanAfford`) et la dépense (`TrySpendResource`) sont deux passes séparées, pour ne jamais consommer une partie de la recette puis échouer sur un ingrédient manquant (transaction atomique). Lance ensuite un `FTimerHandle` unique de la durée de la recette choisie.
-- **Brewing** : aucune action : le joueur ne peut rien faire tant que la préparation n'est pas terminée.
-- **Ready** : `CollectOutput` crédite le résultat de la recette en cours via `UResourceCounterComponent::AddResource`, puis repasse à `Idle` — le chaudron, comme `AFieldPlot`, reste en place et réutilisable.
-
-**Choix technique — mémoriser la recette par son index (`ActiveRecipeIndex`)** : la recette est choisie au lancement (`TryStartBrewing`) mais son résultat n'est livré qu'à une interaction ultérieure (`CollectOutput`), et la durée doit être connue entretemps par `GetBrewProgress`. Le chaudron retient donc l'index de la recette en cours, `INDEX_NONE` (-1) quand il est vide. Un pointeur vers l'élément du tableau a été écarté (un `TArray` peut réallouer sa mémoire et invalider le pointeur) ; une copie de la recette aurait fonctionné mais duplique la donnée. Chaque lecture est protégée par `Recipes.IsValidIndex`.
-
-**Choix technique — « la première recette réalisable gagne »** : quand le joueur peut payer plusieurs recettes, l'ordre du tableau décide. Compromis assumé en attendant une interface de sélection de recette (`TODO.md`) : simple et prévisible, au prix d'un risque de lancer une recette non voulue si les deux sont payables.
-
-**Garde-fous de configuration** : une recette sans ingrédient est ignorée (sinon une entrée ajoutée par erreur dans l'éditeur donnerait un résultat gratuit) ; une `BrewDuration` nulle termine immédiatement la préparation, car un `SetTimer` de durée nulle ne se déclenche jamais et le chaudron resterait bloqué en `Brewing`.
-
-**Choix technique — potion créditée directement, sans objet physique au sol** : contrairement aux ressources récoltées (`AHarvestableResource`, `AFieldPlot`), la potion ne fait pas apparaître de `AResourceDrop` à ramasser. Le résultat est crédité instantanément au compteur du joueur. Simplification assumée en l'absence d'un vrai système d'inventaire (repoussé après le Bloc 2, voir `CLAUDE.md` section 12) : fabriquer un pickup physique pour un objet qui finira de toute façon dans un inventaire structuré aurait été du travail jetable.
-
-**Choix technique — progression par temps écoulé, pas par décompte au tick** : `GetBrewProgress()` (`BlueprintPure`) ne décrémente pas une valeur à chaque frame comme `UStaminaComponent`. Elle calcule un ratio à partir de `GetWorld()->GetTimeSeconds() - BrewStartTime`, sur le même principe que la pousse d'un `AFieldPlot` (section 6) : une échéance fixe à surveiller, pas une valeur qui évolue en continu indépendamment de toute interrogation.
-
-`WBP_CauldronProgress` interroge `GetBrewProgress()` dans son propre `Event Tick` (modèle *pull*, comme `WBP_StaminaBar`) pour afficher une barre de progression pendant le Brewing.
-
-**Recettes actuelles** (dans cet ordre) :
-1. 3 Bois + 1 Pierre + 2 Blé → 1 Potion
-2. Os + 1 Potion → 1 Necrospore — l'objet de résurrection (file d'attente, item 2), qui servira à faire apparaître un serviteur.
-
-`Potion` et `Necrospore` ont été ajoutés en fin d'`EResourceType`, pour ne pas décaler les valeurs existantes.
-
-**Choix technique — la Necrospore est provisoirement une ressource comptée** : en l'absence de vrai inventaire (file d'attente, item 7), l'objet de résurrection est stocké dans `UResourceCounterComponent` comme n'importe quelle ressource. Le code qui le consommera (pose du serviteur) devra isoler cet accès en un seul endroit, pour que le passage à l'inventaire ne touche que cet endroit.
-
-**Outil de debug** : sphère au-dessus du chaudron (gris/rouge/vert selon l'état, mêmes couleurs que `AFieldPlot`) et texte indiquant la recette en cours et son avancement (ex. `Necrospore 42%`), dessinés au tick, désactivables par instance via `bShowDebug`. Le texte utilise `DrawDebugString` avec une durée de `0` (une seule frame) : une durée de `-1` le rendrait permanent et l'accumulerait à chaque tick.
+**Debug** (par instance via `bShowDebug`) : sphère colorée selon l'état (gris/rouge/vert, aussi sur `AFieldPlot`) ; le chaudron affiche en plus recette et avancement (`DrawDebugString` durée `0`, `-1` s'accumulerait à chaque tick).
 
 ---
 
-## 8. Système narratif
+## 7. Narration
 
-`AStoryTrigger` (C++) : une `UBoxComponent` en zone de trigger (profil `Trigger`, pas de simulation physique), une propriété `StoryText` (`FText`) éditable par instance, une garde `bTriggerOnce` pour éviter un redéclenchement en boucle, et un event `BlueprintImplementableEvent OnStoryTriggered()` laissant le comportement concret au Blueprint enfant.
-
-`BP_StoryTrigger_Entrance` (placé à l'entrée de la cabane) déclenche l'affichage d'un widget générique `WBP_StoryText` (une fonction `ShowText(Message)`, implémentée comme Custom Event plutôt que Function, car elle utilise un `Delay`, un nœud latent non autorisé dans les Functions Blueprint).
-
-Ce système illustre la même architecture générique/réutilisable (base C++, instances Blueprint) que le reste du projet, et prépare le travail d'*environmental storytelling* prévu au Bloc 3.
+`AStoryTrigger` : `UBoxComponent` (preset `Trigger`), `StoryText` (`FText`) par instance, garde `bTriggerOnce`, `BlueprintImplementableEvent OnStoryTriggered()` : le C++ déclenche, le Blueprint décide. `BP_StoryTrigger_Entrance` (porte de la cabane) affiche `WBP_StoryText` (`ShowText(Message)` en Custom Event, car il utilise un `Delay`).
 
 ![Début d'un texte de narration](Documentation_Documents/Narrative_Text.png)
 
 ---
 
-## 9. Expérimentation Chaos
+## 8. Chaos (fracture)
 
-Un objet décoratif (**`GC_Mushroom`**, un champignon composé de deux primitives fusionnées) a été converti en Geometry Collection via la Fracture Mode (pattern Uniform Voronoi).
-
-- **Damage Threshold** (par niveau de la hiérarchie de fracture) : `5000 / 500 / 50`, abaissé par rapport aux valeurs par défaut (calibrées pour de gros objets destructibles) pour correspondre à des forces d'impact réalistes.
-- **Enable Damage From Collision** activé, condition nécessaire pour que les impacts physiques génèrent une contrainte de casse.
-
-Le champignon se fracture aussi bien sous l'effet de la gravité (chute) que d'un impact avec un objet lancé via `UGrabComponent::Launch()`.
+`GC_Mushroom` : Geometry Collection (Fracture Mode, Uniform Voronoi). `Damage Threshold` `5000 / 500 / 50` par niveau de hiérarchie (abaissé pour des impacts réalistes), `Enable Damage From Collision` activé. Il se fracture sous la chute ou sous un objet lancé par `Launch()`.
 
 ![Présentation du mode fracture sur des champignons](Documentation_Documents/Videos/Mushroom_Fracture.gif)
 
 ---
 
-## 10. Outils de debug
+## 9. Santé et sorts
 
-- **Trace de détection** (`DrawDebugLine`) : ligne non persistante suivant la caméra, verte si une cible est détectée, rouge sinon, permet de vérifier en temps réel le fonctionnement du système d'interaction.
-- **Visualisation du volume de trigger** : le `UBoxComponent` de `AStoryTrigger` reste visible en wireframe dans l'éditeur pour vérifier son placement et ses dimensions.
-- **Bone colors de la Fracture Mode** : pendant le développement, chaque morceau du Geometry Collection est affiché dans une couleur distincte (`Show Bone Colors`) pour vérifier visuellement le résultat de la fracture avant de désactiver cet affichage de debug pour le rendu final.
+**`UHealthComponent`** : générique, s'abonne à `OnTakeAnyDamage` du propriétaire (déclenché par tout `ApplyDamage`). Délégués `OnHealthChanged` et `OnDeath` (une fois, à 0).
+
+**`UManaComponent`** : comme l'endurance, mais sans délai de recharge (la mana doit rester disponible). `TrySpendMana(Cost)` échoue sans effet de bord.
+
+**`USpellCastingComponent`** : point d'entrée du clic gauche (`IA_CastSpell`) = lancer le sort équipé (aujourd'hui un seul : le coup de bâton). `TryCastSpell()` vérifie la mana, puis deux timers : `HitDelay` (0.2 s) → `ResolveHit()`, `SwingCooldown` (0.5 s) → `EndSwing()` (lève `bIsSwinging`, anti-spam). `ResolveHit()` réutilise `IsAttackableTarget` (pas de nouveau trace) puis `ApplyDamage` : aucun couplage direct avec la santé de la cible. **Hitscan** : un futur sort à distance passera par un projectile sans changer mana, dégâts ni santé. Le coût en mana du coup de bâton est `0` **par la donnée** (`SpellManaCost` : 20 par défaut dans le C++, réglé à 0 sur l'instance), pas par une branche de code.
+
+---
+
+## 10. Environnement
+
+`Lvl_Principal` (`EditorStartupMap` / `GameDefaultMap`, `Config/DefaultEngine.ini`) : un **Landscape** en colline, cabane au sommet (vue dégagée sur le chemin du village, cf. *An Architectural Approach to Level Design*, C. Totten). Cabane en géométrie directe dans le niveau (unique), fenêtre, lumière intérieure. `BP_Fences` délimite le territoire (la zone de base l’englobe sans en dépendre, section 13). Placés : `BP_StoryTrigger_Entrance`, `BP_Cauldron`, plusieurs `BP_FieldPlot`, `BP_Rock`, trois `GC_Mushroom`. Scène volontairement sombre (Post Process, Exposure Compensation négative, Directional Light faible).
+
+**Foliage Mode avec type Actor** (pas Static Mesh) pour disperser `BP_Harvestable_*` : nécessaire pour garder la logique par instance ; aucun gain de performance (chaque exemplaire reste un acteur), seul le confort de placement compte.
+
+---
+
+## 11. Ennemi (soldat)
+
+`Enemies/` : `IDestructible` (expose le `UHealthComponent` d'une cible), `AEnemySoldier`, `AEnemyAIController`, `AEnemyPathSpline` (wrapper de `USplineComponent`). Machine à deux états dans le `Tick` du contrôleur (`EEnemyState`) :
+- **`Transit`** : suit la spline via un accumulateur `DistanceAlongSpline` (`MoveSpeed`) en visant un point en avance (`LookAheadDistance`, évite les à-coups). Passe en `Engage` au bout de la spline.
+- **`Engage`** : `FindNearestDestructible` (acteurs implémentant l'interface, rayon `TargetSearchRadius`), avance tant que la distance dépasse `AttackRange`, sinon attaque toutes les `AttackInterval`.
+
+**`AddMovementInput`, pas `MoveToLocation`** : la navigation NavMesh s'est révélée fragile (voir `CLAUDE.md` section 8) et n'alimentait pas l'Animation Blueprint. Limite assumée : marche en ligne droite, sans contourner. `bUseControllerRotationYaw` désactivé et `bOrientRotationToMovement` activé.
+
+**Distance d'attaque** : `GetClosestPointOnCollision` (surface réelle de la cible) moins `GetScaledCapsuleRadius()`, en 2D (`Size2D`), comme le moteur mesure l'arrivée.
+
+**Spline assignée à la main** : `PathSplineActor` (`EditInstanceOnly`), lue dans `OnPossess` (remplace une recherche `TActorIterator`, fragile). Un futur spawner devra l'assigner en spawn différé (`TODO.md`).
+
+**Mort** : `OnDeath` → `HandleDeath` → `AResourceDrop::SpawnDrops` (os, `EResourceType::Bone`).
+
+---
+
+## 12. Serviteurs : pose
+
+`Servants/AServant` (Character), sans comportement pour l'instant ; pas de classe commune avec `AEnemySoldier` (rôles différents, une seule implémentation ne justifie pas d'abstraction).
+
+**Pose (touche L, `DoPlaceServant`)**, dans cet ordre : 1. `UInteractionComponent::GetPlacementPoint` (point au sol devant le joueur) ; 2. `TrySpendResource(Necrospore, 1)` ; 3. spawn de `ServantClass` (`BP_Servant`). Une pose impossible ne coûte donc jamais de Necrospore.
+
+- **Trace dédié, à la demande** : `LineTraceSingleByChannel` sur `ECC_Visibility` (le trace de détection ne voit pas le sol), uniquement à l'appui de la touche.
+- **Surface** : refusée si rien dans `PlacementRange` (300) ou si la normale `Z < MinPlacementNormalZ` (0.7, soit la pente marchable par défaut, ~45°). Même règle que `MinGroundNormalZ` des drops. Limite connue : le dessus plat d'une pierre est accepté.
+- **Position** : point remonté de la demi-hauteur de capsule (lue sur le CDO de `ServantClass`), serviteur tourné vers le joueur.
+- **Spawn garanti** : `AdjustIfPossibleButAlwaysSpawn` (pas de remboursement à prévoir) ; un échec est tracé dans `LogSpooky_Spores`.
+- **Stockage provisoire** : la Necrospore est une ressource comptée en attendant l'inventaire ; **l'unique accès est le `TrySpendResource` de `DoPlaceServant`** (commenté), pour que le passage à l'inventaire ne touche que cette ligne.
+
+---
+
+## 13. Zone de base
+
+`Base/` : `ABaseZone` (acteur) + `UBaseZoneSubsystem` (registre). Répond à « ce point est-il dans la base ? » et « un point au hasard dans la base ». Consommateurs prévus : errance des serviteurs, vue de gestion et construction.
+
+- **Acteur dédié** : racine `UBoxComponent` (`ZoneBox`), pas un composant de `BP_Fences` (la zone doit survivre à un agrandissement). `BP_BaseZone` (`Placeables/Base/`, sans logique) est dans `Lvl_Principal.umap`, boîte calée à la main autour de la clôture.
+- **Calcul en espace local** : point monde → local (`InverseTransformPosition`), comparé à `GetUnscaledBoxExtent` (l'échelle, même négative ou non uniforme, est dans la transformation). Le tirage est local puis retransformé en monde (densité uniforme, boîte tournée respectée). Rien n'est mémorisé : un `SetBoxExtent`, une échelle ou un déplacement comptent à l'appel suivant. Fonctions statiques publiques (`IsPointInOrientedBox`, `TryGetRandomPointInOrientedBox`, `IsOrientedBoxValid`), testables sans `UWorld`.
+- **Hauteur** : `bIgnoreHeight` (défaut `true`) : seuls X et Y locaux sont testés et le tirage est au plan médian (Z local = 0), pas au sol (colline, boîte posée à la main). Tout point tiré satisfait `IsPointInZone`. Le consommateur qui projette sur le NavMesh utilise `GetZoneExtent().Z` comme extension verticale.
+- **Zone invalide** : extension ou |échelle| `<= KINDA_SMALL_NUMBER` → `IsZoneValid`, `IsPointInZone` et `GetRandomPointInZone` renvoient faux (sortie `ZeroVector` à ne pas utiliser) ; avertissement unique par zone. Test explicite obligatoire : avec une échelle nulle, `InverseTransformPosition` ramène tout au centre, donc « dedans ». Point non fini (NaN, infini) = hors zone. Tolérance de bord 0,1 cm local.
+- **Collision** : `NoCollision`, pas d'overlap, `SetCanEverAffectNavigation(false)` : invisible au trace, ne découpe pas le NavMesh. Ce n'est pas un trigger.
+- **Retrouver la zone** : `UBaseZoneSubsystem` (`UWorldSubsystem`), registre à une entrée (`TWeakObjectPtr`) ; `BeginPlay`/`EndPlay` de `ABaseZone` s'enregistrent/se désenregistrent. Une seule zone par niveau : la seconde est ignorée avec un `Error` nommant les deux. Pas de référence `EditInstanceOnly` : serviteurs spawnés par le code et Character créé par un `PlayerStart` ne peuvent porter de référence de niveau. Les consommateurs appellent `GetWorld()->GetSubsystem<UBaseZoneSubsystem>()->GetBaseZone()` **à chaque décision, sans cache** (ordre des `BeginPlay` non garanti ; `nullptr` sans zone).
+- **API Blueprint** : `IsPointInZone`, `IsZoneValid`, `GetZoneExtent` (pures, composantes positives) ; `GetRandomPointInZone(OutPoint)` en `BlueprintCallable` + `BlueprintPure = false` (sinon UHT la rend pure et un tirage donnerait deux points par décision) ; renvoie faux plutôt qu'un `(0,0,0)` muet.
+- **Visibilité** : aucun `DrawDebug*` ni `Tick`. La boîte est visible en jeu car `Hidden In Game` est décoché sur `ZoneBox` de `BP_BaseZone` (réglage de dev à rétablir avant Release, `TODO.md`). Avec `NoCollision`, `show collision` ne la dessine pas.
+- **Tests** : `Tests/` (géométrie sans monde, valeurs par défaut du CDO, comportement avec monde). Rider : clic droit sur `Tests/` > *Run Unit Tests*, ou panneau Automation, filtre `SpookySpores`.
+
+---
+
+## 14. Outils de debug
+
+- Trace de détection (`DrawDebugLine`) : non persistante, verte si cible, rouge sinon.
+- Volume du `AStoryTrigger` : wireframe dans l'éditeur.
+- Fracture Mode : `Show Bone Colors` pendant le développement.
+- Sphères d'état des champs et du chaudron (section 6).
+- `AEnemySoldier::DebugKill` (temporaire) : tue via `ApplyDamage` pour exercer toute la chaîne (santé → `OnDeath` → butin) ; touche de debug sur `BP_FirstPersonCharacter` ou bouton `CallInEditor`. À supprimer (`TODO.md`).
+- **Panneau de contrôles** (`WBP_ControlsPanel`, pas un outil de dev) : texte statique des touches, togglé par Entrée (`DoToggleControlsPanel` → event Blueprint `OnToggleControlsPanel` : le C++ déclenche, le Blueprint affiche).
 
 ![Présentation des 3 types de debug actuel du projet](Documentation_Documents/Debug.png)
-
-- **État des champs et du chaudron** : sphères colorées par état au-dessus de chaque `AFieldPlot` et `ACauldron` (sections 6 et 7), avec en plus, pour le chaudron, la recette en cours et son avancement.
-- **`AEnemySoldier::DebugKill`** (temporaire) : tue un soldat en lui infligeant des dégâts mortels via `ApplyDamage`, plutôt qu'en appelant directement `HandleDeath` — toute la chaîne réelle (santé → `OnDeath` → butin) est ainsi exercée. Appelable en Blueprint (touche de debug sur `BP_FirstPersonCharacter`) ou via le bouton `CallInEditor` du panneau Details. À supprimer quand le joueur aura un vrai moyen de tuer un soldat.
-
-**Panneau de contrôles** (`WBP_ControlsPanel`) : distinct des outils ci-dessus, pas destiné au développement mais à la consultation en jeu — un texte statique listant les touches actuelles (section 9 ci-dessus), togglé par la touche Entrée (`ASpooky_SporesCharacter::DoToggleControlsPanel` → event Blueprint `OnToggleControlsPanel`, même principe que `AStoryTrigger::OnStoryTriggered` : le C++ déclenche, le Blueprint décide de l'affichage). Pensé pour que les intervenants qui testent le jeu puissent consulter les touches sans dépendre de la documentation externe.
-
----
-
-## 11. Santé, récolte à coups et premier sort
-
-`UHealthComponent` (`Health/HealthComponent.h`) : composant générique et réutilisable, indépendant de tout contexte de combat — il s'appuie uniquement sur le système de dégâts intégré d'Unreal plutôt qu'une logique maison. Il s'abonne au délégué natif `AActor::OnTakeAnyDamage` de son `GetOwner()`, qui se déclenche sur tout appel à `UGameplayStatics::ApplyDamage`, d'où qu'il vienne (sort, futur ennemi). Diffuse deux délégués `BlueprintAssignable` : `OnHealthChanged` (à chaque coup) et `OnDeath` (une seule fois, à 0 point de vie).
-
-**Choix technique — composition optionnelle, pas un nouveau système de récolte** : `AHarvestableResource::BeginPlay` cherche un `UHealthComponent` via `FindComponentByClass`. S'il est présent, le nœud s'abonne à `OnDeath` et `OnInteract` ne fait plus rien (la récolte directe au `E` est désactivée) ; s'il est absent, le comportement d'origine (récolte en un coup au `E`) reste inchangé. Concrètement : `BP_Harvestable_Wood` et `BP_Harvestable_Stone` reçoivent le composant, `BP_Harvestable_Plant` ne le reçoit pas et continue de se récolter au `E`. Aucune ligne de C++ à ajouter pour décider qu'un futur nœud récoltable soit, ou non, « vivant » — l'intuition de départ (façon Minecraft) sans système dédié.
-
-`UManaComponent` (`Spells/ManaComponent.h`) : même principe que `UStaminaComponent` (section 5), régénération continue au tick, mais sans délai avant recharge — contrairement à l'endurance, qui doit décourager le spam de sprint, la mana doit rester disponible en continu. `TrySpendMana(Cost)` échoue sans effet de bord si la réserve est insuffisante.
-
-`USpellCastingComponent` (`Spells/SpellCastingComponent.h`) : point d'entrée unique pour le clic gauche (`IA_CastSpell`), toujours « lancer le sort actuellement équipé » — pour l'instant un unique sort, le coup de bâton.
-
-**Choix technique — un coup différé et cadencé, sans système d'animation** : `TryCastSpell()` vérifie la mana, puis pose deux `FTimerHandle` plutôt que d'appliquer les dégâts immédiatement :
-- `HitDelayTimerHandle` (`HitDelay`, 0.2 s) déclenche `ResolveHit()` — le moment où le bâton « touche » la cible, en attendant une vraie Animation Montage au Bloc 2.
-- `SwingCooldownTimerHandle` (`SwingCooldown`, 0.5 s) déclenche `EndSwing()`, qui lève la garde `bIsSwinging` — empêche de spammer le clic pour détruire une ressource instantanément.
-
-`ResolveHit()` réutilise la détection existante plutôt que de retracer : `UInteractionComponent::IsAttackableTarget(OutTarget)` (nouvelle méthode, même principe que `IsGrabbableTarget`/`IsInteractableTarget`, portée `AttackRange` = 200) renvoie la cible courante du trace unique déjà en place (section 3), puis `UGameplayStatics::ApplyDamage` est appelé dessus — c'est cet appel qui déclenche `OnTakeAnyDamage` sur le `UHealthComponent` de la cible, sans aucun couplage direct entre les deux systèmes.
-
-**Choix technique — pas de coût en mana pour ce coup, par la donnée et non par l'architecture** : le coup de bâton est un sort comme un autre dans le code (il passe par `TryCastSpell`/`TrySpendMana`), mais `SpellManaCost` est réglé à `0` sur cette instance précise, pour traduire qu'il s'agit d'un geste physique et non d'un sort « envoyé ». Aucune branche de code séparée entre « frapper » et « lancer un sort » : seule la donnée change, ce qui laisse la porte ouverte à un futur sort gratuit ou à un coup de bâton qui coûterait de la mana, sans retoucher le système.
-
-**Choix technique — hitscan, pas de projectile** : la résolution des dégâts est instantanée (même frame que `ResolveHit`, après le délai), comme un coup de corps à corps. Un vrai sort à distance (file d'attente, items 11-12 du `CLAUDE.md`) remplacera ce hitscan par un acteur projectile (`UProjectileMovementComponent`, dégâts à l'impact par overlap) pour les sorts élémentaires à venir, sans changer le reste du pipeline (mana, dégâts, santé).
-
----
-
-## 12. Environnement — colline et cabane du joueur
-
-Remplace `Lvl_FirstPerson` comme niveau principal du projet (`EditorStartupMap` et `GameDefaultMap` pointent désormais vers `Lvl_Principal`, voir `Config/DefaultEngine.ini`). `Lvl_FirstPerson` reste disponible comme niveau de test.
-
-Le terrain est un unique **Landscape** sculpté en colline, plutôt qu'un sol plat avec une zone surélevée isolée : la cabane du joueur est posée au sommet, un chemin descend vers ce qui deviendra l'accès au village (file d'attente, item 16).
-
-**Choix technique — hauteur et domination visuelle** : poser la cabane au point le plus haut du niveau donne au joueur une vue dégagée sur le chemin d'arrivée du village, en prévision de la mécanique de défense de base (file d'attente, items 1 et 16). Choix inspiré de la lecture *An Architectural Approach to Level Design* (C. Totten) : la hauteur joue sur l'instinct de survie du joueur (vue dégagée rassurante, « prospect »).
-
-**Cabane** : géométrie simple construite directement dans le niveau (pas un Blueprint réutilisable, contrairement aux ressources — elle est unique), avec sol, murs, toit en pignon, une fenêtre, et une lumière intérieure contrastant avec l'obscurité extérieure.
-
-**Clôture** (`BP_Fences`) délimitant le territoire immédiat du joueur autour de la cabane. La zone de base (`BP_BaseZone`, section 15) est calée à la main pour englober la clôture ; elle n'en dépend pas.
-
-**Éléments de gameplay placés** : `BP_StoryTrigger_Entrance` à la porte, `BP_Cauldron`, plusieurs `BP_FieldPlot`, `BP_Rock` (démonstration du grab, dans l'axe de la porte), trois `GC_Mushroom`.
-
-**Choix technique — Foliage Mode avec un type Actor, pas Static Mesh** : les nœuds de ressources (`BP_Harvestable_Wood/Stone/Plant`) sont dispersés en forêt via le Foliage Mode, avec un Foliage Type de type **Actor** plutôt que Static Mesh — nécessaire pour conserver la logique de gameplay de chaque instance (interaction, santé). Contrairement au Foliage Static Mesh, ce type n'apporte aucun gain de performance par instanciation : chaque exemplaire reste un acteur à part entière, au même coût qu'un placement manuel. Le bénéfice ici est uniquement le confort de placement.
-
-**Éclairage** : scène volontairement sombre (Post Process Volume, Exposure Compensation négative, Directional Light à faible intensité), cohérent avec le ton nécromancien/abandonné du jeu.
-
----
-
-## 13. Ennemi — soldat, poursuite et combat
-
-`Enemies/` : `IDestructible` (interface — un ennemi ou une ressource expose son `UHealthComponent`, pour être repérable comme cible), `AEnemySoldier` (Character), `AEnemyAIController`, `AEnemyPathSpline` (wrapper autour d'un `USplineComponent`).
-
-Machine à deux états dans `AEnemyAIController` (`EEnemyState::Transit` / `Engage`), pilotée par son propre `Tick`.
-
-- **`Transit`** : suit `AEnemyPathSpline` en avançant un accumulateur `DistanceAlongSpline` (vitesse `MoveSpeed`), avec anticipation (`LookAheadDistance`) pour viser un point légèrement en avant sur la courbe plutôt que la position exacte — évite les à-coups de direction. Bascule en `Engage` dès que la distance accumulée dépasse la longueur de la spline.
-- **`Engage`** : cherche le `IDestructible` vivant le plus proche (`FindNearestDestructible`, parcours de tous les acteurs du monde filtrés par l'interface, dans un rayon `TargetSearchRadius`), avance vers lui tant que la distance mesurée dépasse `AttackRange`, sinon s'arrête et attaque à intervalle régulier (`AttackInterval`).
-
-**Choix technique — `AddMovementInput`, pas `AIController::MoveToLocation`, pour les deux phases** : la première version d'`Engage` utilisait `MoveToLocation`/`PathFollowingComponent` (navigation NavMesh). Plusieurs comportements internes du moteur rendaient le réglage fragile (zone d'exclusion du NavMesh autour des obstacles, critère d'arrivée mesuré en 2D uniquement côté moteur, rayon de capsule compté deux fois par deux mécanismes différents — voir les pièges correspondants section 11 du `CLAUDE.md`) et cassaient l'Animation Blueprint : un personnage déplacé par `PathFollowingComponent` ne joue pas forcément son cycle de marche, selon la façon dont l'Anim BP lit la vitesse. Remplacé par un simple `AddMovementInput` vers la direction de la cible à chaque tick — exactement comme `Transit` : plus de NavMesh à gérer pour cet ennemi, animation cohérente entre les deux phases, logique plus simple (limite assumée : il marche en ligne droite vers sa cible, sans contourner d'obstacles sur le chemin).
-
-**Mesure de distance pour l'attaque** : `UPrimitiveComponent::GetClosestPointOnCollision` donne le point le plus proche sur la **surface réelle** de la cible (pas son pivot), dont on soustrait le rayon de la capsule du soldat (`GetScaledCapsuleRadius()`) pour obtenir une distance bord-à-bord cohérente avec `AttackRange`. Mesurée en 2D (`FVector::Size2D()`, Z ignoré), par cohérence avec la façon dont le moteur évalue lui-même l'arrivée à destination ailleurs dans Unreal.
-
-**Référence à la spline, pas de recherche automatique** : `AEnemySoldier::PathSplineActor` (`EditInstanceOnly`) est assignée à la main sur l'instance placée dans le niveau, lue par le contrôleur dans `OnPossess`. Remplace une première version qui cherchait « le premier `AEnemyPathSpline` trouvé dans le monde » (`TActorIterator`) — fragile dès qu'il y a plusieurs splines dans le niveau, ou qu'une ancienne traîne encore dedans. Limite connue : ne fonctionne que pour un ennemi placé à la main ; un futur spawner de vagues devra assigner cette référence par code, **en spawn différé** (`SpawnActorDeferred` → assignation → `FinishSpawning`) : le contrôleur lit la spline dans `OnPossess`, et avec `AutoPossessAI` la possession a lieu pendant `SpawnActor`, donc une assignation faite après arriverait trop tard (voir `TODO.md`, item 3b).
-
-**Rotation** : `AEnemySoldier` désactive `bUseControllerRotationYaw` et active `GetCharacterMovement()->bOrientRotationToMovement`, pour que le personnage tourne vers sa direction de déplacement réelle plutôt que vers la rotation du Controller (pensée par défaut pour un joueur qui regarde à la souris) — s'applique uniformément aux deux phases puisque les deux passent par `AddMovementInput`.
-
-**Mort et butin** : `UHealthComponent::OnDeath` déclenche `HandleDeath`, qui réutilise `AResourceDrop::SpawnDrops` (même mécanisme que la récolte de ressources et les champs, sections 4 et 6) pour faire tomber des os (`EResourceType::Bone`).
-
----
-
-## 14. Serviteurs — pose depuis une Necrospore
-
-`Servants/` : `AServant` (Character). Pour l'instant sans comportement : il apparaît et reste immobile. Pas de classe de base commune avec `AEnemySoldier` : les deux n'ont pas le même rôle (l'ennemi attaque la base, le serviteur la développe), et une seule implémentation ne justifie pas encore d'abstraction.
-
-**Pose (touche L, `DoPlaceServant` dans le Character)**, dans cet ordre :
-1. `UInteractionComponent::GetPlacementPoint` cherche un point au sol devant le joueur.
-2. `UResourceCounterComponent::TrySpendResource(Necrospore, 1)` consomme l'objet de résurrection.
-3. Spawn de `ServantClass` (assignée à `BP_Servant` dans `BP_FirstPersonCharacter`).
-
-L'ordre garantit qu'une pose impossible (viser le ciel ou un mur) ne coûte jamais de Necrospore.
-
-**Choix technique — un trace dédié, à la demande** : le trace de détection (section 3) ne voit que le type d'objet `Interactable`, donc pas le sol. `GetPlacementPoint` fait son propre `LineTraceSingleByChannel` sur `ECC_Visibility`, depuis le même point de vue, uniquement à l'appui sur la touche (pas à chaque frame). `UInteractionComponent` reste un composant de détection : il répond à une question de plus (« quel sol le joueur vise-t-il ? »), sans changer la détection existante.
-
-**Validation de la surface** : la pose est refusée si rien n'est touché dans `PlacementRange` (300, portée d'interaction du 3C) ou si la composante Z de la normale est inférieure à `MinPlacementNormalZ` (0.7). Z vaut le cosinus de la pente : 1 sur un sol plat, 0 sur un mur, environ 0.7 à 45°. Le seuil correspond à l'angle de sol marchable par défaut du `CharacterMovementComponent` (environ 44.8°) : on ne pose un serviteur que là où il peut tenir debout. Même règle que `MinGroundNormalZ` pour les drops (section 4). Limite connue : le dessus plat d'une pierre récoltable est accepté.
-
-**Positionnement** : l'origine d'un Character est le centre de sa capsule. Le point de spawn est donc remonté de la demi-hauteur de capsule, lue sur l'objet par défaut de `ServantClass` (`GetDefaultObject`), pour que les pieds touchent le sol. Le serviteur est tourné vers le joueur (yaw seul).
-
-**Spawn toujours garanti** : `ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn` décale le serviteur s'il chevauche quelque chose (le joueur, un obstacle) au lieu d'annuler le spawn. La Necrospore déjà dépensée n'a donc jamais à être remboursée. Un échec reste possible sur une erreur de programmation (monde en cours de destruction) : il est tracé dans le log (`LogSpooky_Spores`).
-
-**Stockage provisoire de la Necrospore** : en attendant l'inventaire (item 7 de `TODO.md`), c'est une ressource comptée. L'unique accès à ce stockage est l'appel à `TrySpendResource` dans `DoPlaceServant`, commenté comme tel : le passage à l'inventaire ne touchera que cette ligne.
-
----
-
-## 15. Zone de base
-
-`Base/` : `ABaseZone` (acteur) et `UBaseZoneSubsystem` (registre). La zone répond à deux questions : « ce point est-il dans la base ? » et « donne-moi un point au hasard dans la base ». Les serviteurs (errance et retour hors zone, item 2.2c) l'interrogeront ; la vue de gestion et la construction (items 13-14) s'appuieront dessus.
-
-**Forme — un acteur dédié** : la racine de `ABaseZone` est un `UBoxComponent` (`ZoneBox`). Elle n'est pas un composant de `BP_Fences` : la zone doit survivre à un agrandissement de la base, alors que la clôture n'est qu'un élément visuel. `BP_BaseZone` (`Placeables/Base/`, enfant de `ABaseZone`, sans logique) est instancié dans `Lvl_Principal` ; sa boîte est calée à la main pour **englober** la clôture `BP_Fences`, sans en dépendre. `Lvl_Principal` n'utilise pas One File Per Actor : l'instance est stockée dans `Lvl_Principal.umap`.
-
-**Calcul dans l'espace local de la boîte** : le point monde est ramené dans l'espace local du composant (`InverseTransformPosition`) puis comparé à l'extension **non mise à l'échelle** (`GetUnscaledBoxExtent`) : l'échelle, même non uniforme ou négative, est déjà dans la transformation. Le tirage se fait en local, uniformément sur chaque axe, puis est transformé en monde (transformation affine : la densité reste uniforme, et une boîte tournée est respectée, ce qu'un tirage en monde ne ferait pas). Aucune dimension n'est mémorisée : chaque appel relit le composant, donc un `SetBoxExtent`, un changement d'échelle ou un déplacement sont pris en compte à l'appel suivant. Les calculs sont des fonctions statiques publiques (`IsPointInOrientedBox`, `TryGetRandomPointInOrientedBox`, `IsOrientedBoxValid`) sans dépendance à un `UWorld`, ce qui permet de les tester sans monde.
-
-**Hauteur** : `bIgnoreHeight` (défaut `true`). Le terrain est une colline et une boîte posée à la main ne suit pas exactement le sol ; le moteur mesure d'ailleurs l'arrivée en 2D. Avec `true`, `IsPointInZone` teste seulement X et Y locaux et `GetRandomPointInZone` tire au plan médian de la boîte (Z local = 0), pas au sol. Invariant : tout point tiré satisfait `IsPointInZone`. Le consommateur qui projette sur le NavMesh doit donc utiliser une extension verticale qui couvre l'écart entre ce plan et le terrain (`GetZoneExtent().Z`).
-
-**Zone invalide** : si une composante de l'extension ou de la valeur absolue de l'échelle est inférieure ou égale à `KINDA_SMALL_NUMBER`, `IsZoneValid` renvoie faux, `IsPointInZone` renvoie faux et `GetRandomPointInZone` renvoie faux (la sortie est alors `ZeroVector` et ne doit pas être utilisée). Test explicite obligatoire : avec une échelle nulle, `InverseTransformPosition` ramènerait tout point au centre local, donc dedans. Un avertissement est émis une seule fois par zone dans `LogSpooky_Spores`. Un point non fini (NaN, infini) est hors zone. Tolérance de bord : 0,1 cm en local.
-
-**Collision** : preset `NoCollision`, pas d'événements d'overlap, `SetCanEverAffectNavigation(false)` : la boîte est invisible au trace d'interaction, ne bloque rien et ne découpe jamais le NavMesh. Ce n'est pas un trigger (contrairement à `AStoryTrigger`) : c'est un calcul à la demande. Pas de canal custom.
-
-**Retrouver la zone — sous-système** : `UBaseZoneSubsystem` (`UWorldSubsystem`) est un registre à une seule entrée (`TWeakObjectPtr`). `ABaseZone::BeginPlay` s'enregistre, `EndPlay` se désenregistre. Une seule zone par niveau : si une seconde s'enregistre, un message `Error` de `LogSpooky_Spores` nomme les deux acteurs, la première reste enregistrée et la seconde est ignorée. Pourquoi pas une référence `EditInstanceOnly` (recette habituelle) : les serviteurs sont spawnés par le code et le Character par un `PlayerStart`, aucun ne peut porter une référence à un acteur de niveau. Les consommateurs appellent `GetWorld()->GetSubsystem<UBaseZoneSubsystem>()->GetBaseZone()` à chaque décision et ne mettent jamais le résultat en cache : l'ordre des `BeginPlay` entre acteurs n'est pas garanti, et le résultat est `nullptr` sans zone.
-
-**Visibilité** : aucun code de dessin en C++ (pas de `DrawDebug*`, pas de `Tick`). La boîte filaire est visible en jeu grâce à la propriété `Hidden In Game` décochée sur le composant `ZoneBox` de `BP_BaseZone` ; le C++ garde le défaut du moteur (caché). Piège : avec `NoCollision`, la commande `show collision` ne dessine pas la boîte. Réglage de développement à rétablir avant Release (`TODO.md`, dette technique).
-
-**API (Blueprint)** : `IsPointInZone` et `IsZoneValid` et `GetZoneExtent` (pures) ; `GetRandomPointInZone(OutPoint)` en `BlueprintCallable` avec `BlueprintPure = false` : UHT rendrait sinon pure toute fonction `const` à paramètre de sortie, et un nœud pur serait réévalué à chaque branchement, donnant deux points différents pour une même décision. Sur échec, la fonction renvoie faux plutôt qu'un `(0,0,0)` muet. `GetZoneExtent` renvoie des composantes toujours positives (valeur absolue de l'échelle).
-
-**Tests** : Automation Specs dans `Tests/` : géométrie sans monde, valeurs par défaut sur le CDO, comportement avec monde (sous-système, traces). Lancement : clic droit sur le dossier `Tests/` dans Rider puis « Run Unit Tests », ou panneau Automation de l'éditeur avec le filtre `SpookySpores`.
-
----
-
-## 16. Limitations connues et dette technique
-
-Centralisées dans [`TODO.md`](TODO.md), pour éviter une double liste qui diverge avec le temps.

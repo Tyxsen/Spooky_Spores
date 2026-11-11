@@ -1,5 +1,5 @@
 // Automation Spec for the pure geometry of the base zone (no UWorld, no actor).
-// Source of truth: docs/specs/base-zone.md, criteria A1-A7, A9, A10 (static part), R1-R6, D1-D2.
+// Source of truth: the base zone spec (removed at merge, see commit a5a85da), criteria A1-A7, A9, A10 (static part), R1-R6, D1-D2.
 
 #include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
