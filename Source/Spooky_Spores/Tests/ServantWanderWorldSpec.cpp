@@ -58,6 +58,15 @@ BEGIN_DEFINE_SPEC(FServantWanderWorldSpec, "SpookySpores.Servants.Wander.World",
 	ABaseZone* SpawnZone(const TCHAR* Name, const FVector& Location);
 	AServantAIController* RequireController(AServant* Servant);
 	bool ReadTimings(const AServantAIController* Controller);
+	AServantAIController* PrepareOutOfZoneCycle();
+	void CallMoveCompleted(AServantAIController* Controller, EPathFollowingResult::Type Code);
+
+	// A11 timings, written on the instance so that every delay is distinguishable from the others
+	// (with the spec defaults RetryDelay == MinWanderPause == 2 s, a pending retry timer would be mistaken for a pause).
+	static constexpr double A11RetryDelay = 1.0;
+	static constexpr double A11MinWanderPause = 3.0;
+	static constexpr double A11MaxWanderPause = 4.0;
+	static constexpr double A11InitialDecisionDelay = 0.1;
 	void TickFor(double Seconds);
 	bool TickUntil(TFunctionRef<bool()> Condition, double MaxSeconds);
 	void ExpectAction(const FString& What, EServantWanderAction Actual, EServantWanderAction Expected);
@@ -123,6 +132,36 @@ bool FServantWanderWorldSpec::ReadTimings(const AServantAIController* Controller
 		return false;
 	}
 	return true;
+}
+
+AServantAIController* FServantWanderWorldSpec::PrepareOutOfZoneCycle()
+{
+	// Observation of "a decision happened": a servant out of a valid zone, without NavMesh, goes Return at every decision and every
+	// decision after the first one increments FailedReturnAttempts by one (A6). MaxFailedReturnAttempts is raised so Teleport never
+	// stops the counting. The counter is therefore a decision counter, readable at any moment, unlike LastAction (constant Return).
+	SpawnZone(TEXT("ZoneA11"), ZoneCenter);
+	AServant* Servant = SpawnServant(TEXT("ServantA11"), OutsideLocation);
+	AServantAIController* Controller = RequireController(Servant);
+	if (Controller == nullptr) { return nullptr; }
+
+	const double FirstDecisionDelay = InitialDecisionDelay; // the first timer is already armed with the default value
+	const bool bWritten = ServantWanderTest::WriteNumber(Controller, TEXT("RetryDelay"), A11RetryDelay)
+		&& ServantWanderTest::WriteNumber(Controller, TEXT("MinWanderPause"), A11MinWanderPause)
+		&& ServantWanderTest::WriteNumber(Controller, TEXT("MaxWanderPause"), A11MaxWanderPause)
+		&& ServantWanderTest::WriteNumber(Controller, TEXT("InitialDecisionDelay"), A11InitialDecisionDelay)
+		&& ServantWanderTest::WriteNumber(Controller, TEXT("MaxFailedReturnAttempts"), 1000.0);
+	if (!TestTrue(TEXT("harness: A11 timings written by reflection"), bWritten) || !ReadTimings(Controller)) { return nullptr; }
+
+	// Second decision = first counted one. It fires during the last tick, so a RetryDelay timer is pending right now.
+	const bool bCycling = TickUntil([Controller]() { return Controller->GetFailedReturnAttempts() >= 1; },
+	                                FirstDecisionDelay + 2.0 * A11RetryDelay + TimerSlack);
+	if (!TestTrue(TEXT("harness: the out-of-zone cycle runs (counter >= 1)"), bCycling)) { return nullptr; }
+	return Controller;
+}
+
+void FServantWanderWorldSpec::CallMoveCompleted(AServantAIController* Controller, EPathFollowingResult::Type Code)
+{
+	Controller->OnMoveCompleted(FAIRequestID::CurrentRequest, FPathFollowingResult(Code, FPathFollowingResultFlags::None));
 }
 
 void FServantWanderWorldSpec::TickFor(double Seconds)
@@ -221,8 +260,8 @@ void FServantWanderWorldSpec::Define()
 
 			Controller->UnPossess();
 			TestFalse(TEXT("IsWandering() == false after UnPossess"), Controller->IsWandering());
-			TickFor(InitialDecisionDelay + 2.0 * RetryDelay + TimerSlack);
-			ExpectAction(TEXT("no decision runs on an unpossessed controller"), Controller->GetLastAction(), EServantWanderAction::None);
+			// "No decision afterwards" is not asserted: a decision without a pawn exits without touching LastAction, so such an
+			// assertion could not fail. The no-pawn decision itself is covered by the A11 test "controller without a pawn".
 		});
 	});
 
@@ -409,16 +448,13 @@ void FServantWanderWorldSpec::Define()
 			const bool bFailedOnce = TickUntil([Controller]() { return Controller->GetFailedReturnAttempts() >= 1; },
 			                                   InitialDecisionDelay + 2.0 * RetryDelay + TimerSlack);
 			if (!TestTrue(TEXT("A9: precondition, the cycle is running (counter > 0)"), bFailedOnce)) { return; }
-			const int32 CounterAtStop = Controller->GetFailedReturnAttempts();
-			const EServantWanderAction ActionAtStop = Controller->GetLastAction();
-
 			Controller->StopWandering();
 			TestFalse(TEXT("A9: IsWandering() == false"), Controller->IsWandering());
 
-			// Well past several RetryDelay and the longest pause: a surviving timer would run a decision and move the counter.
+			// "Timer cleared" is checked by code reading only: a surviving timer would be masked by the !bIsWandering guard of the
+			// decision and re-armed on the same handle by StartWandering, so no observable assertion here could fail.
+			// What can fail is covered elsewhere: A11 "after StopWandering" (OnMoveCompleted ignored).
 			TickFor(3.0 * RetryDelay + TimerSlack);
-			ExpectAction(TEXT("A9: LastAction frozen after StopWandering"), Controller->GetLastAction(), ActionAtStop);
-			TestEqual(TEXT("A9: counter frozen after StopWandering"), Controller->GetFailedReturnAttempts(), CounterAtStop);
 
 			Controller->StartWandering();
 			TestTrue(TEXT("A9: IsWandering() == true after StartWandering"), Controller->IsWandering());
@@ -431,6 +467,128 @@ void FServantWanderWorldSpec::Define()
 			const int32 CounterAfterRestart = Controller->GetFailedReturnAttempts();
 			TestTrue(FString::Printf(TEXT("A9: the restarted cycle counts failures again from 0 (got %d, expected 1 or 2)"), CounterAfterRestart),
 			         CounterAfterRestart >= 1 && CounterAfterRestart <= 2);
+		});
+	});
+
+	// Every A11 test calls OnMoveCompleted (or StartWandering) while a decision timer is pending: the API offers no state
+	// "wandering without a pending timer". The tests turn this into a strength: the call is made at a moment where the pending
+	// timer would fire at a time the spec forbids, so a call that does not re-arm the single DecisionTimer is detected.
+	Describe("OnMoveCompleted and restart rules (A11)", [this]()
+	{
+		It("A11: Success waits a pause in [MinWanderPause, MaxWanderPause] and never decides synchronously", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			AServantAIController* Controller = PrepareOutOfZoneCycle();
+			if (Controller == nullptr) { return; }
+			const int32 Before = Controller->GetFailedReturnAttempts();
+
+			CallMoveCompleted(Controller, EPathFollowingResult::Success);
+			TestEqual(TEXT("A11: OnMoveCompleted does not run a decision itself"), Controller->GetFailedReturnAttempts(), Before);
+
+			// The pending retry timer was due in RetryDelay (1 s): it must have been replaced by the pause (>= 3 s).
+			TickFor(A11MinWanderPause - 0.3);
+			TestEqual(TEXT("A11: no decision before MinWanderPause after a Success"), Controller->GetFailedReturnAttempts(), Before);
+
+			const bool bDecided = TickUntil([Controller, Before]() { return Controller->GetFailedReturnAttempts() != Before; },
+			                                (A11MaxWanderPause - A11MinWanderPause) + 0.3 + TimerSlack);
+			TestTrue(TEXT("A11: a decision happens at the latest at MaxWanderPause"), bDecided);
+			TestEqual(TEXT("A11: exactly one decision"), Controller->GetFailedReturnAttempts(), Before + 1);
+		});
+
+		It("A11: any other result re-decides after RetryDelay counted from the call, not before", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			AServantAIController* Controller = PrepareOutOfZoneCycle();
+			if (Controller == nullptr) { return; }
+
+			struct FCase { EPathFollowingResult::Type Code; const TCHAR* Name; };
+			const FCase Cases[] =
+			{
+				{ EPathFollowingResult::Aborted, TEXT("Aborted") },
+				{ EPathFollowingResult::Invalid, TEXT("Invalid (synchronous Failed of MoveTo)") },
+				{ EPathFollowingResult::Blocked, TEXT("Blocked") },
+			};
+			for (const FCase& Case : Cases)
+			{
+				const EPathFollowingResult::Type Code = Case.Code;
+				const FString Name = Case.Name;
+				// Mid-period: the pending timer is due in 0.5 x RetryDelay, the re-armed one in 1 x RetryDelay.
+				TickFor(0.5 * A11RetryDelay);
+				const int32 Before = Controller->GetFailedReturnAttempts();
+
+				CallMoveCompleted(Controller, Code);
+				TestEqual(*FString::Printf(TEXT("A11 %s: no synchronous decision"), *Name), Controller->GetFailedReturnAttempts(), Before);
+
+				TickFor(0.8 * A11RetryDelay);
+				TestEqual(*FString::Printf(TEXT("A11 %s: no decision before RetryDelay"), *Name), Controller->GetFailedReturnAttempts(), Before);
+
+				const bool bDecided = TickUntil([Controller, Before]() { return Controller->GetFailedReturnAttempts() != Before; },
+				                                0.2 * A11RetryDelay + TimerSlack);
+				TestTrue(*FString::Printf(TEXT("A11 %s: a decision right after RetryDelay (not a wander pause)"), *Name), bDecided);
+				TestEqual(*FString::Printf(TEXT("A11 %s: exactly one decision"), *Name), Controller->GetFailedReturnAttempts(), Before + 1);
+			}
+		});
+
+		It("A11: after StopWandering, OnMoveCompleted is ignored", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			AServantAIController* Controller = PrepareOutOfZoneCycle();
+			if (Controller == nullptr) { return; }
+			const int32 Before = Controller->GetFailedReturnAttempts();
+
+			Controller->StopWandering();
+			CallMoveCompleted(Controller, EPathFollowingResult::Success);
+			CallMoveCompleted(Controller, EPathFollowingResult::Aborted);
+			TestFalse(TEXT("A11: OnMoveCompleted does not restart the wandering"), Controller->IsWandering());
+
+			TickFor(A11MaxWanderPause + A11RetryDelay + TimerSlack);
+			TestEqual(TEXT("A11: no decision after StopWandering, even beyond MaxWanderPause"), Controller->GetFailedReturnAttempts(), Before);
+			TestFalse(TEXT("A11: still not wandering"), Controller->IsWandering());
+		});
+
+		It("A11: StartWandering while already wandering keeps the counter and the decision cadence", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			AServantAIController* Controller = PrepareOutOfZoneCycle();
+			if (Controller == nullptr) { return; }
+
+			// 0.3 x RetryDelay after a decision: the pending one is due in 0.7 x RetryDelay; a restart would decide after
+			// InitialDecisionDelay (0.1 s), a second timer would add an extra decision.
+			TickFor(0.3 * A11RetryDelay);
+			const int32 Before = Controller->GetFailedReturnAttempts();
+			if (!TestTrue(TEXT("precondition: counter > 0"), Before > 0)) { return; }
+
+			Controller->StartWandering();
+			TestTrue(TEXT("A11: still wandering"), Controller->IsWandering());
+			TestEqual(TEXT("A11: counter unchanged by StartWandering"), Controller->GetFailedReturnAttempts(), Before);
+
+			TickFor(0.5 * A11RetryDelay);
+			TestEqual(TEXT("A11: no early decision (timer not re-armed with InitialDecisionDelay)"), Controller->GetFailedReturnAttempts(), Before);
+
+			const bool bDecided = TickUntil([Controller, Before]() { return Controller->GetFailedReturnAttempts() != Before; },
+			                                0.2 * A11RetryDelay + TimerSlack);
+			TestTrue(TEXT("A11: the decision comes at the original time"), bDecided);
+			TestEqual(TEXT("A11: exactly one decision"), Controller->GetFailedReturnAttempts(), Before + 1);
+
+			TickFor(0.8 * A11RetryDelay);
+			TestEqual(TEXT("A11: no extra decision from a second timer"), Controller->GetFailedReturnAttempts(), Before + 1);
+		});
+
+		It("A11: a controller without a pawn stops wandering at its first decision", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			FActorSpawnParameters Params;
+			Params.Name = FName(TEXT("ServantControllerNoPawn"));
+			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			AServantAIController* Controller = World->SpawnActor<AServantAIController>(AServantAIController::StaticClass(), FTransform::Identity, Params);
+			if (!TestNotNull(TEXT("controller spawned"), Controller) || !ReadTimings(Controller)) { return; }
+			if (!TestNull(TEXT("precondition: no pawn"), Controller->GetPawn())) { return; }
+
+			Controller->StartWandering();
+			TestTrue(TEXT("precondition: StartWandering sets the wandering state"), Controller->IsWandering());
+
+			TickFor(InitialDecisionDelay + TimerSlack);
+			TestFalse(TEXT("A11: IsWandering() == false after the first decision without a pawn"), Controller->IsWandering());
 		});
 	});
 

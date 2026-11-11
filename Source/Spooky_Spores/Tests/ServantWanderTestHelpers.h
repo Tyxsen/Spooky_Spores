@@ -41,6 +41,30 @@ namespace ServantWanderTest
 		return true;
 	}
 
+	// Writes a tunable value on an instance (test setup only), same name and type rules as ReadNumber.
+	inline bool WriteNumber(UObject* Object, const TCHAR* PropertyName, double Value)
+	{
+		if (Object == nullptr)
+		{
+			return false;
+		}
+		const FNumericProperty* Property = FindFProperty<FNumericProperty>(Object->GetClass(), PropertyName);
+		if (Property == nullptr)
+		{
+			return false;
+		}
+		void* ValuePtr = Property->ContainerPtrToValuePtr<void>(Object);
+		if (Property->IsFloatingPoint())
+		{
+			Property->SetFloatingPointPropertyValue(ValuePtr, Value);
+		}
+		else
+		{
+			Property->SetIntPropertyValue(ValuePtr, static_cast<int64>(FMath::RoundToDouble(Value)));
+		}
+		return true;
+	}
+
 	// Counts every move request that reaches an end on a controller's path following component, including the synchronous
 	// Failed / AlreadyAtGoal finishes that AAIController::MoveTo emits. Zero means "no MoveToLocation was ever issued".
 	// Must live on the stack of the test (the lambda captures this).
