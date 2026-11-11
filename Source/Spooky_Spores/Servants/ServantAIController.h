@@ -104,7 +104,7 @@ private:
 
 	// Applied to the pawn's MaxWalkSpeed when wandering starts (wander and return moves): a walk, not a run.
 	UPROPERTY(EditAnywhere, Category = "Servant|Wander", meta = (AllowPrivateAccess = "true", ClampMin = "10.0"))
-	float WanderWalkSpeed = 200.0f;
+	float WanderWalkSpeed = 275.0f;
 
 	UPROPERTY(VisibleInstanceOnly, Category = "Servant|Wander", meta = (AllowPrivateAccess = "true"))
 	bool bIsWandering = false;
