@@ -41,6 +41,8 @@ public:
 	UServantSubsystem* GetServantSubsystem() const;
 
 protected:
+	// Rebinds after RemoveFromParent + AddToViewport (NativeDestruct unbinds)
+	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
 	// Rebuild both columns from the registry.
@@ -62,8 +64,8 @@ private:
 
 // -----------PROPERTIES-----------
 private:
-	UPROPERTY(Transient)
-	TObjectPtr<UServantSubsystem> ServantSubsystem = nullptr;
+	// Weak: the widget (outer: GameInstance) must not keep the world's registry alive
+	TWeakObjectPtr<UServantSubsystem> ServantSubsystem;
 
 	// Weak: a destroyed servant must never be kept alive by the menu
 	TWeakObjectPtr<AServant> SelectedServant;

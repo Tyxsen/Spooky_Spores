@@ -3,6 +3,7 @@
 
 #include "Servants/ServantTaskMenuWidget.h"
 
+#include "Engine/World.h"
 #include "Servants/Servant.h"
 #include "Servants/ServantSubsystem.h"
 #include "Spooky_Spores.h"
@@ -12,7 +13,7 @@ void UServantTaskMenuWidget::InitializeMenu(UServantSubsystem* InSubsystem)
 	UnbindFromSubsystem();
 	ServantSubsystem = InSubsystem;
 
-	if (!ServantSubsystem)
+	if (!InSubsystem)
 	{
 		// No refresh: the Blueprint would read an empty registry reference
 		UE_LOG(LogSpooky_Spores, Warning, TEXT("'%s' InitializeMenu called without a servant subsystem"), *GetNameSafe(this));
@@ -20,7 +21,7 @@ void UServantTaskMenuWidget::InitializeMenu(UServantSubsystem* InSubsystem)
 		return;
 	}
 
-	ServantSubsystem->OnAssignmentsChanged.AddDynamic(this, &UServantTaskMenuWidget::HandleAssignmentsChanged);
+	InSubsystem->OnAssignmentsChanged.AddUniqueDynamic(this, &UServantTaskMenuWidget::HandleAssignmentsChanged);
 
 	// Same path as a broadcast: drops a selection unknown to the new registry, then rebuilds
 	HandleAssignmentsChanged();
@@ -37,7 +38,8 @@ bool UServantTaskMenuWidget::AssignSelectedServant(EServantTask Task)
 	if (!Selected) return false;
 
 	// Broadcast (and so the refresh) happens inside AssignTask, before the selection is cleared
-	const bool bHasChanged = ServantSubsystem && ServantSubsystem->AssignTask(Selected, Task);
+	UServantSubsystem* Subsystem = ServantSubsystem.Get();
+	const bool bHasChanged = Subsystem && Subsystem->AssignTask(Selected, Task);
 	SetSelection(nullptr);
 	return bHasChanged;
 }
@@ -49,7 +51,19 @@ AServant* UServantTaskMenuWidget::GetSelectedServant() const
 
 UServantSubsystem* UServantTaskMenuWidget::GetServantSubsystem() const
 {
-	return ServantSubsystem;
+	return ServantSubsystem.Get();
+}
+
+void UServantTaskMenuWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+
+	// First construction usually happens before InitializeMenu: nothing to rebind yet
+	if (UServantSubsystem* Subsystem = ServantSubsystem.Get())
+	{
+		Subsystem->OnAssignmentsChanged.AddUniqueDynamic(this, &UServantTaskMenuWidget::HandleAssignmentsChanged);
+		HandleAssignmentsChanged();
+	}
 }
 
 void UServantTaskMenuWidget::NativeDestruct()
@@ -61,9 +75,15 @@ void UServantTaskMenuWidget::NativeDestruct()
 
 void UServantTaskMenuWidget::HandleAssignmentsChanged()
 {
+	// On world teardown every servant's EndPlay broadcasts: rebuilding the columns then would create widgets
+	// in a dying world. The registry's world is used, not the widget's: the widget's outer is the GameInstance.
+	UServantSubsystem* Subsystem = ServantSubsystem.Get();
+	const UWorld* SubsystemWorld = Subsystem ? Subsystem->GetWorld() : nullptr;
+	if (!SubsystemWorld || SubsystemWorld->bIsTearingDown) return;
+
 	// A servant removed from the registry (destroyed) cannot stay selected
 	AServant* Selected = SelectedServant.Get();
-	if (Selected && (!ServantSubsystem || !ServantSubsystem->IsServantRegistered(Selected)))
+	if (Selected && !Subsystem->IsServantRegistered(Selected))
 	{
 		SetSelection(nullptr);
 	}
@@ -81,8 +101,9 @@ void UServantTaskMenuWidget::SetSelection(AServant* NewSelection)
 
 void UServantTaskMenuWidget::UnbindFromSubsystem()
 {
-	if (ServantSubsystem)
+	// The registry may already be destroyed (world gone): nothing left to unbind from
+	if (UServantSubsystem* Subsystem = ServantSubsystem.Get())
 	{
-		ServantSubsystem->OnAssignmentsChanged.RemoveDynamic(this, &UServantTaskMenuWidget::HandleAssignmentsChanged);
+		Subsystem->OnAssignmentsChanged.RemoveDynamic(this, &UServantTaskMenuWidget::HandleAssignmentsChanged);
 	}
 }
