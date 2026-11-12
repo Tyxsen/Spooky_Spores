@@ -1,5 +1,5 @@
 # Spec — Assignation des tâches aux serviteurs : menu (2.1)
-Item TODO : 2.1 Menu (sans comportement derrière) | Branche : feature/servant-task-menu | Statut : brouillon
+Item TODO : 2.1 Menu (sans comportement derrière) | Branche : feature/servant-task-menu | Statut : validée
 
 ## Objectif
 Le joueur ouvre un menu (Tab) qui met le jeu en pause et affiche deux colonnes (`GDD.md`, « Assignation des tâches ») : les serviteurs non assignés et une section par catégorie. Il affecte un serviteur par clic (serviteur puis catégorie). 2.1 livre le **modèle d'affectation en C++** et le menu qui l'appelle. Aucun comportement nouveau : tout serviteur garde l'errance actuelle, quelle que soit sa tâche.
@@ -7,7 +7,8 @@ Le joueur ouvre un menu (Tab) qui met le jeu en pause et affiche deux colonnes (
 ## Comportement
 - `EServantTask` : `Unassigned` (défaut), `AttackDefense`, `FieldHarvest`. Ajouter une catégorie = une valeur d'enum + une section dans le widget.
 - Registre `UServantSubsystem` (`UWorldSubsystem`, modèle `UBaseZoneSubsystem`) : `AServant::BeginPlay` s'enregistre, `EndPlay` se retire. C'est la **source unique** de la tâche (un tableau d'entrées {serviteur, tâche, numéro}) : rien n'est stocké sur `AServant`, donc impossible de changer une tâche sans l'événement.
-- À l'enregistrement : tâche `Unassigned`, numéro = compteur du monde (1, 2, 3...), jamais réutilisé. Le menu affiche « Serviteur N ».
+- À l'enregistrement : tâche `Unassigned`, numéro = compteur du monde (1, 2, 3...), jamais réutilisé. Le menu affiche « Serviteur N » (Timéo : « C'est effectivement suffisant, je réfléchirai à une méthode pour les reonnaitre plus simplement plus tard. »).
+- Ouverture du menu sans restriction de lieu (Timéo : « on peut ouvrir le menu depuis n'importe où sur le jeu. »).
 - `OnAssignmentsChanged` (sans paramètre) est diffusé à chaque enregistrement, retrait ou changement effectif de tâche. Le widget reconstruit tout ; pas de diff (quelques serviteurs).
 - `AssignTask` ne touche pas au contrôleur : `AServantAIController` n'est pas modifié en 2.1.
 - Logique du menu dans une classe C++ `UServantTaskMenuWidget` (parent de `WBP_ServantTaskMenu`) : sélection, assignation, abonnement au registre. Le Blueprint ne fait que la mise en page et le câblage des clics.
@@ -25,7 +26,7 @@ Le joueur ouvre un menu (Tab) qui met le jeu en pause et affiche deux colonnes (
 - [ ] Réassigner la même tâche renvoie `false`, sans diffusion ; `AssignTask(S, Unassigned)` depuis une catégorie renvoie `true` et remet S dans la liste `Unassigned`.
 - [ ] `AssignTask` sur `nullptr` ou sur un serviteur non enregistré renvoie `false`, sans diffusion ni changement d'état.
 - [ ] `GetServantsWithTask` renvoie les serviteurs dans l'ordre d'enregistrement ; sans aucun serviteur, la liste de chaque tâche est vide.
-- [ ] Après `AssignTask` vers n'importe quelle tâche, le contrôleur du serviteur reste en errance (`IsWandering() == true`).
+- [ ] `AssignTask` ne modifie pas l'état d'errance du contrôleur (`IsWandering()` identique avant et après, quelle que soit la tâche).
 - [ ] Widget : `AssignSelectedServant` sans sélection renvoie `false` ; avec une sélection, il assigne puis vide la sélection ; la sélection est vidée si le serviteur sélectionné est retiré du registre ; `OnMenuRefreshRequested` est appelé par `InitializeMenu` puis à chaque diffusion.
 - [ ] PIE : Tab ouvre le menu (jeu en pause, curseur visible) ; Tab le referme (jeu repris, curseur masqué, regard souris rétabli). Menu ouvert : ZQSD, souris, E, L, clic gauche, clic droit et Entrée sont sans effet.
 - [ ] PIE : un clic sur un serviteur puis sur « Récolte de champ » le fait changer de colonne ; l'affectation est conservée après fermeture et réouverture.
@@ -70,13 +71,14 @@ Aucune. Touche : Tab (`IMC_Default`), provisoire (refonte des touches prévue pa
 ## Périmètre de fichiers
 - **C++, à créer** : `Servants/ServantTask.h` (enum), `Servants/ServantSubsystem.h/.cpp`, `Servants/ServantTaskMenuWidget.h/.cpp`.
 - **C++, à modifier** : `Servants/Servant.h/.cpp` (`BeginPlay`/`EndPlay`), `Core/Character/Spooky_SporesCharacter.h/.cpp` (action, toggle, pause, événement).
-- **Tests (`qa-test-writer`)** : `Tests/ServantSubsystem*Spec.cpp`, `Tests/ServantTaskMenuWidget*Spec.cpp` (noms libres).
+- **Tests (`qa-test-writer`)** : `Tests/ServantSubsystem*Spec.cpp`, `Tests/ServantTaskMenuWidget*Spec.cpp` (noms libres). Si `UServantTaskMenuWidget` ne peut pas être testé proprement en Automation Spec (création de widget sans joueur ou sans GameInstance), `qa-test-writer` le signale et ne livre pas de test de complaisance : ses critères basculent en scénario PIE.
 - **[MCP]** : créer `Core/Input/Actions/IA_ToggleServantMenu` (Digital, `bTriggerWhenPaused = true`), mapper Tab dans `IMC_Default`, renseigner `ToggleServantMenuAction` sur `BP_FirstPersonCharacter`, vérifier qu'aucune autre IA n'a `bTriggerWhenPaused` à `true` et que Tab n'est pas déjà mappé.
 - **[HUMAIN]** (le MCP ne crée ni widget ni Event Graph) : `UI/Widgets/WBP_ServantTaskMenu` (parent `UServantTaskMenuWidget`, deux colonnes, boutons non focusables), `UI/Widgets/WBP_ServantEntry` (bouton « Serviteur N » → `SelectServant`), Event Graph de `BP_FirstPersonCharacter` (création au `BeginPlay`, `InitializeMenu`, visibilité sur `OnServantMenuToggled`).
 - **Points chauds** : aucun dans le code (`Build.cs` contient déjà `UMG`). `IMC_Default` et `BP_FirstPersonCharacter` sont des assets partagés : à sérialiser. `Lvl_Principal.umap` n'est pas touché. Docs (`documentation-technique.md`, `TODO.md`) : `consistency-keeper` en fin de branche.
 
 ## Hors périmètre
 - Comportement « attaque / défense ». Intention de Timéo, sans spécification ici : en errance tant qu'aucun ennemi n'est entré dans la base, puis ils vont l'attaquer (dépend de l'item 3).
+- Règle de Timéo pour 2.2 et attaque / défense (intention, non spécifiée ici) : « Alors en soit l'assignation des tâches ne doit pas rééllement enlever l'état d'errance, il l'enlève seulement si il y a des fieldPlot à gérer dans la base ou si il y a des ennemis à tuer. Dans le cas où il y a plus de champ ou plus d'ennemis, le serviteur se remet dans un êtat d'errance même en étant assigné, dans l'attente de nouvelles choses à faire. »
 - Comportement « récolte de champ » (2.2, avec le despawn des drops au sol de la dette technique).
 - Glisser-déposer (item 8 : seul le widget changera, l'API C++ reste).
 - Sauvegarde des affectations (item 5), UI hors du Character (item 6), vue de gestion et pause associée (item 13).
