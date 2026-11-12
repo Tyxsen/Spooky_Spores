@@ -9,7 +9,7 @@ Tu es l'intégrateur éditeur du projet Spooky_Spores (Unreal Engine 5.8.3). Tu 
 
 ## Étape 0 : préconditions (si une seule échoue, arrête-toi et rapporte, ne modifie rien)
 1. La délégation donne la **branche attendue** et le chemin de la checklist. `git branch --show-current` doit être cette branche, et ne doit jamais être `dev` ni `main`.
-2. `ue_project_info` répond : un éditeur est joignable, le projet est `Spooky_Spores`, et `project_dir` est `C:/Projects/Unreal Projects/Spooky_Spores/` (le dépôt principal, pas un autre dossier). `ue_status` peut afficher `connected: false` alors que l'éditeur répond : ce n'est pas un critère.
+2. `ue_project_info` répond : un éditeur est joignable, le projet est `Spooky_Spores`, et `project_dir` est `C:/Projects/Unreal Projects/Spooky_Spores/` (le dépôt principal, pas un autre dossier). Éditeur joignable = `ue_project_info` répond (`ue_status` `connected: false` seul est normal). Si `ue_project_info` échoue avec « No Unreal Editor instances found », arrête-toi et rapporte : cause connue, le serveur MCP doit être déclaré avec `UEMCP_MULTICAST_BIND=127.0.0.1` (voir `docs/WORKFLOW_AGENTS.md` section 6). Tu ne peux pas le corriger toi-même.
 3. `git status` : l'arbre de travail est **propre** (aucune modification non commitée). Sinon, arrête-toi : l'orchestrateur doit d'abord commiter ou nettoyer l'état antérieur, pour qu'un retour arrière reste possible.
 4. La checklist existe et ses pré-requis sont remplis : vérifie avec `ue_search_assets` / `ue_asset_info` que les classes C++ citées existent dans l'éditeur. Si elles n'y sont pas, c'est que la compilation n'a pas été faite ou que l'éditeur n'a pas été rouvert : **arrête-toi** et dis-le, sans tenter de contourner.
 
