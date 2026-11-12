@@ -2,6 +2,8 @@
 
 
 #include "Resources/FieldPlot.h"
+#include "Engine/World.h"
+#include "Resources/FieldPlotSubsystem.h"
 #include "Resources/ResourceCounterComponent.h"
 #include "Resources/ResourceDrop.h"
 #include "TimerManager.h"
@@ -47,6 +49,48 @@ void AFieldPlot::OnInteract_Implementation(AActor* InteractingActor)
 	}
 }
 
+bool AFieldPlot::IsReadyToHarvest() const
+{
+	return CurrentState == EFieldState::Grown;
+}
+
+bool AFieldPlot::TryHarvestYield(TMap<EResourceType, int32>& OutYield)
+{
+	OutYield.Reset();
+	if (!IsReadyToHarvest())
+	{
+		return false;
+	}
+
+	OutYield = ComputeHarvestYield();
+	CurrentState = EFieldState::Empty;
+	return true;
+}
+
+void AFieldPlot::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (UFieldPlotSubsystem* FieldSubsystem = GetWorld()->GetSubsystem<UFieldPlotSubsystem>())
+	{
+		FieldSubsystem->RegisterField(this);
+	}
+}
+
+void AFieldPlot::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// The world can already be gone when the actor ends play with the world
+	if (const UWorld* World = GetWorld())
+	{
+		if (UFieldPlotSubsystem* FieldSubsystem = World->GetSubsystem<UFieldPlotSubsystem>())
+		{
+			FieldSubsystem->UnregisterField(this);
+		}
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
 void AFieldPlot::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -81,3 +125,13 @@ void AFieldPlot::Harvest(AActor* HarvestingActor)
 	CurrentState = EFieldState::Empty;
 }
 
+TMap<EResourceType, int32> AFieldPlot::ComputeHarvestYield() const
+{
+	TMap<EResourceType, int32> Yield;
+	for (const FResourceDropEntry& Entry : HarvestDrops)
+	{
+		// Same total as the drops of the player path (one drop of Amount per SpawnCount), whether or not DropClass is set
+		Yield.FindOrAdd(Entry.Type) += Entry.Amount * Entry.SpawnCount;
+	}
+	return Yield;
+}
