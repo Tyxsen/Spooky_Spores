@@ -6,6 +6,7 @@
 #include "Subsystems/WorldSubsystem.h"
 #include "FieldPlotSubsystem.generated.h"
 
+class AActor;
 class AFieldPlot;
 
 // One registered field and who reserved it. Weak pointers: the registry never keeps anything alive and never dangles.

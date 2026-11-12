@@ -357,7 +357,8 @@ void AServantAIController::ResolveHarvest(bool bReachedTarget)
 
 bool AServantAIController::HarvestAndDeposit(AFieldPlot& Field)
 {
-	// PROVISIONAL: the only place that credits a harvest. To change when the shared base inventory exists (TODO item 7).
+	// PROVISIONAL (until the shared base inventory, TODO item 7): credit happens here, storage is resolved in
+	// FindHarvestStorage; these two functions are the only ones to change.
 	UResourceCounterComponent* Storage = FindHarvestStorage();
 	if (!Storage)
 	{

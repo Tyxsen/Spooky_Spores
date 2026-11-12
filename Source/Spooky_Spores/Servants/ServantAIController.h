@@ -41,7 +41,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Servant|Wander")
 	void StartWandering();
 
-	// Stops the current move and cancels the next decision (task assignment will call this).
+	// Stops the current move and cancels the next decision. Also releases the harvest reservation.
+	// Called by OnUnPossess; a task assignment change does not call it (see OnServantAssignmentsChanged).
 	UFUNCTION(BlueprintCallable, Category = "Servant|Wander")
 	void StopWandering();
 
@@ -86,8 +87,9 @@ private:
 	// Task of the controlled servant, Unassigned if none or not registered.
 	EServantTask GetAssignedTask() const;
 
-	// PROVISIONAL (until the shared base inventory, TODO item 7): the harvest is credited to player 0's counter.
-	// nullptr when there is no player or no counter.
+	// PROVISIONAL (until the shared base inventory, TODO item 7): storage is resolved in FindHarvestStorage and
+	// credited in HarvestAndDeposit; these two functions are the only ones to change.
+	// Here: player 0's counter. nullptr when there is no player or no counter.
 	UResourceCounterComponent* FindHarvestStorage() const;
 
 	// Starts a harvest if the servant is assigned and an eligible field exists. True if the decision is a Harvest
@@ -97,7 +99,8 @@ private:
 	// Runs when the servant is at the field (immediately or from OnMoveCompleted): harvests, or fails.
 	void ResolveHarvest(bool bReachedTarget);
 
-	// PROVISIONAL (until the shared base inventory, TODO item 7): the only place that credits a harvest.
+	// PROVISIONAL (until the shared base inventory, TODO item 7): credits the harvest (storage comes from
+	// FindHarvestStorage); these two functions are the only ones to change.
 	// False if the field was not harvested (no storage: the field stays Grown).
 	bool HarvestAndDeposit(AFieldPlot& Field);
 
