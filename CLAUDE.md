@@ -69,7 +69,7 @@ Chargé à chaque session **et par chaque sous-agent** : uniquement les règles,
 
 ## 6. Contrôles
 
-ZQSD / souris / Espace : déplacement, regard, saut. **E** : saisir / relâcher / interagir (contextuel). **Clic droit** : lancer. **Clic gauche** : sort. **Maj gauche** : sprint. **L** : poser une Necrospore. **Entrée** : panneau de contrôles.
+ZQSD / souris / Espace : déplacement, regard, saut. **E** : saisir / relâcher / interagir (contextuel). **Clic droit** : lancer. **Clic gauche** : sort. **Maj gauche** : sprint. **L** : poser une Necrospore. **Entrée** : panneau de contrôles. **Tab** : menu d'assignation des serviteurs (met le jeu en pause ; provisoire, refonte des touches prévue).
 - Le clic droit est réservé à la roue des sorts par le 3C : n'ajoute pas de rôle sans en discuter.
 - **`²` (AZERTY) = console Unreal : ne jamais l'assigner.** Échap ferme le viewport en PIE : à éviter.
 - Refonte prévue avec les objets équipables (Input Mapping Contexts d'Enhanced Input).
@@ -110,6 +110,8 @@ Question systématique : **à quel moment cette ligne s'exécute-t-elle ?**
 - Un personnage déplacé via `MoveToLocation`/`PathFollowingComponent` impose une **vitesse** (`RequestDirectMove`) et non une accélération, sauf si `GetCharacterMovement()->GetNavMovementProperties()->bUseAccelerationForPaths = true` (défaut `false`). Un Anim Blueprint qui lit `GetCurrentAcceleration` (ex. `ABP_Unarmed`, `Should Move`) fait alors glisser le personnage sans cycle de marche. Corrigé et confirmé sur le serviteur ; vérifier avec l'Anim Blueprint Debugger.
 - `TActorIterator<T>` ne garantit aucun ordre : ne jamais s'en servir pour choisir « le bon » acteur parmi plusieurs du même type ; préférer une référence explicite assignée à la main (`EditInstanceOnly`). Si le consommateur est créé par le code (serviteur spawné) ou par un `PlayerStart` (Character), aucune instance du niveau ne peut porter cette référence : passer par un `UWorldSubsystem` qui enregistre l'unique instance (modèle : `UBaseZoneSubsystem`, la première enregistrée gagne, un log d'erreur signale la seconde).
 - `UFUNCTION(BlueprintCallable)` `const` avec un paramètre de sortie devient **pure** automatiquement (UHT) : un nœud pur est réévalué à chaque pin de sortie, donc un tirage aléatoire donnerait deux valeurs. Ajouter `BlueprintPure = false`.
+- Un menu qui met le jeu en pause ne doit pas utiliser `FInputModeUIOnly` : il appelle `SetIgnoreInput(true)` et la touche de fermeture n'arrive plus. Utiliser `FInputModeGameAndUI` et une Input Action avec `Trigger when Paused`.
+- Dans un Blueprint, enchaîner une étape après un `For Each Loop` via son `Loop Body` au lieu de `Completed` (ou d'un `Sequence`) la saute quand la liste est vide et la répète par élément sinon.
 
 ---
 
