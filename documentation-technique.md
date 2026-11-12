@@ -36,7 +36,7 @@ Movement/    StaminaComponent
 Health/      HealthComponent
 Spells/      ManaComponent, SpellCastingComponent
 Enemies/     EnemySoldier, EnemyAIController, EnemyPathSpline, Destructible
-Servants/    Servant, ServantAIController
+Servants/    Servant, ServantAIController, ServantSubsystem, ServantTask, ServantTaskMenuWidget
 Base/        BaseZone, BaseZoneSubsystem
 Tests/       Automation Specs (code de test du module, pas un domaine de gameplay)
 ```
@@ -168,9 +168,9 @@ La vitesse (`MaxWalkSpeed`) n'est modifiée qu'à un endroit, `HandleSprintState
 
 ---
 
-## 12. Serviteurs : pose et errance
+## 12. Serviteurs : pose, errance et affectation
 
-`Servants/` : `AServant` (Character) et `AServantAIController` (errance) ; pas de classe commune avec `AEnemySoldier` (rôles différents, une seule implémentation ne justifie pas d'abstraction).
+`Servants/` : `AServant` (Character), `AServantAIController` (errance), `UServantSubsystem` (tâches) et `UServantTaskMenuWidget` (menu) ; pas de classe commune avec `AEnemySoldier` (rôles différents, une seule implémentation ne justifie pas d'abstraction).
 
 **Pose (touche L, `DoPlaceServant`)**, dans cet ordre : 1. `UInteractionComponent::GetPlacementPoint` (point au sol devant le joueur) ; 2. `TrySpendResource(Necrospore, 1)` ; 3. spawn de `ServantClass` (`BP_Servant`). Une pose impossible ne coûte donc jamais de Necrospore.
 
@@ -184,12 +184,19 @@ La vitesse (`MaxWalkSpeed`) n'est modifiée qu'à un endroit, `HandleSprintState
 - **Décision** (`MakeDecision`, règle pure `DecideNextAction`, `EServantWanderAction`) : `Wait` (pas de zone ou zone invalide, nouvel essai après `RetryDelay`), `Wander` (dans la zone : point tiré, projeté sur le NavMesh, pause de `MinWanderPause` à `MaxWanderPause` après l'arrivée), `Return` (hors zone : `MoveToLocation` vers un point de la zone), `Teleport`. La zone est relue via `UBaseZoneSubsystem` à chaque décision, sans cache.
 - **Point de destination** : `GetRandomPointInZone` puis `ProjectPointToNavigation` (extension verticale = `GetZoneExtent().Z` + `ProjectionVerticalMargin`), au plus `MaxProjectionAttempts` essais ; un point projeté hors zone compte comme un échec.
 - **Retour et téléportation** : tout retour raté (pas de point, `Failed`, `Aborted`, `Blocked`, arrêt sur le bord) incrémente `FailedReturnAttempts` ; un retour réussi le remet à 0. À `MaxFailedReturnAttempts` (3), `TeleportTo` dans la zone (le serviteur n'est ni laissé dehors ni la pose bloquée) ; un échec de téléportation est tracé.
-- **API pour l'assignation (item 2 du `TODO.md`)** : `StartWandering` (remet le compteur à 0, sans effet si déjà en errance) et `StopWandering` (arrête le déplacement, efface le timer ; un `OnMoveCompleted` tardif est ignoré). Lancé par `OnPossess`.
+- **Démarrage et arrêt** : `StartWandering` (remet le compteur à 0, sans effet si déjà en errance) et `StopWandering` (arrête le déplacement, efface le timer ; un `OnMoveCompleted` tardif est ignoré). `StartWandering` est lancé par `OnPossess`. L'assignation d'une tâche ne les appelle pas (voir ci-dessous).
 - **Possession** : `AutoPossessAI = PlacedInWorldOrSpawned` (le défaut `PlacedInWorld` ne possède pas un serviteur spawné par la pose).
 - **Vitesse** : `WanderWalkSpeed` (275, sur le contrôleur) est appliquée à `MaxWalkSpeed` par `StartWandering`, errance et retour compris : la vitesse appartient au comportement, pas au défaut d'`AServant`.
 - **Animation et rotation** : `bUseAccelerationForPaths = true` sur `AServant` (l'`ABP_Unarmed` calcule `Should Move` depuis `GetCurrentAcceleration` ; sans cela il glissait sans cycle de marche). `bUseControllerRotationYaw` désactivé, `bOrientRotationToMovement` activé.
 - **Dépendances** : module `NavigationSystem` dans `Spooky_Spores.Build.cs`. `AcceptanceRadius` (50) n'inclut pas le rayon de capsule (`bStopOnOverlap` l'ajoute).
 - **Limite** : le NavMesh de `Lvl_Principal` a été réduit à la base (volume resserré à la main) ; un consommateur de navigation hors base (récolte de champ, défense) devra vérifier ou agrandir le `NavMeshBoundsVolume`.
+
+**Affectation des tâches (`UServantSubsystem`)** : `UWorldSubsystem`, source unique de la tâche de chaque serviteur ; `AServant` ne stocke rien, donc une tâche ne change jamais sans diffusion.
+- **Registre** : `AServant::BeginPlay` enregistre, `EndPlay` retire (doublons et inconnus ignorés, `TWeakObjectPtr`, ordre d'enregistrement conservé). Chaque serviteur reçoit un numéro (« Serviteur N ») **jamais réutilisé** dans le monde, même après sa mort.
+- **`EServantTask`** (`ServantTask.h`) : trois valeurs, dont `Unassigned` (valeur par défaut d'un serviteur enregistré).
+- **`AssignTask`** renvoie `true` seulement si la tâche change. `OnAssignmentsChanged` est diffusé à chaque enregistrement, retrait ou changement effectif. L'assignation ne touche pas au contrôleur : tous les serviteurs restent en errance (aucun comportement de tâche pour l'instant, `TODO.md` item 2).
+- **Menu (`UServantTaskMenuWidget`, `Abstract`)** : toute la logique est en C++ (sélection par clic puis clic sur une colonne, `AssignSelectedServant`, reconstruction complète des deux colonnes via l'événement `OnMenuRefreshRequested`). `InitializeMenu` reçoit le registre (le widget ne le cherche pas) ; pointeurs faibles vers le registre et le serviteur sélectionné. `InitializeMenu` abonne le widget ; `NativeConstruct` le réabonne s'il est réajouté à l'écran, `NativeDestruct` le désabonne ; aucune reconstruction pendant la destruction du monde (garde sur le monde du subsystem).
+- **Blueprints** : `WBP_ServantTaskMenu` (enfant, mise en page) et `WBP_ServantEntry` (un bouton par serviteur). La surbrillance passe par une fonction Blueprint unique par liste, `HighlightEntriesInList(List, Selection)`.
 
 ---
 
@@ -206,6 +213,7 @@ La vitesse (`MaxWalkSpeed`) n'est modifiée qu'à un endroit, `HandleSprintState
 - **API Blueprint** : `IsPointInZone`, `IsZoneValid`, `GetZoneExtent` (pures, composantes positives) ; `GetRandomPointInZone(OutPoint)` en `BlueprintCallable` + `BlueprintPure = false` (sinon UHT la rend pure et un tirage donnerait deux points par décision) ; renvoie faux plutôt qu'un `(0,0,0)` muet.
 - **Visibilité** : aucun `DrawDebug*` ni `Tick`. La boîte est visible en jeu car `Hidden In Game` est décoché sur `ZoneBox` de `BP_BaseZone` (réglage de dev à rétablir avant Release, `TODO.md`). Avec `NoCollision`, `show collision` ne la dessine pas.
 - **Tests** : `Tests/` (géométrie sans monde, valeurs par défaut du CDO, comportement avec monde). Rider : clic droit sur `Tests/` > *Run Unit Tests*, ou panneau Automation, filtre `SpookySpores`.
+- **Tests des serviteurs** : `ServantSubsystemSpec` (registre, numéros, `AssignTask`, diffusions) et `ServantTaskMenuWidgetSpec` (logique seule, sans Slate ; widget instancié via `FScopedAllowAbstractClassAllocation` car la classe est `Abstract`). `UServantTaskTestListener` : écouteur d'un delegate dynamique, première `UCLASS` de `Tests/`, compilée dans toutes les configurations (UHT refuse une `UCLASS` sous `#if`), `Transient` et jamais utilisée par le jeu.
 
 ---
 
@@ -217,5 +225,6 @@ La vitesse (`MaxWalkSpeed`) n'est modifiée qu'à un endroit, `HandleSprintState
 - Sphères d'état des champs et du chaudron (section 6).
 - `AEnemySoldier::DebugKill` (temporaire) : tue via `ApplyDamage` pour exercer toute la chaîne (santé → `OnDeath` → butin) ; touche de debug sur `BP_FirstPersonCharacter` ou bouton `CallInEditor`. À supprimer (`TODO.md`).
 - **Panneau de contrôles** (`WBP_ControlsPanel`, pas un outil de dev) : texte statique des touches, togglé par Entrée (`DoToggleControlsPanel` → event Blueprint `OnToggleControlsPanel` : le C++ déclenche, le Blueprint affiche).
+- **Menu des serviteurs (pause)** : Tab → `DoToggleServantMenu` → `SetServantMenuOpen` (fonction privée du Character) : `SetPause`, curseur visible, `FInputModeGameAndUI` + `SetHideCursorDuringCapture(false)` (pas `UIOnly`, qui bloquerait Tab) ; à la fermeture `FInputModeGameOnly`. L'événement Blueprint `OnServantMenuToggled` affiche ou masque le widget. `IA_ToggleServantMenu` est la seule action avec `Trigger when Paused` : pendant la pause tout est figé sauf Tab et les clics UMG. Les actions maintenues (sprint) reçoivent `Completed` à la première frame de pause (confirmé en PIE). Pas de système de pause générique : la vue de gestion (`TODO.md` item 13) reprendra cette fonction.
 
 ![Présentation des 3 types de debug actuel du projet](Documentation_Documents/Debug.png)

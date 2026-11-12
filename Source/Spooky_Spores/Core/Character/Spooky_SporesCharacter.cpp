@@ -8,6 +8,7 @@
 #include "EnhancedInputComponent.h"
 #include "InputActionValue.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "Spooky_Spores.h"
 #include "Interaction/GrabComponent.h"
 #include "Interaction/InteractionComponent.h"
@@ -99,6 +100,9 @@ void ASpooky_SporesCharacter::SetupPlayerInputComponent(UInputComponent* PlayerI
 
 		// Place Servant
 		EnhancedInputComponent->BindAction(PlaceServantAction, ETriggerEvent::Started, this, &ASpooky_SporesCharacter::DoPlaceServant);
+
+		// Servant Task Menu
+		EnhancedInputComponent->BindAction(ToggleServantMenuAction, ETriggerEvent::Started, this, &ASpooky_SporesCharacter::DoToggleServantMenu);
 	}
 	else
 	{
@@ -256,4 +260,40 @@ void ASpooky_SporesCharacter::HandleSprintStateChanged(bool bNewIsSprinting)
 void ASpooky_SporesCharacter::DoToggleControlsPanel()
 {
 	OnToggleControlsPanel();
+}
+
+void ASpooky_SporesCharacter::DoToggleServantMenu()
+{
+	SetServantMenuOpen(!bIsServantMenuOpen);
+}
+
+void ASpooky_SporesCharacter::SetServantMenuOpen(bool bOpen)
+{
+	APlayerController* PlayerController = Cast<APlayerController>(GetController());
+	if (!PlayerController)
+	{
+		UE_LOG(LogSpooky_Spores, Warning, TEXT("'%s' is not controlled by a PlayerController, cannot toggle the servant menu"), *GetNameSafe(this));
+		return;
+	}
+
+	bIsServantMenuOpen = bOpen;
+
+	// While paused, only IA_ToggleServantMenu (bTriggerWhenPaused) and UMG clicks stay active.
+	// Held actions (sprint, jump) receive Completed on the first paused frame, so nothing stays stuck.
+	PlayerController->SetPause(bOpen);
+	PlayerController->SetShowMouseCursor(bOpen);
+
+	if (bOpen)
+	{
+		// Not UIOnly: it ignores game input, so the toggle key could not close the menu
+		FInputModeGameAndUI InputMode;
+		InputMode.SetHideCursorDuringCapture(false);
+		PlayerController->SetInputMode(InputMode);
+	}
+	else
+	{
+		PlayerController->SetInputMode(FInputModeGameOnly());
+	}
+
+	OnServantMenuToggled(bOpen);
 }
