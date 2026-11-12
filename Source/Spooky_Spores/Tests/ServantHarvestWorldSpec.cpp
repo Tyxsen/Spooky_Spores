@@ -7,6 +7,8 @@
 // tick disabled, NO NavMesh). Consequence: a servant already within reach of a field harvests without any move (reachable here), while a
 // field out of reach needs a NavMesh projection, which always fails (the "NavMesh absent near the field" edge case, also testable here).
 // What cannot be built here is a servant walking to a field with a held reservation: criterion 10 is NOT covered, see the report.
+// Likewise, reservation-based exclusion between two servants on their way is not covered; criterion 9 here only detects a double credit
+// (field not emptied), and the reservation read by the controller is covered by the "reserved by another owner" test.
 // Player 0: an APlayerController registered in the world, with a pawn assigned through SetPawn (no possession logic needed),
 // because the spec resolves the storage with UGameplayStatics::GetPlayerPawn(this, 0).
 // Every test lists its mutation: the change of behaviour that must turn it red.
@@ -586,10 +588,58 @@ void FServantHarvestWorldSpec::Define()
 		}
 	});
 
+	Describe("Closest field first (eligibility rule: nearest in 2D)", [this]()
+	{
+		// Mutation: the controller picks the first registered field, or the farthest one, instead of the nearest -> the far field
+		//           (spawned and registered FIRST) is emptied first: "far still Grown" and "near Empty" lines turn red.
+		//           The next decision does not look for another field (the loop stops after one harvest) -> the far field stays
+		//           Grown and the final counter stays at one yield: red.
+		It("harvests the nearest Grown field first, then the farther one after HarvestNextDelay", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			SpawnZone(TEXT("ZoneNearest"));
+			UResourceCounterComponent* Counter = SpawnPlayer(true);
+			AServant* Servant = SpawnServant(TEXT("ServantNearest"), ServantLocation);
+			AServantAIController* Controller = RequireController(Servant);
+			if (Controller == nullptr || !TestNotNull(TEXT("harness: counter"), Counter) || !TestNotNull(TEXT("harness: capsule"), Servant->GetCapsuleComponent())) { return; }
+			// Both fields are within immediate reach (no NavMesh needed): the near one at 40 cm, the far one just inside
+			// HarvestReach + capsule radius (on the opposite side), spawned and therefore registered FIRST.
+			const double FarDistance = HarvestReach + Servant->GetCapsuleComponent()->GetScaledCapsuleRadius() - 5.0;
+			AFieldPlot* FarField = SpawnGrownField(TEXT("FieldFarFirst"), FVector(-FarDistance, 0.0, 0.0));
+			AFieldPlot* NearField2D = SpawnGrownField(TEXT("FieldNearSecond"), FVector(40.0, 0.0, 0.0));
+			if (!TestNotNull(TEXT("harness: far field"), FarField) || !TestNotNull(TEXT("harness: near field"), NearField2D)) { return; }
+			if (!TestTrue(TEXT("harness: assigned"), Assign(Servant, EServantTask::FieldHarvest))) { return; }
+
+			// First decision: the nearest field (2D) only.
+			const bool bHarvest = TickUntil([Controller]() { return Controller->GetLastAction() == EServantWanderAction::Harvest; },
+			                                InitialDecisionDelay + TimerSlack);
+			if (!TestTrue(TEXT("the first decision is Harvest"), bHarvest)) { return; }
+			TickFor(TickStep);
+			EFieldState NearState = EFieldState::Grown;
+			EFieldState FarState = EFieldState::Empty;
+			FieldPlotTest::GetState(NearField2D, NearState);
+			FieldPlotTest::GetState(FarField, FarState);
+			TestTrue(TEXT("the nearest field (2D) is Empty after the first harvest"), NearState == EFieldState::Empty);
+			TestTrue(TEXT("the farther field is still Grown (the first registered one was not chosen)"), FarState == EFieldState::Grown);
+			ExpectCounters(TEXT("after the first harvest: exactly one yield"), Counter, BaseWheat + 7, BaseSeed + 2);
+
+			// Next decision after HarvestNextDelay: the farther field.
+			const bool bFarHarvested = TickUntil([FarField]() { return !FarField->IsReadyToHarvest(); }, HarvestNextDelay + TimerSlack);
+			TestTrue(TEXT("the farther field is harvested at the next decision"), bFarHarvested);
+			TickFor(TickStep);
+			ExpectCounters(TEXT("after the second harvest: exactly two yields"), Counter, BaseWheat + 14, BaseSeed + 4);
+			TestEqual(TEXT("no AResourceDrop spawned"), FieldPlotTest::CountDrops(World), 0);
+		});
+	});
+
 	Describe("Two servants, one field (criterion 9)", [this]()
 	{
-		// Mutation: the controller harvests without TryHarvestYield succeeding or credits twice (no Grown check, no reservation) ->
-		//           the counter is credited twice (Wheat + 14): red. Both servants reach Harvest: red.
+		// Mutation: the field is not emptied after the credit, or the credit ignores TryHarvestYield's result (no Grown check),
+		//           so the second servant credits it again -> Wheat + 14 and both servants reach Harvest: red.
+		// NOT detected here: the absence of the RESERVATION. Both servants are within immediate reach, A harvests synchronously
+		//           in its decision and the field is already Empty when B decides, so only the Grown state stops B. The exclusion by
+		//           reservation between two servants on their way is covered only by criterion 10 (PIE, NavMesh); the reservation
+		//           honoured by a servant is covered by the "reserved by another owner" test below.
 		It("credits the counter once and only one servant ever harvests", [this]()
 		{
 			if (!RequireWorld()) { return; }

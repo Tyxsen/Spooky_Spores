@@ -231,8 +231,10 @@ void FFieldPlotSpec::Define()
 			TestFalse(TEXT("the Empty field is still not listed"), List.Contains(EmptyField));
 		});
 
-		// Mutation: AFieldPlot::EndPlay does not unregister -> a stale entry stays in the list (null or destroyed pointer): red.
-		//           Unregistration removes the wrong field -> the surviving field disappears: red.
+		// Mutation: unregistration removes the wrong field (e.g. the first one instead of the destroyed one) -> the survivor disappears: red.
+		//           The list returns a destroyed field (validity not filtered) -> "one field left" / "no null entry" turn red.
+		// NOT detected: AFieldPlot::EndPlay not calling UnregisterField. The registry holds weak pointers, so a destroyed field is
+		// invisible with or without the explicit unregistration; that call is memory housekeeping, not observable through behaviour.
 		It("a destroyed field disappears from the list and the survivors stay", [this]()
 		{
 			if (!RequireWorld()) { return; }
@@ -324,7 +326,9 @@ void FFieldPlotSpec::Define()
 			TestTrue(TEXT("another reserver can take it"), Subsystem->TryReserve(Field, B));
 		});
 
-		// Mutation: EndPlay unregisters nothing (the reservation entry survives its field) -> IsReserved stays true or the list keeps it: red.
+		// Mutation: IsReserved / the list report a destroyed field as still reserved or listed (weak-pointer validity not checked) -> red.
+		// NOT detected: AFieldPlot::EndPlay not unregistering. A destroyed field is invisible through the weak pointer either way,
+		// so the explicit unregistration (memory housekeeping) cannot be observed through behaviour; no counting API is added for it.
 		It("a destroyed field is no longer reserved nor listed", [this]()
 		{
 			if (!RequireWorld()) { return; }
