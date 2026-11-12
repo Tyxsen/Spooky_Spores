@@ -10,8 +10,14 @@
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "NavigationSystem.h"
+#include "Resources/FieldPlot.h"
+#include "Resources/FieldPlotSubsystem.h"
+#include "Resources/ResourceCounterComponent.h"
+#include "Servants/Servant.h"
+#include "Servants/ServantSubsystem.h"
 #include "Spooky_Spores.h"
 #include "TimerManager.h"
 
@@ -40,8 +46,20 @@ void AServantAIController::StopWandering()
 {
 	// Must be cleared before StopMovement: the synchronous Aborted callback would otherwise reschedule a decision
 	bIsWandering = false;
+	// Also before StopMovement: the reservation must not outlive the harvest, and the Aborted callback must not resolve it
+	ReleaseHarvest();
 	StopMovement();
 	GetWorldTimerManager().ClearTimer(DecisionTimer);
+}
+
+AFieldPlot* AServantAIController::GetHarvestTarget() const
+{
+	return HarvestTarget.Get();
+}
+
+bool AServantAIController::IsHarvesting() const
+{
+	return bIsHarvesting;
 }
 
 bool AServantAIController::IsWandering() const
@@ -81,6 +99,13 @@ void AServantAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFo
 		return;
 	}
 
+	// A harvest move ends here, success or not (cancellations clear bIsHarvesting before StopMovement)
+	if (bIsHarvesting)
+	{
+		ResolveHarvest(Result.IsSuccess());
+		return;
+	}
+
 	if (Result.IsSuccess())
 	{
 		ScheduleDecision(FMath::FRandRange(MinWanderPause, MaxWanderPause));
@@ -95,6 +120,11 @@ void AServantAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
+	if (UServantSubsystem* ServantSubsystem = GetWorld()->GetSubsystem<UServantSubsystem>())
+	{
+		ServantSubsystem->OnAssignmentsChanged.AddUniqueDynamic(this, &AServantAIController::OnServantAssignmentsChanged);
+	}
+
 	// Possession happens in the servant's PostInitializeComponents, before its BeginPlay and possibly
 	// before the zone's BeginPlay (registration): the first decision is delayed, the zone is read then.
 	StartWandering();
@@ -104,6 +134,11 @@ void AServantAIController::OnUnPossess()
 {
 	// Before Super: StopMovement still needs the pawn
 	StopWandering();
+
+	if (UServantSubsystem* ServantSubsystem = GetWorld()->GetSubsystem<UServantSubsystem>())
+	{
+		ServantSubsystem->OnAssignmentsChanged.RemoveDynamic(this, &AServantAIController::OnServantAssignmentsChanged);
+	}
 
 	Super::OnUnPossess();
 }
@@ -127,6 +162,10 @@ void AServantAIController::MakeDecision()
 	const UBaseZoneSubsystem* ZoneSubsystem = GetWorld()->GetSubsystem<UBaseZoneSubsystem>();
 	ABaseZone* Zone = ZoneSubsystem ? ZoneSubsystem->GetBaseZone() : nullptr;
 
+	// Consumed by this decision whatever it ends up being
+	const bool bSkipHarvest = bSkipNextHarvest;
+	bSkipNextHarvest = false;
+
 	const bool bHasValidZone = Zone && Zone->IsZoneValid();
 	const bool bIsInZone = bHasValidZone && Zone->IsPointInZone(ControlledPawn->GetActorLocation());
 
@@ -144,6 +183,12 @@ void AServantAIController::MakeDecision()
 	}
 
 	LastAction = DecideNextAction(bHasValidZone, bIsInZone, FailedReturnAttempts, MaxFailedReturnAttempts);
+
+	// Wandering stays the background state: the harvest only replaces a Wander decision (never a Return)
+	if (LastAction == EServantWanderAction::Wander && !bSkipHarvest && TryStartHarvest(*Zone))
+	{
+		return;
+	}
 
 	switch (LastAction)
 	{
@@ -169,13 +214,6 @@ void AServantAIController::ScheduleDecision(float Delay)
 
 bool AServantAIController::TryFindNavPointInZone(const ABaseZone& Zone, FVector& OutPoint) const
 {
-	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
-	if (!NavSys)
-	{
-		return false;
-	}
-
-	const FNavAgentProperties& AgentProps = GetNavAgentPropertiesRef();
 	const FVector QueryExtent(ProjectionHorizontalExtent, ProjectionHorizontalExtent,
 							Zone.GetZoneExtent().Z + ProjectionVerticalMargin);
 
@@ -187,15 +225,184 @@ bool AServantAIController::TryFindNavPointInZone(const ABaseZone& Zone, FVector&
 			return false;
 		}
 
-		FNavLocation ProjectedLocation;
-		if (NavSys->ProjectPointToNavigation(RandomPoint, ProjectedLocation, QueryExtent, &AgentProps)
-			&& Zone.IsPointInZone(ProjectedLocation.Location))
+		FVector ProjectedPoint;
+		if (TryProjectOnNavMesh(RandomPoint, QueryExtent, ProjectedPoint) && Zone.IsPointInZone(ProjectedPoint))
 		{
-			OutPoint = ProjectedLocation.Location;
+			OutPoint = ProjectedPoint;
 			return true;
 		}
 	}
 	return false;
+}
+
+bool AServantAIController::TryProjectOnNavMesh(const FVector& Point, const FVector& Extent, FVector& OutPoint) const
+{
+	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	if (!NavSys)
+	{
+		return false;
+	}
+
+	FNavLocation ProjectedLocation;
+	if (!NavSys->ProjectPointToNavigation(Point, ProjectedLocation, Extent, &GetNavAgentPropertiesRef()))
+	{
+		return false;
+	}
+
+	OutPoint = ProjectedLocation.Location;
+	return true;
+}
+
+EServantTask AServantAIController::GetAssignedTask() const
+{
+	const UServantSubsystem* ServantSubsystem = GetWorld()->GetSubsystem<UServantSubsystem>();
+	return ServantSubsystem ? ServantSubsystem->GetServantTask(Cast<AServant>(GetPawn())) : EServantTask::Unassigned;
+}
+
+UResourceCounterComponent* AServantAIController::FindHarvestStorage() const
+{
+	// PROVISIONAL: player 0 until the shared base inventory exists (TODO item 7)
+	const APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
+	return PlayerPawn ? PlayerPawn->FindComponentByClass<UResourceCounterComponent>() : nullptr;
+}
+
+bool AServantAIController::TryStartHarvest(const ABaseZone& Zone)
+{
+	UFieldPlotSubsystem* FieldSubsystem = GetWorld()->GetSubsystem<UFieldPlotSubsystem>();
+	const APawn* ControlledPawn = GetPawn();
+	// Storage checked before reserving: without it the harvest would be refused anyway
+	if (!FieldSubsystem || !ControlledPawn || GetAssignedTask() != EServantTask::FieldHarvest || !FindHarvestStorage())
+	{
+		return false;
+	}
+
+	const FVector PawnLocation = ControlledPawn->GetActorLocation();
+	AFieldPlot* NearestField = nullptr;
+	double NearestDistanceSq = TNumericLimits<double>::Max();
+	for (AFieldPlot* Field : FieldSubsystem->GetUnreservedHarvestableFields())
+	{
+		if (!Zone.IsPointInZone(Field->GetActorLocation()))
+		{
+			continue;
+		}
+
+		const double DistanceSq = FVector::DistSquared2D(PawnLocation, Field->GetActorLocation());
+		if (DistanceSq < NearestDistanceSq)
+		{
+			NearestDistanceSq = DistanceSq;
+			NearestField = Field;
+		}
+	}
+
+	if (!NearestField || !FieldSubsystem->TryReserve(NearestField, this))
+	{
+		return false;
+	}
+
+	HarvestTarget = NearestField;
+	bIsHarvesting = true;
+	LastAction = EServantWanderAction::Harvest;
+
+	// 2D on purpose: the path following measures arrival in 2D (CLAUDE.md section 8)
+	const ACharacter* ControlledCharacter = GetCharacter();
+	const double CapsuleRadius = ControlledCharacter ? ControlledCharacter->GetCapsuleComponent()->GetScaledCapsuleRadius() : 0.0;
+	const double ReachDistance = HarvestReach + CapsuleRadius;
+	if (NearestDistanceSq <= ReachDistance * ReachDistance)
+	{
+		ResolveHarvest(/*bReachedTarget*/ true);
+		return true;
+	}
+
+	FVector NavPoint;
+	if (!TryProjectOnNavMesh(NearestField->GetActorLocation(), FVector(HarvestProjectionExtent), NavPoint))
+	{
+		ResolveHarvest(/*bReachedTarget*/ false);
+		return true;
+	}
+
+	// Follow-up scheduled by OnMoveCompleted only, even when MoveToLocation completes synchronously
+	// (Failed, AlreadyAtGoal). Not projected again (bProjectDestinationToNavigation false), the capsule radius
+	// comes from bStopOnOverlap.
+	MoveToLocation(NavPoint, HarvestReach, /*bStopOnOverlap*/ true, /*bUsePathfinding*/ true,
+				/*bProjectDestinationToNavigation*/ false, /*bCanStrafe*/ false, /*FilterClass*/ nullptr,
+				/*bAllowPartialPath*/ false);
+	return true;
+}
+
+void AServantAIController::ResolveHarvest(bool bReachedTarget)
+{
+	AFieldPlot* Field = HarvestTarget.Get();
+	UFieldPlotSubsystem* FieldSubsystem = GetWorld()->GetSubsystem<UFieldPlotSubsystem>();
+
+	// The field may have been harvested by the player or destroyed during the walk. TryReserve by us succeeds
+	// only if nobody else holds it (a destroyed field is not registered anymore).
+	bool bHarvested = false;
+	if (bReachedTarget && Field && FieldSubsystem && FieldSubsystem->TryReserve(Field, this))
+	{
+		bHarvested = HarvestAndDeposit(*Field);
+	}
+
+	ReleaseHarvest();
+
+	if (bHarvested)
+	{
+		ScheduleDecision(HarvestNextDelay);
+	}
+	else
+	{
+		bSkipNextHarvest = true;
+		ScheduleDecision(RetryDelay);
+	}
+}
+
+bool AServantAIController::HarvestAndDeposit(AFieldPlot& Field)
+{
+	// PROVISIONAL: the only place that credits a harvest. To change when the shared base inventory exists (TODO item 7).
+	UResourceCounterComponent* Storage = FindHarvestStorage();
+	if (!Storage)
+	{
+		return false;
+	}
+
+	TMap<EResourceType, int32> Yield;
+	if (!Field.TryHarvestYield(Yield))
+	{
+		return false;
+	}
+
+	for (const TPair<EResourceType, int32>& Pair : Yield)
+	{
+		Storage->AddResource(Pair.Key, Pair.Value);
+	}
+	return true;
+}
+
+void AServantAIController::ReleaseHarvest()
+{
+	AFieldPlot* Field = HarvestTarget.Get();
+	UFieldPlotSubsystem* FieldSubsystem = GetWorld()->GetSubsystem<UFieldPlotSubsystem>();
+	if (Field && FieldSubsystem)
+	{
+		FieldSubsystem->Release(Field, this);
+	}
+
+	HarvestTarget.Reset();
+	bIsHarvesting = false;
+}
+
+void AServantAIController::OnServantAssignmentsChanged()
+{
+	// Fired on every (un)registration and assignment: only a harvest in progress whose task was removed is cancelled.
+	// An unregistered servant (EndPlay) counts as Unassigned.
+	if (!bIsHarvesting || GetAssignedTask() == EServantTask::FieldHarvest)
+	{
+		return;
+	}
+
+	// Released and cleared before StopMovement: the Aborted callback then reschedules a plain decision
+	ReleaseHarvest();
+	LastAction = EServantWanderAction::None;
+	StopMovement();
 }
 
 void AServantAIController::MoveToZonePoint(const ABaseZone& Zone)
