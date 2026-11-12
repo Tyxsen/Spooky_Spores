@@ -59,7 +59,8 @@ Caméra en **première personne**, choisie pour maximiser l'immersion du joueur 
 |---|---|
 | Déplacement | Z Q S D |
 | Regarder autour de soi | Souris |
-| Ouvrir l'inventaire | Tab |
+| Menu d'assignation des serviteurs (met le jeu en pause) | Tab |
+| Ouvrir l'inventaire | Touche à définir |
 | Interagir avec l'environnement / les objets | E |
 | Attaquer (sort sélectionné) | Clic gauche |
 | Lancer un objet actuellement grab | Clic droit |
