@@ -74,6 +74,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category ="Input")
 	UInputAction* PlaceServantAction;
 
+	/** Toggle servant task menu Input Action (must have bTriggerWhenPaused, the menu pauses the game) */
+	UPROPERTY(EditAnywhere, Category = "Input")
+	UInputAction* ToggleServantMenuAction = nullptr;
+
 	/** SERVANTS */
 	/** Servant class spawned when a Necrospore is placed (set to the Blueprint child in BP_FirstPersonCharacter) */
 	UPROPERTY(EditAnywhere, Category = "Servants")
@@ -142,6 +146,10 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	virtual void DoPlaceServant();
 
+	/** Show or hide the servant task menu widget (pause, cursor and input mode are already handled in C++) */
+	UFUNCTION(BlueprintImplementableEvent, Category = "UI")
+	void OnServantMenuToggled(bool bIsOpen);
+
 	UFUNCTION()
 	void HandleSprintStateChanged(bool bNewIsSprinting);
 
@@ -151,7 +159,17 @@ protected:
 private:
 	void DoToggleControlsPanel();
 
+	void DoToggleServantMenu();
+
+	/** Pauses the game and gives the cursor to the menu, or the reverse. Not a generic pause system (single consumer). */
+	void SetServantMenuOpen(bool bOpen);
+
+	bool bIsServantMenuOpen = false;
+
 public:
+
+	UFUNCTION(BlueprintPure, Category = "UI")
+	bool IsServantMenuOpen() const { return bIsServantMenuOpen; }
 
 	/** Returns the first person mesh **/
 	USkeletalMeshComponent* GetFirstPersonMesh() const { return FirstPersonMesh; }

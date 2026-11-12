@@ -3,8 +3,10 @@
 
 #include "Servants/Servant.h"
 
+#include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Servants/ServantAIController.h"
+#include "Servants/ServantSubsystem.h"
 
 AServant::AServant()
 {
@@ -22,4 +24,31 @@ AServant::AServant()
 	// focuses the next path point and the pawn would snap at every corner.
 	bUseControllerRotationYaw = false;
 	GetCharacterMovement()->bOrientRotationToMovement = true;
+}
+
+void AServant::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// The subsystem may be missing (unsupported world type): the servant simply stays out of the registry
+	if (UWorld* World = GetWorld())
+	{
+		if (UServantSubsystem* Subsystem = World->GetSubsystem<UServantSubsystem>())
+		{
+			Subsystem->RegisterServant(this);
+		}
+	}
+}
+
+void AServant::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		if (UServantSubsystem* Subsystem = World->GetSubsystem<UServantSubsystem>())
+		{
+			Subsystem->UnregisterServant(this);
+		}
+	}
+
+	Super::EndPlay(EndPlayReason);
 }

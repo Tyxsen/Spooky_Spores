@@ -16,4 +16,9 @@ class SPOOKY_SPORES_API AServant : public ACharacter
 // -----------FUNCTIONS-----------
 public:
 	AServant();
+
+protected:
+	// Register in / unregister from the UServantSubsystem (task registry)
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 };
