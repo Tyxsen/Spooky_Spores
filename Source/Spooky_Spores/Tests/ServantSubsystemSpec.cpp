@@ -303,6 +303,20 @@ void FServantSubsystemSpec::Define()
 			Subsystem->AssignTask(B, EServantTask::FieldHarvest);
 			ExpectList(TEXT("after B left and came back"), EServantTask::FieldHarvest, { A, B, C });
 		});
+
+		It("Criterion 6: removing the first servant keeps the registration order of the others", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			AServant* A = SpawnServant(TEXT("ServantRemoveA"));
+			AServant* B = SpawnServant(TEXT("ServantRemoveB"));
+			AServant* C = SpawnServant(TEXT("ServantRemoveC"));
+			if (!TestTrue(TEXT("servants spawned"), A != nullptr && B != nullptr && C != nullptr)) { return; }
+			ExpectList(TEXT("after registration"), EServantTask::Unassigned, { A, B, C });
+
+			// Real case: destruction runs EndPlay, which removes the servant. A swap removal would give [C, B].
+			A->Destroy();
+			ExpectList(TEXT("after destroying the first servant"), EServantTask::Unassigned, { B, C });
+		});
 	});
 
 	Describe("Wandering untouched (criterion 7)", [this]()
