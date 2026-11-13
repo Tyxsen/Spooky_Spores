@@ -21,6 +21,42 @@ void UFieldPlotSubsystem::UnregisterField(AFieldPlot* Field)
 
 	// RemoveAt (not RemoveAtSwap) keeps the registration order; the reservation goes with the entry
 	Entries.RemoveAt(Index);
+
+	// After the removal: listeners that release their reservation find nothing, which is fine
+	NotifyFieldChanged(Field, /*bRemoved*/ true);
+}
+
+TArray<AFieldPlot*> UFieldPlotSubsystem::GetUnreservedPlantableFields() const
+{
+	TArray<AFieldPlot*> Result;
+	for (const FFieldPlotEntry& Entry : Entries)
+	{
+		AFieldPlot* EntryField = Entry.Field.Get();
+		if (EntryField && !Entry.Reserver.IsValid() && EntryField->IsReadyToPlant())
+		{
+			Result.Add(EntryField);
+		}
+	}
+	return Result;
+}
+
+int32 UFieldPlotSubsystem::GetPromisedSeeds(const AActor* ExcludedReserver) const
+{
+	int32 Promised = 0;
+	for (const FFieldPlotEntry& Entry : Entries)
+	{
+		const AFieldPlot* EntryField = Entry.Field.Get();
+		if (EntryField && Entry.Reserver.IsValid() && Entry.Reserver.Get() != ExcludedReserver && EntryField->IsReadyToPlant())
+		{
+			Promised += EntryField->GetSeedCost();
+		}
+	}
+	return Promised;
+}
+
+void UFieldPlotSubsystem::NotifyFieldChanged(AFieldPlot* Field, bool bRemoved)
+{
+	OnFieldChanged.Broadcast(Field, bRemoved);
 }
 
 TArray<AFieldPlot*> UFieldPlotSubsystem::GetUnreservedHarvestableFields() const

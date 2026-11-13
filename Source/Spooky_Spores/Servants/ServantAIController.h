@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AIController.h"
+#include "Resources/ResourceTypes.h"
 #include "Servants/ServantTask.h"
 #include "ServantAIController.generated.h"
 
@@ -21,14 +22,16 @@ enum class EServantWanderAction : uint8
 	Wander,
 	Return,
 	Teleport,
-	Harvest
+	Harvest,
+	Plant
 };
 
 /**
  * Makes an idle servant wander inside the base zone. Placed outside the zone, it walks back,
  * and is teleported in after MaxFailedReturnAttempts failed returns.
  * An assigned FieldHarvest servant leaves the wander for a Grown field of the zone (harvest), then wanders again
- * when none is left. No Tick, no Behavior Tree: one decision timer, rescheduled after each move by OnMoveCompleted.
+ * when none is left. It also replants (on the spot after a harvest, or an Empty field) while the player's seeds allow it.
+ * Field and seed changes wake an idle servant early (OnFieldChanged, OnResourceChanged); the decision timer stays the safety net. No Tick, no Behavior Tree: one decision timer, rescheduled after each move by OnMoveCompleted.
  */
 UCLASS()
 class SPOOKY_SPORES_API AServantAIController : public AAIController
@@ -62,6 +65,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Servant|Harvest")
 	bool IsHarvesting() const;
 
+	// The field this servant is going to plant, nullptr when not planting (or destroyed meanwhile).
+	UFUNCTION(BlueprintPure, Category = "Servant|Plant")
+	AFieldPlot* GetPlantTarget() const;
+
+	UFUNCTION(BlueprintPure, Category = "Servant|Plant")
+	bool IsPlanting() const;
+
 	// Pure decision rule, no UObject needed: callable from Automation Specs.
 	static EServantWanderAction DecideNextAction(bool bHasValidZone, bool bIsInZone, int32 FailedReturns, int32 MaxReturns);
 
@@ -87,25 +97,55 @@ private:
 	// Task of the controlled servant, Unassigned if none or not registered.
 	EServantTask GetAssignedTask() const;
 
-	// PROVISIONAL (until the shared base inventory, TODO item 7): storage is resolved in FindHarvestStorage and
-	// credited in HarvestAndDeposit; these two functions are the only ones to change.
+	// PROVISIONAL (until the shared base inventory, TODO item 7): storage is resolved in FindHarvestStorage, credited
+	// in HarvestAndDeposit, spent in TryPlantOnField and watched in WatchStorage; these functions are the only ones to change.
 	// Here: player 0's counter. nullptr when there is no player or no counter.
 	UResourceCounterComponent* FindHarvestStorage() const;
 
-	// Starts a harvest if the servant is assigned and an eligible field exists. True if the decision is a Harvest
-	// (the follow-up is then scheduled by the harvest itself).
-	bool TryStartHarvest(const ABaseZone& Zone);
+	// Subscribes to the seed changes of Storage (once; leaves the previous storage if it changed).
+	void WatchStorage(UResourceCounterComponent* Storage);
 
-	// Runs when the servant is at the field (immediately or from OnMoveCompleted): harvests, or fails.
+	// Starts a field job if the servant is assigned and an eligible field exists: the nearest Grown field first (harvest),
+	// else the nearest Empty one the available seeds can pay (plant). True if the decision is a Harvest or a Plant
+	// (the follow-up is then scheduled by the job itself).
+	bool TryStartFieldWork(const ABaseZone& Zone);
+
+	// Seeds of Storage not already promised to another servant.
+	int32 GetAvailableSeeds(const UResourceCounterComponent& Storage) const;
+
+	// Nearest (2D) field of Fields inside the zone, nullptr if none. OutDistanceSq is valid only when non null.
+	AFieldPlot* FindNearestFieldInZone(const TArray<AFieldPlot*>& Fields, const ABaseZone& Zone, double& OutDistanceSq) const;
+
+	// Walks to the field, or resolves at once if already in reach (or if no nav point: failure).
+	void ApproachField(AFieldPlot& Field, double DistanceSq);
+
+	// Runs when the servant is at the field (immediately or from OnMoveCompleted): harvests or plants, or fails.
+	void ResolveFieldWork(bool bReachedTarget);
 	void ResolveHarvest(bool bReachedTarget);
+	void ResolvePlant(bool bReachedTarget);
 
 	// PROVISIONAL (until the shared base inventory, TODO item 7): credits the harvest (storage comes from
-	// FindHarvestStorage); these two functions are the only ones to change.
+	// FindHarvestStorage); see the list above.
 	// False if the field was not harvested (no storage: the field stays Grown).
 	bool HarvestAndDeposit(AFieldPlot& Field);
 
-	// Releases the reservation and forgets the target. Safe when not harvesting.
-	void ReleaseHarvest();
+	// PROVISIONAL (until the shared base inventory, TODO item 7): plants Field if the available seeds pay for it.
+	bool TryPlantOnField(AFieldPlot& Field);
+
+	// Releases the reservation and forgets the target. Safe when no field job is running.
+	void ReleaseFieldTarget();
+
+	// Aborts the field job in progress (reservation released, state cleared BEFORE StopMovement: its callback is synchronous).
+	void CancelFieldWork();
+
+	// Brings the next decision forward (random delay up to MaxWakeDelay) if the servant is idle: wandering, paused.
+	void WakeIfIdle();
+
+	// Cancels our job if its field changed (no longer Grown / Empty as expected, or removed), else wakes the servant.
+	void OnFieldChanged(AFieldPlot* Field, bool bRemoved);
+
+	UFUNCTION()
+	void OnStorageResourceChanged(EResourceType Type, int32 NewCount);
 
 	UFUNCTION()
 	void OnServantAssignmentsChanged();
@@ -173,11 +213,25 @@ private:
 	UPROPERTY(VisibleInstanceOnly, Category = "Servant|Harvest", meta = (AllowPrivateAccess = "true"))
 	bool bIsHarvesting = false;
 
-	// Set after a failed harvest: the next decision does not harvest, so an unreachable field cannot make us loop
+	// True from the reservation of an Empty field to the end of the planting (success, failure or cancellation)
+	UPROPERTY(VisibleInstanceOnly, Category = "Servant|Plant", meta = (AllowPrivateAccess = "true"))
+	bool bIsPlanting = false;
+
+	// Set after a failed harvest or planting: the next decision does no field work, so an unreachable field cannot make us loop
 	UPROPERTY(VisibleInstanceOnly, Category = "Servant|Harvest", meta = (AllowPrivateAccess = "true"))
 	bool bSkipNextHarvest = false;
 
-	TWeakObjectPtr<AFieldPlot> HarvestTarget;
+	// Upper bound of the random delay before an idle servant reacts to a field or seed change (spreads the rush).
+	UPROPERTY(EditAnywhere, Category = "Servant|Wake", meta = (AllowPrivateAccess = "true", ClampMin = "0.1"))
+	float MaxWakeDelay = 0.5f;
+
+	// True while ResolveHarvest / ResolvePlant run: the field changes we cause ourselves must not cancel our own job
+	bool bIsResolving = false;
+
+	// Target of the current field job (bIsHarvesting or bIsPlanting)
+	TWeakObjectPtr<AFieldPlot> FieldTarget;
+
+	TWeakObjectPtr<UResourceCounterComponent> WatchedStorage;
 
 	FTimerHandle DecisionTimer;
 };
