@@ -80,11 +80,11 @@ En explorant les environs, il découvre un sous-sol caché sous la cabane, où l
 
 La cabane appartenait à un ancien moine du village, mort de vieillesse ; personne n'a voulu la récupérer après sa mort, et elle s'est progressivement dégradée. Le moine pratiquait lui-même la nécromancie en secret, dans un sous-sol caché sous la cabane — c'est là que le joueur trouve l'objet maudit. Ce lien explique pourquoi un objet aussi dangereux se trouvait justement à cet endroit, plutôt que n'importe où ailleurs.
 
-**Choix technique — pas de refonte de la cabane existante** : l'extérieur de la cabane (déjà construit et fusionné, voir `documentation-technique.md` section 12) reste inchangé — une cabane modeste convient très bien à un moine vivant simplement. Le sous-sol est un **ajout**, pas une reconstruction : une pièce indépendante plutôt qu'une excavation du Landscape existant (creuser une vraie grotte dans un terrain déjà sculpté est une opération technique risquée, à éviter). La solution la plus simple : une petite pièce fermée construite avec la même technique que la cabane elle-même (géométrie simple, assets d'environnement achetés), reliée à l'extérieur par une trappe ou une porte — pas une vraie excavation du terrain. Détail d'implémentation exact à trancher quand cette tâche arrivera dans la file d'attente, pas maintenant.
+**Choix technique — pas de refonte de la cabane existante** : l'extérieur de la cabane (déjà construit et fusionné, voir `documentation-technique.md` section 10) reste inchangé — une cabane modeste convient très bien à un moine vivant simplement. Le sous-sol est un **ajout**, pas une reconstruction : une pièce indépendante plutôt qu'une excavation du Landscape existant (creuser une vraie grotte dans un terrain déjà sculpté est une opération technique risquée, à éviter). La solution la plus simple : une petite pièce fermée construite avec la même technique que la cabane elle-même (géométrie simple, assets d'environnement achetés), reliée à l'extérieur par une trappe ou une porte — pas une vraie excavation du terrain. Détail d'implémentation exact à trancher quand cette tâche arrivera dans la file d'attente, pas maintenant.
 
 ### Ce que signifie « conquérir le village »
 
-Le joueur n'atteint jamais physiquement le village — il n'y a pas de niveau d'assaut jouable. Dans la continuité du chemin qui descend de la colline (déjà prévu, voir `documentation-technique.md` section 12), une zone de fin devient accessible une fois le joueur suffisamment puissant (seuil exact — nombre de serviteurs ou de vagues survécues — à trancher en section 4). Le joueur reçoit un indicateur quand cette condition est remplie. En entrant dans cette zone, il déclenche un choix : terminer la partie maintenant, ou continuer à jouer normalement.
+Le joueur n'atteint jamais physiquement le village — il n'y a pas de niveau d'assaut jouable. Dans la continuité du chemin qui descend de la colline (déjà prévu, voir `documentation-technique.md` section 10), une zone de fin devient accessible une fois le joueur suffisamment puissant (seuil exact — nombre de serviteurs ou de vagues survécues — à trancher en section 4). Le joueur reçoit un indicateur quand cette condition est remplie. En entrant dans cette zone, il déclenche un choix : terminer la partie maintenant, ou continuer à jouer normalement.
 
 S'il choisit de terminer, une cinématique montre le joueur et son armée conquérir le village, et la run se termine sur une victoire — teintée par le fait que le joueur reste, de son plein gré, l'antagoniste de cette histoire (voir plus haut).
 
@@ -106,7 +106,7 @@ Les ressources sont réparties de façon globalement uniforme sur toute la carte
 
 ### Le chemin d'accès reste toujours praticable
 
-Il n'existe qu'un seul chemin reliant la cabane au village (celui déjà sculpté dans le Landscape, voir `documentation-technique.md` section 12), et ça restera le cas — pas de pluralité de fronts à défendre prévue. Ce chemin doit rester **impossible à bloquer entièrement** par une construction du joueur : le murer reviendrait à neutraliser toutes les vagues sans effort, ce qui viderait le combat de son enjeu.
+Il n'existe qu'un seul chemin reliant la cabane au village (celui déjà sculpté dans le Landscape, voir `documentation-technique.md` section 10), et ça restera le cas — pas de pluralité de fronts à défendre prévue. Ce chemin doit rester **impossible à bloquer entièrement** par une construction du joueur : le murer reviendrait à neutraliser toutes les vagues sans effort, ce qui viderait le combat de son enjeu.
 
 **Choix de conception — système de construction en grille** : le futur système de construction (vue top-down, `TODO.md`) reposera sur une grille de cases virtuelles, comme dans un city-builder. Les cases correspondant au chemin seront marquées non constructibles en permanence (affichées en rouge dans l'interface de placement) — pas de règle de « largeur minimale à préserver » à vérifier au cas par cas : la contrainte est déjà résolue par la grille elle-même, une case est soit constructible, soit non, sans dégradé possible.
 
@@ -124,7 +124,7 @@ Liste des mécaniques déjà en place et à venir, et comment elles dépendent l
 
 ### Déjà en place (détail complet : `documentation-technique.md`)
 
-Interaction et manipulation physique (grab/lancer), récolte de ressources (nœuds → drops), plantation (`AFieldPlot`), chaudron (une recette : ressources → potion), composant de santé générique, mana et premier sort, panneau de contrôles, environnement de base (colline, cabane, clôture délimitant le territoire).
+Interaction et manipulation physique (grab/lancer), récolte de ressources (nœuds → drops), plantation (`AFieldPlot`), chaudron (deux recettes : ressources → potion, os + potion → Necrospore), composant de santé générique, mana et premier sort, panneau de contrôles, environnement de base (colline, cabane, clôture délimitant le territoire), soldat ennemi (suit un chemin, attaque, laisse des os), résurrection (chaudron → Necrospore, pose d'un serviteur avec la touche L), zone de base, errance des serviteurs, menu d'assignation des tâches, récolte de champ par les serviteurs assignés (le serviteur crédite directement le compteur du joueur).
 
 ### De la mort du soldat au serviteur assigné
 
@@ -136,7 +136,7 @@ Interaction et manipulation physique (grab/lancer), récolte de ressources (nœu
 4. Le joueur le pose librement, n'importe où, directement depuis le personnage — pas via la grille de construction des bâtiments (vue top-down, voir plus bas) : un serviteur se déplace tout seul une fois posé, une grille rigide n'a pas de sens pour lui.
 5. À la pose, le serviteur apparaît et erre sans tâche dans la zone de la base, jusqu'à être assigné (voir ci-dessous). S'il est posé en dehors de cette zone, il y retourne automatiquement.
 
-**Dépendance technique à prévoir** : la « zone de base » n'existe pas encore comme concept — il faudra un volume qui la délimite (probablement calé sur la clôture `BP_Fences` déjà posée, avec le même type de composant que les triggers narratifs existants, `UBoxComponent`). Ce volume sert à la fois de limite pour les serviteurs errants et de périmètre pour la vue de gestion top-down (voir plus bas).
+**Zone de base** : elle existe (`ABaseZone`, `documentation-technique.md` section 13), un volume (`UBoxComponent`) calé sur la clôture `BP_Fences`. Il sert à la fois de limite pour les serviteurs errants et de périmètre pour la vue de gestion top-down (voir plus bas).
 
 ### Assignation des tâches aux serviteurs
 
@@ -162,7 +162,7 @@ Ton, ambiance, références. Assez pour trancher si un choix (asset, couleur, so
 
 ### Ton général
 
-Pas de référence externe précise à citer ici (contrairement au level design, qui s'appuie sur Totten, section 3) — la direction reste volontairement simple : un jeu **sombre**, cohérent avec le ton nécromancien/abandonné déjà posé par l'éclairage actuel du niveau (Post Process Volume, Exposure Compensation négative, Directional Light faible, voir `documentation-technique.md` section 12). Un choix (asset, couleur, musique) qui alourdit ou édulcore ce ton sombre ne colle pas au jeu.
+Pas de référence externe précise à citer ici (contrairement au level design, qui s'appuie sur Totten, section 3) — la direction reste volontairement simple : un jeu **sombre**, cohérent avec le ton nécromancien/abandonné déjà posé par l'éclairage actuel du niveau (Post Process Volume, Exposure Compensation négative, Directional Light faible, voir `documentation-technique.md` section 10). Un choix (asset, couleur, musique) qui alourdit ou édulcore ce ton sombre ne colle pas au jeu.
 
 ### Le contraste lumière comme principe récurrent
 
