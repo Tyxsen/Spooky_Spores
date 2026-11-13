@@ -535,9 +535,10 @@ void AServantAIController::ReleaseFieldTarget()
 
 void AServantAIController::CancelFieldWork()
 {
-	// Released and cleared before StopMovement: the Aborted callback then reschedules a plain decision
+	// Released and cleared before StopMovement: the Aborted callback then reschedules a plain decision.
+	// LastAction = Wander (resting state): WakeIfIdle accepts the servant right away instead of after RetryDelay.
 	ReleaseFieldTarget();
-	LastAction = EServantWanderAction::None;
+	LastAction = EServantWanderAction::Wander;
 	StopMovement();
 }
 

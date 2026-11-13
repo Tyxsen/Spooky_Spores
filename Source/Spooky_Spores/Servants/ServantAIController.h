@@ -136,6 +136,7 @@ private:
 	void ReleaseFieldTarget();
 
 	// Aborts the field job in progress (reservation released, state cleared BEFORE StopMovement: its callback is synchronous).
+	// Leaves LastAction == Wander so that WakeIfIdle can wake the servant during the RetryDelay scheduled by the callback.
 	void CancelFieldWork();
 
 	// Brings the next decision forward (random delay up to MaxWakeDelay) if the servant is idle: wandering, paused.
