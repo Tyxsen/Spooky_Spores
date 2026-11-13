@@ -31,7 +31,9 @@ enum class EServantWanderAction : uint8
  * and is teleported in after MaxFailedReturnAttempts failed returns.
  * An assigned FieldHarvest servant leaves the wander for a Grown field of the zone (harvest), then wanders again
  * when none is left. It also replants (on the spot after a harvest, or an Empty field) while the player's seeds allow it.
- * Field and seed changes wake an idle servant early (OnFieldChanged, OnResourceChanged); the decision timer stays the safety net. No Tick, no Behavior Tree: one decision timer, rescheduled after each move by OnMoveCompleted.
+ * Field and seed changes wake an idle servant early (OnFieldChanged, OnResourceChanged); the decision timer stays the safety net.
+ * A signal received while the servant walks does not turn it around: it is remembered (bWakePending) and shortens the pause that follows the move.
+ * No Tick, no Behavior Tree: one decision timer, rescheduled after each move by OnMoveCompleted.
  */
 UCLASS()
 class SPOOKY_SPORES_API AServantAIController : public AAIController
@@ -140,6 +142,8 @@ private:
 	void CancelFieldWork();
 
 	// Brings the next decision forward (random delay up to MaxWakeDelay) if the servant is idle: wandering, paused.
+	// If it is walking (wander or return move) the move is not interrupted: bWakePending is raised and
+	// OnMoveCompleted uses the wake delay instead of the normal pause. Ignored if not assigned to FieldHarvest.
 	void WakeIfIdle();
 
 	// Cancels our job if its field changed (no longer Grown / Empty as expected, or removed), else wakes the servant.
@@ -225,6 +229,11 @@ private:
 	// Upper bound of the random delay before an idle servant reacts to a field or seed change (spreads the rush).
 	UPROPERTY(EditAnywhere, Category = "Servant|Wake", meta = (AllowPrivateAccess = "true", ClampMin = "0.1"))
 	float MaxWakeDelay = 0.5f;
+
+	// A wake signal arrived while the servant was walking: the pause after this move is a wake delay. Cleared when consumed,
+	// on cancellation, when a field job starts and when wandering stops.
+	UPROPERTY(VisibleInstanceOnly, Category = "Servant|Wake", meta = (AllowPrivateAccess = "true"))
+	bool bWakePending = false;
 
 	// True while ResolveHarvest / ResolvePlant run: the field changes we cause ourselves must not cancel our own job
 	bool bIsResolving = false;

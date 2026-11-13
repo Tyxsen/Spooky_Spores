@@ -47,6 +47,7 @@ void AServantAIController::StopWandering()
 {
 	// Must be cleared before StopMovement: the synchronous Aborted callback would otherwise reschedule a decision
 	bIsWandering = false;
+	bWakePending = false;
 	// Also before StopMovement: the reservation must not outlive the field job, and the Aborted callback must not resolve it
 	ReleaseFieldTarget();
 	StopMovement();
@@ -117,7 +118,15 @@ void AServantAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFo
 		return;
 	}
 
-	if (Result.IsSuccess())
+	// A wake signal received during this move replaces the pause (success) or the retry delay (failure).
+	// Consumed before scheduling; no move is started here, so the state is consistent.
+	if (bWakePending)
+	{
+		bWakePending = false;
+		// SetTimer with a rate of 0 would clear the timer
+		ScheduleDecision(FMath::Max(FMath::FRandRange(0.0f, MaxWakeDelay), UE_KINDA_SMALL_NUMBER));
+	}
+	else if (Result.IsSuccess())
 	{
 		ScheduleDecision(FMath::FRandRange(MinWanderPause, MaxWanderPause));
 	}
@@ -348,6 +357,8 @@ bool AServantAIController::TryStartFieldWork(const ABaseZone& Zone)
 	FieldTarget = TargetField;
 	bIsHarvesting = bHarvest;
 	bIsPlanting = !bHarvest;
+	// The job answers the signal; cleared before ApproachField (which may resolve synchronously)
+	bWakePending = false;
 	LastAction = bHarvest ? EServantWanderAction::Harvest : EServantWanderAction::Plant;
 
 	ApproachField(*TargetField, NearestDistanceSq);
@@ -538,16 +549,32 @@ void AServantAIController::CancelFieldWork()
 	// Released and cleared before StopMovement: the Aborted callback then reschedules a plain decision.
 	// LastAction = Wander (resting state): WakeIfIdle accepts the servant right away instead of after RetryDelay.
 	ReleaseFieldTarget();
+	bWakePending = false;
 	LastAction = EServantWanderAction::Wander;
 	StopMovement();
 }
 
 void AServantAIController::WakeIfIdle()
 {
-	// Idle = wandering, paused between two moves (decision timer active, so not walking), not on a field job
+	// Only a wandering FieldHarvest servant without a field job is concerned
 	FTimerManager& TimerManager = GetWorldTimerManager();
-	if (!bIsWandering || bIsHarvesting || bIsPlanting || LastAction != EServantWanderAction::Wander
-		|| !TimerManager.IsTimerActive(DecisionTimer) || GetAssignedTask() != EServantTask::FieldHarvest)
+	if (!bIsWandering || bIsHarvesting || bIsPlanting || GetAssignedTask() != EServantTask::FieldHarvest)
+	{
+		return;
+	}
+
+	// Decision timer inactive = walking: no U-turn, OnMoveCompleted will shorten the pause that follows
+	if (!TimerManager.IsTimerActive(DecisionTimer))
+	{
+		if (LastAction == EServantWanderAction::Wander || LastAction == EServantWanderAction::Return)
+		{
+			bWakePending = true;
+		}
+		return;
+	}
+
+	// Idle = paused between two moves (decision timer active)
+	if (LastAction != EServantWanderAction::Wander)
 	{
 		return;
 	}
