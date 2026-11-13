@@ -25,20 +25,7 @@ void AFieldPlot::OnInteract_Implementation(AActor* InteractingActor)
 	switch (CurrentState)
 	{
 		case EFieldState::Empty:
-			if (UResourceCounterComponent* Counter = InteractingActor->FindComponentByClass<UResourceCounterComponent>())
-			{
-				if (Counter->TrySpendResource(EResourceType::Seed, SeedCost))
-				{
-					CurrentState = EFieldState::Growing;
-					GetWorldTimerManager().SetTimer(
-						GrowthTimerHandle,
-						this,
-						&AFieldPlot::OnGrowthComplete,
-						GrowthDuration,
-						false
-					);
-				}
-			}
+			TryPlant(InteractingActor->FindComponentByClass<UResourceCounterComponent>());
 			break;
 		case EFieldState::Growing:
 			// Rien pour le moment
@@ -63,7 +50,35 @@ bool AFieldPlot::TryHarvestYield(TMap<EResourceType, int32>& OutYield)
 	}
 
 	OutYield = ComputeHarvestYield();
-	CurrentState = EFieldState::Empty;
+	SetState(EFieldState::Empty);
+	return true;
+}
+
+bool AFieldPlot::IsReadyToPlant() const
+{
+	return CurrentState == EFieldState::Empty;
+}
+
+int32 AFieldPlot::GetSeedCost() const
+{
+	return SeedCost;
+}
+
+bool AFieldPlot::TryPlant(UResourceCounterComponent* SeedSource)
+{
+	if (!IsReadyToPlant() || !SeedSource || !SeedSource->TrySpendResource(EResourceType::Seed, SeedCost))
+	{
+		return false;
+	}
+
+	GetWorldTimerManager().SetTimer(
+		GrowthTimerHandle,
+		this,
+		&AFieldPlot::OnGrowthComplete,
+		GrowthDuration,
+		false
+	);
+	SetState(EFieldState::Growing);
 	return true;
 }
 
@@ -115,14 +130,24 @@ void AFieldPlot::Tick(float DeltaTime)
 
 void AFieldPlot::OnGrowthComplete()
 {
-	CurrentState = EFieldState::Grown;
+	SetState(EFieldState::Grown);
 }
 
 void AFieldPlot::Harvest(AActor* HarvestingActor)
 {
 	AResourceDrop::SpawnDrops(GetWorld(), HarvestDrops, GetActorLocation(), DropSpawnRadius);
 
-	CurrentState = EFieldState::Empty;
+	SetState(EFieldState::Empty);
+}
+
+void AFieldPlot::SetState(EFieldState NewState)
+{
+	CurrentState = NewState;
+
+	if (UFieldPlotSubsystem* FieldSubsystem = GetWorld()->GetSubsystem<UFieldPlotSubsystem>())
+	{
+		FieldSubsystem->NotifyFieldChanged(this);
+	}
 }
 
 TMap<EResourceType, int32> AFieldPlot::ComputeHarvestYield() const

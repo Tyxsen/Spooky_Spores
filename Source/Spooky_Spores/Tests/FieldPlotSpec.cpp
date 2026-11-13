@@ -2,9 +2,15 @@
 // Source of truth: the servant field harvest spec (docs/specs/servant-field-harvest.md, removed at merge), acceptance criteria 1 to 5
 // and the edge case "fields without DropClass are credited anyway".
 //
+// Item 2.2b (docs/specs/servant-replant.md, removed at merge) adds: TryPlant / IsReadyToPlant / GetSeedCost, GetUnreservedPlantableFields,
+// GetPromisedSeeds and the UFieldPlotSubsystem::OnFieldChanged notification (acceptance criteria 1 to 3 of that spec, plus the notification
+// rules of its "Notification" section and the edge case "a reserved Grown that becomes Empty is counted as promised").
+//
 // World: FTestWorldWrapper (Engine, Tests/AutomationCommon.h), Game world with BeginPlay done, so a spawned AFieldPlot registers in
-// BeginPlay and Destroy() runs EndPlay (unregistration) synchronously. The world is never ticked: only the calls of the test change state.
-// The state of a field is written through reflection (Tests/FieldPlotTestHelpers.h), the API has no setter.
+// BeginPlay and Destroy() runs EndPlay (unregistration) synchronously. The world is only ticked by the growth tests (GrowthDuration reduced
+// by reflection): everywhere else only the calls of the test change state.
+// The state of a field is written through reflection (Tests/FieldPlotTestHelpers.h), the API has no setter. A reflection write does NOT
+// notify: the notification tests therefore only count events caused by real API calls.
 // Every test lists its mutation: the change of behaviour that must turn it red.
 
 #include "CoreMinimal.h"
@@ -32,6 +38,24 @@ BEGIN_DEFINE_SPEC(FFieldPlotSpec, "SpookySpores.Resources.FieldPlot",
 	UFieldPlotSubsystem* Subsystem = nullptr;
 	bool bWorldReady = false;
 
+	// Events recorded from UFieldPlotSubsystem::OnFieldChanged (the state is read in the callback: "notified after the change").
+	struct FRecordedEvent
+	{
+		AFieldPlot* Field = nullptr;
+		bool bRemoved = false;
+		bool bStateReadable = false;
+		EFieldState StateAtCall = EFieldState::Empty;
+	};
+	TArray<FRecordedEvent> Events;
+	FDelegateHandle EventsHandle;
+
+	// Growth duration written on the fields of the growth tests (seconds of test-world time) and tick used to advance it.
+	static constexpr double ShortGrowth = 0.4;
+	static constexpr float GrowthTick = 0.1f;
+
+	void StartRecording();
+	int32 CountEvents(const AFieldPlot* Field, bool bRemoved) const;
+	void TickGrowth(int32 Steps);
 	bool RequireWorld();
 	AFieldPlot* SpawnField(const TCHAR* Name, EFieldState State);
 	void ExpectState(const FString& What, const AFieldPlot* Field, EFieldState Expected);
@@ -56,10 +80,44 @@ AFieldPlot* FFieldPlotSpec::SpawnField(const TCHAR* Name, EFieldState State)
 
 void FFieldPlotSpec::ExpectState(const FString& What, const AFieldPlot* Field, EFieldState Expected)
 {
-	EFieldState Actual = EFieldState::Empty;
-	if (!TestTrue(FString::Printf(TEXT("%s: CurrentState readable by reflection"), *What), FieldPlotTest::GetState(Field, Actual))) { return; }
-	TestTrue(FString::Printf(TEXT("%s: expected state %s, got %s"), *What, *UEnum::GetValueAsString(Expected), *UEnum::GetValueAsString(Actual)),
-	         Actual == Expected);
+	FieldPlotTest::ExpectState(*this, What, Field, Expected);
+}
+
+void FFieldPlotSpec::StartRecording()
+{
+	EventsHandle = Subsystem->OnFieldChanged.AddLambda([this](AFieldPlot* Field, bool bRemoved)
+	{
+		FRecordedEvent Event;
+		Event.Field = Field;
+		Event.bRemoved = bRemoved;
+		if (!bRemoved)
+		{
+			// A field being removed is not safe to read: only live fields have their state captured.
+			Event.bStateReadable = FieldPlotTest::GetState(Field, Event.StateAtCall);
+		}
+		Events.Add(Event);
+	});
+}
+
+int32 FFieldPlotSpec::CountEvents(const AFieldPlot* Field, bool bRemoved) const
+{
+	int32 Count = 0;
+	for (const FRecordedEvent& Event : Events)
+	{
+		if (Event.Field == Field && Event.bRemoved == bRemoved)
+		{
+			++Count;
+		}
+	}
+	return Count;
+}
+
+void FFieldPlotSpec::TickGrowth(int32 Steps)
+{
+	for (int32 Index = 0; Index < Steps; ++Index)
+	{
+		Wrapper->TickTestWorld(GrowthTick);
+	}
 }
 
 void FFieldPlotSpec::ExpectYield(const FString& What, const TMap<EResourceType, int32>& Actual, const TMap<EResourceType, int32>& Expected)
@@ -94,6 +152,13 @@ void FFieldPlotSpec::Define()
 
 	AfterEach([this]()
 	{
+		// Unbind before the world is destroyed: destroying the fields broadcasts "removed" to a lambda that uses the members of this spec.
+		if (Subsystem != nullptr && EventsHandle.IsValid())
+		{
+			Subsystem->OnFieldChanged.Remove(EventsHandle);
+		}
+		EventsHandle.Reset();
+		Events.Reset();
 		Wrapper.Reset();
 		World = nullptr;
 		Subsystem = nullptr;
@@ -341,6 +406,299 @@ void FFieldPlotSpec::Define()
 
 			TestFalse(TEXT("IsReserved is false for a destroyed field"), Subsystem->IsReserved(Field));
 			TestEqual(TEXT("the list is empty"), Subsystem->GetUnreservedHarvestableFields().Num(), 0);
+		});
+	});
+
+	Describe("IsReadyToPlant and GetSeedCost (2.2b)", [this]()
+	{
+		// Mutation: IsReadyToPlant returns "state != Grown" (true for Growing) or always true -> the Growing / Grown line turns red;
+		//           returns "state == Grown" -> the Empty line turns red.
+		It("IsReadyToPlant is true for Empty only", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			AFieldPlot* Field = SpawnField(TEXT("PlantReady"), EFieldState::Empty);
+			if (!TestNotNull(TEXT("field spawned"), Field)) { return; }
+
+			TestTrue(TEXT("Empty is ready to plant"), Field->IsReadyToPlant());
+			if (!TestTrue(TEXT("harness: state written"), FieldPlotTest::SetState(Field, EFieldState::Growing))) { return; }
+			TestFalse(TEXT("Growing is not ready to plant"), Field->IsReadyToPlant());
+			FieldPlotTest::SetState(Field, EFieldState::Grown);
+			TestFalse(TEXT("Grown is not ready to plant"), Field->IsReadyToPlant());
+		});
+
+		// Mutation: GetSeedCost returns a hard-coded value instead of the field's SeedCost -> the "3" line turns red;
+		//           the default is not 1 (spec: "SeedCost du champ (1)") -> the first line turns red.
+		It("GetSeedCost is 1 by default and follows the SeedCost setting", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			AFieldPlot* Field = SpawnField(TEXT("PlantCost"), EFieldState::Empty);
+			if (!TestNotNull(TEXT("field spawned"), Field)) { return; }
+
+			TestEqual(TEXT("default SeedCost"), Field->GetSeedCost(), 1);
+			if (!TestTrue(TEXT("harness: SeedCost writable by reflection"), FieldPlotTest::SetSeedCost(Field, 3))) { return; }
+			TestEqual(TEXT("GetSeedCost reads the setting"), Field->GetSeedCost(), 3);
+		});
+	});
+
+	Describe("TryPlant (2.2b, criteria 1 and 2)", [this]()
+	{
+		// Mutation: TryPlant spends 1 (or everything, or nothing) instead of SeedCost -> the Seed amount (5 -> 2) turns red;
+		//           it touches another type -> the Wheat line turns red;
+		//           the field jumps straight to Grown, or never reaches Grown -> the "Growing" or the final "Grown" line turns red;
+		//           the growth ignores GrowthDuration (Grown before it elapsed) -> the "still Growing after 0.2 s" line turns red.
+		It("on Empty with enough seeds: true, spends exactly SeedCost, Growing, then Grown after GrowthDuration", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			AFieldPlot* Field = SpawnField(TEXT("PlantOk"), EFieldState::Empty);
+			AActor* Owner = FieldPlotTest::SpawnPlainActor(World, TEXT("PlantOkOwner"));
+			if (!TestTrue(TEXT("spawned"), Field && Owner)) { return; }
+			if (!TestTrue(TEXT("harness: tunables written"), FieldPlotTest::SetSeedCost(Field, 3) && FieldPlotTest::SetGrowthDuration(Field, ShortGrowth))) { return; }
+			UResourceCounterComponent* Counter = FieldPlotTest::MakeCounter(Owner, 7, 5);
+
+			TestTrue(TEXT("TryPlant succeeds"), Field->TryPlant(Counter));
+			TestEqual(TEXT("Seed spent: exactly SeedCost"), Counter->GetResourceCount(EResourceType::Seed), 5 - 3);
+			TestEqual(TEXT("Wheat untouched"), Counter->GetResourceCount(EResourceType::Wheat), 7);
+			ExpectState(TEXT("right after the plant"), Field, EFieldState::Growing);
+			TestFalse(TEXT("a Growing field is not harvestable"), Field->IsReadyToHarvest());
+			TestFalse(TEXT("a Growing field is not plantable"), Field->IsReadyToPlant());
+
+			TickGrowth(2); // 0.2 s of 0.4 s
+			ExpectState(TEXT("0.2 s into a 0.4 s growth"), Field, EFieldState::Growing);
+			TickGrowth(4); // 0.6 s in total
+			ExpectState(TEXT("after GrowthDuration"), Field, EFieldState::Grown);
+			TestTrue(TEXT("a Grown field is harvestable again"), Field->IsReadyToHarvest());
+			TestEqual(TEXT("growing did not spend more seeds"), Counter->GetResourceCount(EResourceType::Seed), 2);
+		});
+
+		// Mutation: the check is "Seed > SeedCost" (strict) -> the stock of exactly SeedCost is refused: red.
+		//           The Seed is not removed when the stock equals the cost -> the 0 line turns red.
+		It("a stock of exactly SeedCost is enough and is emptied", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			AFieldPlot* Field = SpawnField(TEXT("PlantExact"), EFieldState::Empty);
+			AActor* Owner = FieldPlotTest::SpawnPlainActor(World, TEXT("PlantExactOwner"));
+			if (!TestTrue(TEXT("spawned"), Field && Owner)) { return; }
+			if (!TestTrue(TEXT("harness: SeedCost written"), FieldPlotTest::SetSeedCost(Field, 3))) { return; }
+			UResourceCounterComponent* Counter = FieldPlotTest::MakeCounter(Owner, 0, 3);
+
+			TestTrue(TEXT("TryPlant succeeds with Seed == SeedCost"), Field->TryPlant(Counter));
+			TestEqual(TEXT("Seed is now 0"), Counter->GetResourceCount(EResourceType::Seed), 0);
+			ExpectState(TEXT("after the plant"), Field, EFieldState::Growing);
+		});
+
+		// Mutation: the state check is missing (a Growing / Grown field is replanted: seeds spent, or state reset) -> the matching row turns red;
+		//           the stock check is missing or partial (spends what is there) -> the "Seed 2 < cost 3" row turns red;
+		//           a null source crashes or succeeds -> the null row turns red;
+		//           a failed TryPlant still broadcasts a change -> the final "no notification" line turns red (inferred from "a chaque changement").
+		It("fails without touching the field, the counter or the listeners: Growing, Grown, short stock, empty stock, null source", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			struct FFailRow { const TCHAR* Name; EFieldState State; int32 Seed; bool bNullSource; };
+			const FFailRow Rows[] = {
+				{ TEXT("Growing, stock 5"), EFieldState::Growing, 5, false },
+				{ TEXT("Grown, stock 5"), EFieldState::Grown, 5, false },
+				{ TEXT("Empty, stock 2 < cost 3"), EFieldState::Empty, 2, false },
+				{ TEXT("Empty, stock 0"), EFieldState::Empty, 0, false },
+				{ TEXT("Empty, null source"), EFieldState::Empty, 5, true },
+			};
+			StartRecording();
+			int32 Index = 0;
+			for (const FFailRow& Row : Rows)
+			{
+				AFieldPlot* Field = SpawnField(*FString::Printf(TEXT("PlantFail%d"), Index), Row.State);
+				AActor* Owner = FieldPlotTest::SpawnPlainActor(World, *FString::Printf(TEXT("PlantFailOwner%d"), Index));
+				++Index;
+				if (!TestTrue(TEXT("spawned"), Field && Owner)) { return; }
+				if (!TestTrue(TEXT("harness: SeedCost written"), FieldPlotTest::SetSeedCost(Field, 3))) { return; }
+				UResourceCounterComponent* Counter = FieldPlotTest::MakeCounter(Owner, 7, Row.Seed);
+
+				TestFalse(FString::Printf(TEXT("%s: TryPlant returns false"), Row.Name), Field->TryPlant(Row.bNullSource ? nullptr : Counter));
+				ExpectState(Row.Name, Field, Row.State);
+				TestEqual(FString::Printf(TEXT("%s: Seed untouched"), Row.Name), Counter->GetResourceCount(EResourceType::Seed), Row.Seed);
+				TestEqual(FString::Printf(TEXT("%s: Wheat untouched"), Row.Name), Counter->GetResourceCount(EResourceType::Wheat), 7);
+			}
+			TestEqual(TEXT("no OnFieldChanged event for failed plants"), Events.Num(), 0);
+		});
+
+		// Mutation: OnInteract on an Empty field still does nothing (old behaviour) -> the Growing line turns red;
+		//           the player's plant does not spend the seeds (or spends 1) -> the Seed amount turns red;
+		//           it plants without checking the stock -> the "stock 2 < 3" part turns red.
+		// ASSUMPTION (spec gap): the spec does not say where OnInteract takes the seeds from; the test assumes the
+		// UResourceCounterComponent of the interacting actor (the player pawn), as for the servant path with the player's counter.
+		It("OnInteract by the player on Empty gives the same result as TryPlant, and does nothing without enough seeds", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			AFieldPlot* Field = SpawnField(TEXT("PlayerPlantOk"), EFieldState::Empty);
+			AFieldPlot* PoorField = SpawnField(TEXT("PlayerPlantPoor"), EFieldState::Empty);
+			AActor* Rich = FieldPlotTest::SpawnPlainActor(World, TEXT("RichPlayer"));
+			AActor* Poor = FieldPlotTest::SpawnPlainActor(World, TEXT("PoorPlayer"));
+			if (!TestTrue(TEXT("spawned"), Field && PoorField && Rich && Poor)) { return; }
+			if (!TestTrue(TEXT("harness: SeedCost written"), FieldPlotTest::SetSeedCost(Field, 3) && FieldPlotTest::SetSeedCost(PoorField, 3))) { return; }
+			UResourceCounterComponent* RichCounter = FieldPlotTest::MakeCounter(Rich, 7, 5);
+			UResourceCounterComponent* PoorCounter = FieldPlotTest::MakeCounter(Poor, 7, 2);
+			TestTrue(TEXT("precondition: the field implements IInteractable"), Field->Implements<UInteractable>());
+
+			IInteractable::Execute_OnInteract(Field, Rich);
+			ExpectState(TEXT("player plant with enough seeds"), Field, EFieldState::Growing);
+			TestEqual(TEXT("Seed spent: exactly SeedCost"), RichCounter->GetResourceCount(EResourceType::Seed), 5 - 3);
+			TestEqual(TEXT("Wheat untouched"), RichCounter->GetResourceCount(EResourceType::Wheat), 7);
+			TestEqual(TEXT("no drop is spawned by a plant"), FieldPlotTest::CountDrops(World), 0);
+
+			IInteractable::Execute_OnInteract(PoorField, Poor);
+			ExpectState(TEXT("player interaction with 2 seeds for a cost of 3"), PoorField, EFieldState::Empty);
+			TestEqual(TEXT("Seed untouched"), PoorCounter->GetResourceCount(EResourceType::Seed), 2);
+		});
+	});
+
+	Describe("GetUnreservedPlantableFields (2.2b, criterion 3)", [this]()
+	{
+		// Mutation: the list ignores the state (lists Growing / Grown) or lists only registered-while-Empty fields -> the exact-list lines turn red;
+		//           it ignores reservations -> the reserved line turns red; Release does not free -> the last line turns red;
+		//           a destroyed field stays listed -> the "no null / one left" lines turn red;
+		//           the list is a snapshot (state read once) -> "became Empty later" turns red.
+		It("lists only the Empty, unreserved, living fields", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			AFieldPlot* EmptyFree = SpawnField(TEXT("PlantableFree"), EFieldState::Empty);
+			AFieldPlot* EmptyReserved = SpawnField(TEXT("PlantableReserved"), EFieldState::Empty);
+			AFieldPlot* GrowingPlot = SpawnField(TEXT("PlantableGrowing"), EFieldState::Growing);
+			AFieldPlot* GrownPlot = SpawnField(TEXT("PlantableGrown"), EFieldState::Grown);
+			AFieldPlot* Doomed = SpawnField(TEXT("PlantableDoomed"), EFieldState::Empty);
+			AActor* Reserver = FieldPlotTest::SpawnPlainActor(World, TEXT("PlantableReserver"));
+			if (!TestTrue(TEXT("spawned"), EmptyFree && EmptyReserved && GrowingPlot && GrownPlot && Doomed && Reserver)) { return; }
+			TestTrue(TEXT("precondition: reservation taken"), Subsystem->TryReserve(EmptyReserved, Reserver));
+			Doomed->Destroy();
+
+			TArray<AFieldPlot*> List = Subsystem->GetUnreservedPlantableFields();
+			TestEqual(TEXT("only the free Empty field is listed"), List.Num(), 1);
+			TestTrue(TEXT("the free Empty field is the listed one"), List.Contains(EmptyFree));
+			TestFalse(TEXT("the reserved Empty field is not listed"), List.Contains(EmptyReserved));
+			TestFalse(TEXT("no null entry (destroyed field)"), List.Contains(nullptr));
+
+			Subsystem->Release(EmptyReserved, Reserver);
+			TestTrue(TEXT("once released the field is listed"), Subsystem->GetUnreservedPlantableFields().Contains(EmptyReserved));
+
+			FieldPlotTest::SetState(GrownPlot, EFieldState::Empty);
+			TestTrue(TEXT("a field that became Empty later is listed"), Subsystem->GetUnreservedPlantableFields().Contains(GrownPlot));
+			TestEqual(TEXT("three plantable fields now"), Subsystem->GetUnreservedPlantableFields().Num(), 3);
+			// The harvest list is the mirror: the planted/Empty ones are not harvestable.
+			TestEqual(TEXT("the harvestable list is empty"), Subsystem->GetUnreservedHarvestableFields().Num(), 0);
+		});
+	});
+
+	Describe("GetPromisedSeeds (2.2b, criterion 3)", [this]()
+	{
+		// Mutation: the sum counts 1 per reservation instead of SeedCost -> the 3 + 1 lines turn red;
+		//           the excluded reserver is not excluded (or everything is excluded) -> the A / B lines turn red;
+		//           a reserved Grown field is counted -> the Grown line turns red;
+		//           the promise is kept after Release -> the "after Release" line turns red;
+		//           an unreserved Empty field is counted -> the unreserved line turns red.
+		It("sums the SeedCost of the Empty fields reserved by someone other than the excluded actor", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			AFieldPlot* CostThree = SpawnField(TEXT("PromiseThree"), EFieldState::Empty);
+			AFieldPlot* CostOne = SpawnField(TEXT("PromiseOne"), EFieldState::Empty);
+			AFieldPlot* GrownPlot = SpawnField(TEXT("PromiseGrown"), EFieldState::Grown);
+			AFieldPlot* Unreserved = SpawnField(TEXT("PromiseUnreserved"), EFieldState::Empty);
+			AActor* A = FieldPlotTest::SpawnPlainActor(World, TEXT("PromiseA"));
+			AActor* B = FieldPlotTest::SpawnPlainActor(World, TEXT("PromiseB"));
+			AActor* Third = FieldPlotTest::SpawnPlainActor(World, TEXT("PromiseThird"));
+			if (!TestTrue(TEXT("spawned"), CostThree && CostOne && GrownPlot && Unreserved && A && B && Third)) { return; }
+			if (!TestTrue(TEXT("harness: SeedCost written"), FieldPlotTest::SetSeedCost(CostThree, 3))) { return; }
+
+			TestEqual(TEXT("nothing reserved: nothing promised"), Subsystem->GetPromisedSeeds(Third), 0);
+			Subsystem->TryReserve(CostThree, A);
+			Subsystem->TryReserve(CostOne, B);
+			Subsystem->TryReserve(GrownPlot, A);
+
+			TestEqual(TEXT("a third party sees both promises (3 + 1), not the Grown one, not the unreserved one"), Subsystem->GetPromisedSeeds(Third), 4);
+			TestEqual(TEXT("A is excluded: only B's promise (1)"), Subsystem->GetPromisedSeeds(A), 1);
+			TestEqual(TEXT("B is excluded: only A's Empty promise (3), A's Grown reservation is worth 0"), Subsystem->GetPromisedSeeds(B), 3);
+
+			Subsystem->Release(CostThree, A);
+			TestEqual(TEXT("after Release the promise is gone"), Subsystem->GetPromisedSeeds(Third), 1);
+			Subsystem->Release(CostOne, B);
+			Subsystem->Release(GrownPlot, A);
+			TestEqual(TEXT("all released: nothing promised"), Subsystem->GetPromisedSeeds(Third), 0);
+		});
+
+		// Mutation: the promise is recorded at reservation time (Grown = 0 forever, Empty = cost forever) instead of derived from the
+		//           current state -> the "Grown became Empty" line turns red (spec edge case: counted until its reserver cancels);
+		//           a destroyed reserver keeps promising seeds (would starve every other servant forever) -> the last line turns red.
+		It("is derived from the current state and ignores destroyed reservers", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			AFieldPlot* Field = SpawnField(TEXT("PromiseDerived"), EFieldState::Grown);
+			AActor* Reserver = FieldPlotTest::SpawnPlainActor(World, TEXT("PromiseReserver"));
+			AActor* Other = FieldPlotTest::SpawnPlainActor(World, TEXT("PromiseOther"));
+			if (!TestTrue(TEXT("spawned"), Field && Reserver && Other)) { return; }
+			Subsystem->TryReserve(Field, Reserver);
+			TestEqual(TEXT("a reserved Grown field promises nothing"), Subsystem->GetPromisedSeeds(Other), 0);
+
+			FieldPlotTest::SetState(Field, EFieldState::Empty); // e.g. the player harvested it during the trip
+			TestEqual(TEXT("the same reservation on a field that became Empty is now promised"), Subsystem->GetPromisedSeeds(Other), Field->GetSeedCost());
+
+			Reserver->Destroy();
+			TestEqual(TEXT("a destroyed reserver promises nothing"), Subsystem->GetPromisedSeeds(Other), 0);
+		});
+	});
+
+	Describe("OnFieldChanged notification (2.2b)", [this]()
+	{
+		// Mutation: AFieldPlot does not notify on one of the four transitions (plant, growth end, servant harvest, player harvest)
+		//           -> the exact sequence (6 events) turns red at that position;
+		//           it notifies before writing the state (a listener would read the old state) -> the StateAtCall column turns red;
+		//           it notifies twice for one change -> the count turns red; it passes bRemoved = true on a change -> the flag line turns red.
+		// NOTE: "exactly one event per change" and "state already updated in the callback" are the natural reading of
+		// "NotifyFieldChanged a chaque changement d'etat" + the cancellation rule that reads the state in the callback; the spec does not spell them out.
+		It("notifies once per state change, after the change: plant, growth end, servant harvest, player harvest", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			AFieldPlot* Field = SpawnField(TEXT("NotifyCycle"), EFieldState::Empty);
+			AActor* Owner = FieldPlotTest::SpawnPlainActor(World, TEXT("NotifyOwner"));
+			if (!TestTrue(TEXT("spawned"), Field && Owner)) { return; }
+			if (!TestTrue(TEXT("harness: tunables written"), FieldPlotTest::SetGrowthDuration(Field, ShortGrowth) && FieldPlotTest::SetDrops(Field, FieldPlotTest::MakeYieldTable()))) { return; }
+			UResourceCounterComponent* Counter = FieldPlotTest::MakeCounter(Owner, 0, 5);
+			StartRecording();
+
+			Field->TryPlant(Counter);                       // Empty -> Growing
+			TickGrowth(6);                                  // Growing -> Grown (0.6 s > 0.4 s)
+			TMap<EResourceType, int32> Yield;
+			TestTrue(TEXT("harness: servant harvest succeeded"), Field->TryHarvestYield(Yield)); // Grown -> Empty (servant path)
+			Field->TryPlant(Counter);                       // Empty -> Growing
+			TickGrowth(6);                                  // Growing -> Grown
+			IInteractable::Execute_OnInteract(Field, Owner); // Grown -> Empty (player path)
+
+			const EFieldState Expected[] = { EFieldState::Growing, EFieldState::Grown, EFieldState::Empty, EFieldState::Growing, EFieldState::Grown, EFieldState::Empty };
+			const int32 ExpectedCount = UE_ARRAY_COUNT(Expected);
+			if (!TestEqual(TEXT("six changes, six events"), Events.Num(), ExpectedCount)) { return; }
+			for (int32 Index = 0; Index < ExpectedCount; ++Index)
+			{
+				const FRecordedEvent& Event = Events[Index];
+				TestTrue(FString::Printf(TEXT("event %d is about the field"), Index), Event.Field == Field);
+				TestFalse(FString::Printf(TEXT("event %d is not a removal"), Index), Event.bRemoved);
+				TestTrue(FString::Printf(TEXT("event %d: state readable in the callback"), Index), Event.bStateReadable);
+				TestTrue(FString::Printf(TEXT("event %d: state at call is %s, got %s"), Index, *UEnum::GetValueAsString(Expected[Index]), *UEnum::GetValueAsString(Event.StateAtCall)),
+				         Event.StateAtCall == Expected[Index]);
+			}
+		});
+
+		// Mutation: UnregisterField does not broadcast -> the removed count is 0: red;
+		//           it broadcasts with bRemoved = false -> the removed count is 0 and the plain count is 1: red;
+		//           it broadcasts for every field instead of the destroyed one -> the survivor line turns red.
+		It("destroying a field broadcasts bRemoved = true for that field only", [this]()
+		{
+			if (!RequireWorld()) { return; }
+			AFieldPlot* Doomed = SpawnField(TEXT("NotifyDoomed"), EFieldState::Grown);
+			AFieldPlot* Survivor = SpawnField(TEXT("NotifySurvivor"), EFieldState::Grown);
+			if (!TestTrue(TEXT("spawned"), Doomed && Survivor)) { return; }
+			StartRecording();
+
+			Doomed->Destroy();
+
+			TestEqual(TEXT("one removal event for the destroyed field"), CountEvents(Doomed, true), 1);
+			TestEqual(TEXT("no plain change event for the destroyed field"), CountEvents(Doomed, false), 0);
+			TestEqual(TEXT("no event at all for the survivor"), CountEvents(Survivor, true) + CountEvents(Survivor, false), 0);
 		});
 	});
 }

@@ -11,6 +11,10 @@
 // (field not emptied), and the reservation read by the controller is covered by the "reserved by another owner" test.
 // Player 0: an APlayerController registered in the world, with a pawn assigned through SetPawn (no possession logic needed),
 // because the spec resolves the storage with UGameplayStatics::GetPlayerPawn(this, 0).
+// Item 2.2b (docs/specs/servant-replant.md): after the credit the servant REPLANTS the field on the spot, so a harvest at reach leaves the
+// field Growing (not Empty) and costs PlantCost seeds out of the stock. Fields here get a huge GrowthDuration so that a replanted field
+// never becomes Grown again during a test (that would make the servant harvest a second time and blur the counters).
+// The new behaviour itself (priority, budget, wake-up) is tested in ServantReplantWorldSpec.cpp.
 // Every test lists its mutation: the change of behaviour that must turn it red.
 
 #include "CoreMinimal.h"
@@ -21,6 +25,7 @@
 #include "Tests/FieldPlotTestHelpers.h"
 #include "Tests/ServantWanderTestHelpers.h"
 #include "Tests/BaseZoneTestHelpers.h"
+#include "Tests/ServantFieldTestHelpers.h"
 #include "Servants/Servant.h"
 #include "Servants/ServantAIController.h"
 #include "Servants/ServantSubsystem.h"
@@ -57,6 +62,10 @@ BEGIN_DEFINE_SPEC(FServantHarvestWorldSpec, "SpookySpores.Servants.Harvest.World
 	// Counter baselines written before each scenario, so that "set instead of add" and "touched anyway" are visible.
 	static constexpr int32 BaseWheat = 10;
 	static constexpr int32 BaseSeed = 5;
+	// SeedCost of a field (spec 2.2b: "SeedCost du champ (1) inchange"), spent by the replant that follows a harvest.
+	static constexpr int32 PlantCost = 1;
+	// A replanted field must stay Growing for the whole test.
+	static constexpr double NeverGrownDuration = 100000.0;
 
 	TUniquePtr<FTestWorldWrapper> Wrapper;
 	UWorld* World = nullptr;
@@ -73,7 +82,7 @@ BEGIN_DEFINE_SPEC(FServantHarvestWorldSpec, "SpookySpores.Servants.Harvest.World
 	ABaseZone* SpawnZone(const TCHAR* Name, bool bIgnoreHeight = true);
 	AServant* SpawnServant(const TCHAR* Name, const FVector& Location);
 	AFieldPlot* SpawnGrownField(const TCHAR* Name, const FVector& Location, EFieldState State = EFieldState::Grown);
-	UResourceCounterComponent* SpawnPlayer(bool bWithCounter);
+	UResourceCounterComponent* SpawnPlayer(bool bWithCounter, int32 Seed = BaseSeed);
 	AServantAIController* RequireController(AServant* Servant);
 	bool ReadSettings(const AServantAIController* Controller);
 	bool Assign(AServant* Servant, EServantTask Task);
@@ -96,6 +105,7 @@ BEGIN_DEFINE_SPEC(FServantHarvestWorldSpec, "SpookySpores.Servants.Harvest.World
 		bool bDestroyField = false;
 		bool bPlayer = true;
 		bool bCounter = true;
+		int32 Seed = BaseSeed; // stock of the player counter
 		EServantWanderAction ExpectedAction = EServantWanderAction::Wander;
 		double DecisionsToWait = 3.0; // in RetryDelay units, after InitialDecisionDelay
 	};
@@ -114,30 +124,12 @@ bool FServantHarvestWorldSpec::RequireWorld()
 
 ABaseZone* FServantHarvestWorldSpec::SpawnZone(const TCHAR* Name, bool bIgnoreHeight)
 {
-	FActorSpawnParameters Params;
-	Params.Name = FName(Name);
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	ABaseZone* Zone = World->SpawnActor<ABaseZone>(ABaseZone::StaticClass(), FTransform(ZoneCenter), Params);
-	if (Zone != nullptr)
-	{
-		// Explicit, so that a height difference between servant and field never decides "in zone".
-		BaseZoneTest::SetIgnoreHeight(Zone, bIgnoreHeight);
-	}
-	return Zone;
+	return ServantFieldTest::SpawnZone(World, Name, bIgnoreHeight);
 }
 
 AServant* FServantHarvestWorldSpec::SpawnServant(const TCHAR* Name, const FVector& Location)
 {
-	FActorSpawnParameters Params;
-	Params.Name = FName(Name);
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	AServant* Servant = World->SpawnActor<AServant>(AServant::StaticClass(), FTransform(Location), Params);
-	if (Servant != nullptr && Servant->GetCharacterMovement() != nullptr)
-	{
-		// No floor in the test world: freeze physical movement so positions (and 2D distances) stay what the test set.
-		Servant->GetCharacterMovement()->SetComponentTickEnabled(false);
-	}
-	return Servant;
+	return ServantFieldTest::SpawnServant(World, Name, Location);
 }
 
 AFieldPlot* FServantHarvestWorldSpec::SpawnGrownField(const TCHAR* Name, const FVector& Location, EFieldState State)
@@ -146,33 +138,16 @@ AFieldPlot* FServantHarvestWorldSpec::SpawnGrownField(const TCHAR* Name, const F
 	if (Field != nullptr)
 	{
 		FieldPlotTest::SetDrops(Field, FieldPlotTest::MakeYieldTable()); // Wheat 7, Seed 2
+		// A replanted field must not become Grown again during the test (see the header comment).
+		if (!TestTrue(TEXT("harness: GrowthDuration writable by reflection"), FieldPlotTest::SetGrowthDuration(Field, NeverGrownDuration))) { return nullptr; }
+		TestEqual(TEXT("harness: the field's SeedCost is the spec default"), Field->GetSeedCost(), PlantCost);
 	}
 	return Field;
 }
 
-UResourceCounterComponent* FServantHarvestWorldSpec::SpawnPlayer(bool bWithCounter)
+UResourceCounterComponent* FServantHarvestWorldSpec::SpawnPlayer(bool bWithCounter, int32 Seed)
 {
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	Params.Name = FName(TEXT("TestPlayerController"));
-	APlayerController* Controller = World->SpawnActor<APlayerController>(APlayerController::StaticClass(), FTransform::Identity, Params);
-	Params.Name = FName(TEXT("TestPlayerPawn"));
-	ADefaultPawn* Pawn = World->SpawnActor<ADefaultPawn>(ADefaultPawn::StaticClass(), FTransform(FVector(0.0, 0.0, 5000.0)), Params);
-	if (Controller == nullptr || Pawn == nullptr)
-	{
-		return nullptr;
-	}
-	// SetPawn only stores the pawn: enough for GetPlayerPawn(World, 0), without running the possession machinery in a test world.
-	Controller->SetPawn(Pawn);
-	if (!bWithCounter)
-	{
-		return nullptr;
-	}
-	UResourceCounterComponent* Counter = NewObject<UResourceCounterComponent>(Pawn);
-	Counter->RegisterComponent();
-	Counter->AddResource(EResourceType::Wheat, BaseWheat);
-	Counter->AddResource(EResourceType::Seed, BaseSeed);
-	return Counter;
+	return ServantFieldTest::SpawnPlayer(World, bWithCounter, BaseWheat, Seed);
 }
 
 AServantAIController* FServantHarvestWorldSpec::RequireController(AServant* Servant)
@@ -206,38 +181,22 @@ bool FServantHarvestWorldSpec::ReadSettings(const AServantAIController* Controll
 
 bool FServantHarvestWorldSpec::Assign(AServant* Servant, EServantTask Task)
 {
-	UServantSubsystem* Subsystem = World->GetSubsystem<UServantSubsystem>();
-	return TestNotNull(TEXT("harness: UServantSubsystem"), Subsystem) && Subsystem->IsServantRegistered(Servant) && (Subsystem->AssignTask(Servant, Task) || Subsystem->GetServantTask(Servant) == Task);
+	return ServantFieldTest::Assign(World, Servant, Task);
 }
 
 void FServantHarvestWorldSpec::TickFor(double Seconds)
 {
-	const int32 Steps = FMath::Max(1, FMath::CeilToInt32(Seconds / TickStep - 0.001));
-	for (int32 Index = 0; Index < Steps; ++Index)
-	{
-		Wrapper->TickTestWorld(TickStep);
-	}
+	ServantFieldTest::TickFor(*Wrapper, Seconds);
 }
 
 bool FServantHarvestWorldSpec::TickUntil(TFunctionRef<bool()> Condition, double MaxSeconds)
 {
-	const int32 MaxSteps = FMath::Max(1, FMath::CeilToInt32(MaxSeconds / TickStep));
-	for (int32 Index = 0; Index < MaxSteps; ++Index)
-	{
-		if (Condition()) { return true; }
-		Wrapper->TickTestWorld(TickStep);
-	}
-	return Condition();
+	return ServantFieldTest::TickUntil(*Wrapper, Condition, MaxSeconds);
 }
 
 void FServantHarvestWorldSpec::TickWatching(double Seconds, TFunctionRef<void()> Observer)
 {
-	const int32 Steps = FMath::Max(1, FMath::CeilToInt32(Seconds / TickStep - 0.001));
-	for (int32 Index = 0; Index < Steps; ++Index)
-	{
-		Wrapper->TickTestWorld(TickStep);
-		Observer();
-	}
+	ServantFieldTest::TickWatching(*Wrapper, Seconds, Observer);
 }
 
 bool FServantHarvestWorldSpec::IsReservedNow(const AFieldPlot* Field) const
@@ -248,25 +207,20 @@ bool FServantHarvestWorldSpec::IsReservedNow(const AFieldPlot* Field) const
 
 void FServantHarvestWorldSpec::ExpectAction(const FString& What, EServantWanderAction Actual, EServantWanderAction Expected)
 {
-	TestTrue(FString::Printf(TEXT("%s: expected %s, got %s"), *What, *ServantWanderTest::ActionName(Expected), *ServantWanderTest::ActionName(Actual)),
-	         Actual == Expected);
+	ServantFieldTest::ExpectAction(*this, What, Actual, Expected);
 }
 
 void FServantHarvestWorldSpec::ExpectCounters(const FString& What, const UResourceCounterComponent* Counter, int32 Wheat, int32 Seed)
 {
-	TestEqual(FString::Printf(TEXT("%s: Wheat"), *What), Counter->GetResourceCount(EResourceType::Wheat), Wheat);
-	TestEqual(FString::Printf(TEXT("%s: Seed"), *What), Counter->GetResourceCount(EResourceType::Seed), Seed);
-	// Types absent from the yield must never move.
-	TestEqual(FString::Printf(TEXT("%s: Wood"), *What), Counter->GetResourceCount(EResourceType::Wood), 0);
-	TestEqual(FString::Printf(TEXT("%s: Stone"), *What), Counter->GetResourceCount(EResourceType::Stone), 0);
-	TestEqual(FString::Printf(TEXT("%s: Bone"), *What), Counter->GetResourceCount(EResourceType::Bone), 0);
+	// Types absent from the yield must never move (checked by the shared helper).
+	ServantFieldTest::ExpectCounters(*this, What, Counter, Wheat, Seed);
 }
 
 void FServantHarvestWorldSpec::RunIdleCase(const FIdleCase& Case)
 {
 	if (!RequireWorld()) { return; }
 	if (Case.bZone) { SpawnZone(TEXT("IdleZone")); }
-	UResourceCounterComponent* Counter = Case.bPlayer ? SpawnPlayer(Case.bCounter) : nullptr;
+	UResourceCounterComponent* Counter = Case.bPlayer ? SpawnPlayer(Case.bCounter, Case.Seed) : nullptr;
 	AFieldPlot* Field = Case.bHasField ? SpawnGrownField(TEXT("IdleField"), Case.FieldLocation, Case.FieldState) : nullptr;
 	AServant* Servant = SpawnServant(TEXT("IdleServant"), Case.bServantInZone ? ServantLocation : OutsideLocation);
 	AServantAIController* Controller = RequireController(Servant);
@@ -300,7 +254,7 @@ void FServantHarvestWorldSpec::RunIdleCase(const FIdleCase& Case)
 	}
 	if (Counter != nullptr)
 	{
-		ExpectCounters(TEXT("counter unchanged"), Counter, BaseWheat, BaseSeed);
+		ExpectCounters(TEXT("counter unchanged"), Counter, BaseWheat, Case.Seed);
 	}
 }
 
@@ -335,10 +289,12 @@ void FServantHarvestWorldSpec::Define()
 		//           It spawns drops instead of crediting -> drop count and counters turn red.
 		//           It sets the counter instead of adding, or credits something other than OutYield -> exact amounts turn red.
 		//           The field is left Grown -> the state line and the "no second credit" window turn red.
+		//           The field is not replanted (left Empty) -> the state line and the Seed amount (one SeedCost too many) turn red.
+		//           The replant spends more or less than SeedCost -> the Seed amount turns red.
 		//           The next decision does not wait HarvestNextDelay (synchronous or too early) -> the "still Harvest" line turns red;
 		//           it never comes back to the wandering -> the final Wander line turns red.
 		//           The reservation is not released after the harvest -> the final IsReserved line turns red.
-		It("credits the player counter with exactly the yield, leaves no drop, then goes back to Wander", [this]()
+		It("credits the player counter with the yield, replants the field (SeedCost spent), leaves no drop, then goes back to Wander", [this]()
 		{
 			if (!RequireWorld()) { return; }
 			SpawnZone(TEXT("ZoneHarvest"));
@@ -356,13 +312,13 @@ void FServantHarvestWorldSpec::Define()
 			if (!TestTrue(TEXT("the first decision is Harvest"), bHarvest)) { return; }
 			TickFor(TickStep); // the credit is part of the same decision, one frame of slack for safety
 
-			ExpectCounters(TEXT("credited"), Counter, BaseWheat + Yield.FindRef(EResourceType::Wheat), BaseSeed + Yield.FindRef(EResourceType::Seed));
-			EFieldState State = EFieldState::Grown;
-			FieldPlotTest::GetState(Field, State);
-			TestTrue(TEXT("the field is Empty"), State == EFieldState::Empty);
+			// Credit first, then the replant spends PlantCost out of the stock (which includes the seeds of this very yield).
+			ExpectCounters(TEXT("credited then replanted"), Counter, BaseWheat + Yield.FindRef(EResourceType::Wheat), BaseSeed + Yield.FindRef(EResourceType::Seed) - PlantCost);
+			FieldPlotTest::ExpectState(*this, TEXT("after the harvest and the replant"), Field, EFieldState::Growing);
 			TestEqual(TEXT("no AResourceDrop spawned"), FieldPlotTest::CountDrops(World), 0);
 
-			// The next decision comes after HarvestNextDelay: not before, then Wander (the field is Empty, nothing left to do).
+			// The next decision comes after HarvestNextDelay: not before, then Wander (the field is Growing, nothing left to do).
+			// The replant keeps LastAction == Harvest (spec): the assertion just below would catch a Plant here.
 			TickFor(0.5 * HarvestNextDelay);
 			ExpectAction(TEXT("before HarvestNextDelay the action is still Harvest"), Controller->GetLastAction(), EServantWanderAction::Harvest);
 			const bool bWander = TickUntil([Controller]() { return Controller->GetLastAction() != EServantWanderAction::Harvest; },
@@ -375,7 +331,8 @@ void FServantHarvestWorldSpec::Define()
 
 			// Several more decisions: no second credit.
 			TickFor(3.0 * RetryDelay);
-			ExpectCounters(TEXT("still credited once"), Counter, BaseWheat + Yield.FindRef(EResourceType::Wheat), BaseSeed + Yield.FindRef(EResourceType::Seed));
+			ExpectCounters(TEXT("still credited once and replanted once"), Counter, BaseWheat + Yield.FindRef(EResourceType::Wheat), BaseSeed + Yield.FindRef(EResourceType::Seed) - PlantCost);
+			FieldPlotTest::ExpectState(*this, TEXT("still Growing"), Field, EFieldState::Growing);
 		});
 
 		// Mutation: the reach test is 3D (the servant 300 cm above the field is "too far") -> no immediate harvest: red.
@@ -529,8 +486,11 @@ void FServantHarvestWorldSpec::Define()
 		}
 		{
 			FIdleCase Row;
-			Row.Name = TEXT("an Empty field in reach");
+			// Item 2.2b: with seeds in stock an Empty field in reach is now PLANTED (tested in ServantReplantWorldSpec). This row keeps
+			// the harvest rule "an Empty field is never harvested" with the stock at 0, so that nothing at all is expected to happen.
+			Row.Name = TEXT("an Empty field in reach, no seed in stock");
 			Row.FieldState = EFieldState::Empty;
+			Row.Seed = 0;
 			Cases.Add(Row);
 		}
 		{
@@ -619,15 +579,16 @@ void FServantHarvestWorldSpec::Define()
 			EFieldState FarState = EFieldState::Empty;
 			FieldPlotTest::GetState(NearField2D, NearState);
 			FieldPlotTest::GetState(FarField, FarState);
-			TestTrue(TEXT("the nearest field (2D) is Empty after the first harvest"), NearState == EFieldState::Empty);
+			// Item 2.2b: the harvested field is replanted on the spot, so it is Growing (not Empty) and one SeedCost was spent.
+			TestTrue(TEXT("the nearest field (2D) was harvested and replanted: Growing"), NearState == EFieldState::Growing);
 			TestTrue(TEXT("the farther field is still Grown (the first registered one was not chosen)"), FarState == EFieldState::Grown);
-			ExpectCounters(TEXT("after the first harvest: exactly one yield"), Counter, BaseWheat + 7, BaseSeed + 2);
+			ExpectCounters(TEXT("after the first harvest: exactly one yield, one replant"), Counter, BaseWheat + 7, BaseSeed + 2 - PlantCost);
 
 			// Next decision after HarvestNextDelay: the farther field.
 			const bool bFarHarvested = TickUntil([FarField]() { return !FarField->IsReadyToHarvest(); }, HarvestNextDelay + TimerSlack);
 			TestTrue(TEXT("the farther field is harvested at the next decision"), bFarHarvested);
 			TickFor(TickStep);
-			ExpectCounters(TEXT("after the second harvest: exactly two yields"), Counter, BaseWheat + 14, BaseSeed + 4);
+			ExpectCounters(TEXT("after the second harvest: exactly two yields, two replants"), Counter, BaseWheat + 14, BaseSeed + 4 - 2 * PlantCost);
 			TestEqual(TEXT("no AResourceDrop spawned"), FieldPlotTest::CountDrops(World), 0);
 		});
 	});
@@ -662,8 +623,8 @@ void FServantHarvestWorldSpec::Define()
 			});
 
 			TestTrue(TEXT("exactly one of the two servants harvested"), bHarvestA != bHarvestB);
-			ExpectCounters(TEXT("credited exactly once"), Counter, BaseWheat + 7, BaseSeed + 2);
-			TestFalse(TEXT("the field is Empty"), Field->IsReadyToHarvest());
+			ExpectCounters(TEXT("credited exactly once, replanted exactly once"), Counter, BaseWheat + 7, BaseSeed + 2 - PlantCost);
+			FieldPlotTest::ExpectState(*this, TEXT("the field was harvested then replanted"), Field, EFieldState::Growing);
 			TestFalse(TEXT("no reservation left"), IsReservedNow(Field));
 		});
 
@@ -702,7 +663,7 @@ void FServantHarvestWorldSpec::Define()
 			                                2.0 * RetryDelay + MaxWanderPause + TimerSlack);
 			TestTrue(TEXT("once released, the servant harvests at a following decision"), bHarvest);
 			TickFor(TickStep);
-			ExpectCounters(TEXT("credited after the release"), Counter, BaseWheat + 7, BaseSeed + 2);
+			ExpectCounters(TEXT("credited (and replanted) after the release"), Counter, BaseWheat + 7, BaseSeed + 2 - PlantCost);
 		});
 	});
 }

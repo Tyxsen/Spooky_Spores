@@ -8,6 +8,8 @@
 #include "Interaction/Interactable.h"
 #include "FieldPlot.generated.h"
 
+class UResourceCounterComponent;
+
 UENUM()
 enum class EFieldState : uint8
 {
@@ -35,6 +37,18 @@ public:
 	// Returns false (field untouched, OutYield empty) otherwise. The caller decides where the yield goes.
 	bool TryHarvestYield(TMap<EResourceType, int32>& OutYield);
 
+	UFUNCTION(BlueprintPure, Category = "Farming")
+	bool IsReadyToPlant() const;
+
+	UFUNCTION(BlueprintPure, Category = "Farming")
+	int32 GetSeedCost() const;
+
+	// Plants on an Empty field: spends SeedCost seeds from SeedSource and starts the growth.
+	// Returns false (field and counter untouched) if the field is not Empty, SeedSource is null or holds too few seeds.
+	// Shared by the player (OnInteract) and the servants.
+	UFUNCTION(BlueprintCallable, Category = "Farming")
+	bool TryPlant(UResourceCounterComponent* SeedSource);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -43,6 +57,9 @@ protected:
 private:
 	void OnGrowthComplete();
 	void Harvest(AActor* HarvestingActor);
+
+	// Only place that changes CurrentState: tells the field subsystem so that servants react without polling.
+	void SetState(EFieldState NewState);
 
 	// Single computation of what a harvest yields, from HarvestDrops: Amount * SpawnCount per type.
 	TMap<EResourceType, int32> ComputeHarvestYield() const;
