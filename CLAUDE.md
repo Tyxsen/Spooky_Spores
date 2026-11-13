@@ -113,6 +113,7 @@ Question systématique : **à quel moment cette ligne s'exécute-t-elle ?**
 - Un menu qui met le jeu en pause ne doit pas utiliser `FInputModeUIOnly` : il appelle `SetIgnoreInput(true)` et la touche de fermeture n'arrive plus. Utiliser `FInputModeGameAndUI` et une Input Action avec `Trigger when Paused`.
 - Dans un Blueprint, enchaîner une étape après un `For Each Loop` via son `Loop Body` au lieu de `Completed` (ou d'un `Sequence`) la saute quand la liste est vide et la répète par élément sinon.
 - `MoveToLocation` (échec, `AlreadyAtGoal`) et `StopMovement` (`Aborted`) appellent `OnMoveCompleted` de façon synchrone, avant que la fonction n'ait rendu la main : tout état que ce callback lit (`bIsWandering`, réservation, cible) doit être remis à zéro avant l'appel, sinon il replanifie ou résout un déplacement déjà annulé.
+- Un acteur qui réagit à un delegate dont il est lui-même la cause (ex. le serviteur qui récolte un champ et reçoit `OnFieldChanged`) doit ignorer ses propres changements pendant l'action (garde `bIsResolving` / `TGuardValue`), sinon il s'annule lui-même.
 
 ---
 
