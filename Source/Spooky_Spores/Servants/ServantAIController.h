@@ -143,7 +143,7 @@ private:
 
 	// Brings the next decision forward (random delay up to MaxWakeDelay) if the servant is idle: wandering, paused.
 	// If it is walking (wander or return move) the move is not interrupted: bWakePending is raised and
-	// OnMoveCompleted uses the wake delay instead of the normal pause. Ignored if not assigned to FieldHarvest.
+	// OnMoveCompleted uses the wake delay instead of the normal pause (or of the RetryDelay if the move fails). Ignored if not assigned to FieldHarvest.
 	void WakeIfIdle();
 
 	// Cancels our job if its field changed (no longer Grown / Empty as expected, or removed), else wakes the servant.
@@ -230,8 +230,9 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Servant|Wake", meta = (AllowPrivateAccess = "true", ClampMin = "0.1"))
 	float MaxWakeDelay = 0.5f;
 
-	// A wake signal arrived while the servant was walking: the pause after this move is a wake delay. Cleared when consumed,
-	// on cancellation, when a field job starts and when wandering stops.
+	// A wake signal arrived while the servant was walking: the pause after this move is a wake delay. Raised only while walking (wander or
+	// return move), never during a field job. Cleared when OnMoveCompleted consumes it and in StopWandering. After a failed
+	// Return move the wake delay replaces the RetryDelay (accepted deviation).
 	UPROPERTY(VisibleInstanceOnly, Category = "Servant|Wake", meta = (AllowPrivateAccess = "true"))
 	bool bWakePending = false;
 

@@ -47,6 +47,7 @@ void AServantAIController::StopWandering()
 {
 	// Must be cleared before StopMovement: the synchronous Aborted callback would otherwise reschedule a decision
 	bIsWandering = false;
+	// Also before StopMovement: the callback returns early (not wandering), so it would not consume the flag
 	bWakePending = false;
 	// Also before StopMovement: the reservation must not outlive the field job, and the Aborted callback must not resolve it
 	ReleaseFieldTarget();
@@ -119,7 +120,9 @@ void AServantAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFo
 	}
 
 	// A wake signal received during this move replaces the pause (success) or the retry delay (failure).
-	// Consumed before scheduling; no move is started here, so the state is consistent.
+	// This is where the flag is consumed (the other reset is StopWandering). It cannot be raised during a field job
+	// (WakeIfIdle exits on bIsHarvesting / bIsPlanting) nor while the decision timer is active, so the job start and
+	// CancelFieldWork need no reset.
 	if (bWakePending)
 	{
 		bWakePending = false;
@@ -357,8 +360,6 @@ bool AServantAIController::TryStartFieldWork(const ABaseZone& Zone)
 	FieldTarget = TargetField;
 	bIsHarvesting = bHarvest;
 	bIsPlanting = !bHarvest;
-	// The job answers the signal; cleared before ApproachField (which may resolve synchronously)
-	bWakePending = false;
 	LastAction = bHarvest ? EServantWanderAction::Harvest : EServantWanderAction::Plant;
 
 	ApproachField(*TargetField, NearestDistanceSq);
@@ -549,7 +550,6 @@ void AServantAIController::CancelFieldWork()
 	// Released and cleared before StopMovement: the Aborted callback then reschedules a plain decision.
 	// LastAction = Wander (resting state): WakeIfIdle accepts the servant right away instead of after RetryDelay.
 	ReleaseFieldTarget();
-	bWakePending = false;
 	LastAction = EServantWanderAction::Wander;
 	StopMovement();
 }
@@ -563,7 +563,8 @@ void AServantAIController::WakeIfIdle()
 		return;
 	}
 
-	// Decision timer inactive = walking: no U-turn, OnMoveCompleted will shorten the pause that follows
+	// Decision timer inactive = walking: no U-turn, OnMoveCompleted will shorten the pause that follows.
+	// Also raised during a Return move: if it fails, the wake delay replaces the RetryDelay (accepted deviation).
 	if (!TimerManager.IsTimerActive(DecisionTimer))
 	{
 		if (LastAction == EServantWanderAction::Wander || LastAction == EServantWanderAction::Return)
