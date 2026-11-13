@@ -28,12 +28,24 @@ public:
 
 	virtual void OnInteract_Implementation(AActor* InteractingActor) override;
 
+	UFUNCTION(BlueprintPure, Category = "Farming")
+	bool IsReadyToHarvest() const;
+
+	// Harvests without spawning drops: on a Grown field, fills OutYield (total amount per type) and empties the field.
+	// Returns false (field untouched, OutYield empty) otherwise. The caller decides where the yield goes.
+	bool TryHarvestYield(TMap<EResourceType, int32>& OutYield);
+
 protected:
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaTime) override;
 
 private:
 	void OnGrowthComplete();
 	void Harvest(AActor* HarvestingActor);
+
+	// Single computation of what a harvest yields, from HarvestDrops: Amount * SpawnCount per type.
+	TMap<EResourceType, int32> ComputeHarvestYield() const;
 
 // -----------PROPERTIES-----------
 protected:

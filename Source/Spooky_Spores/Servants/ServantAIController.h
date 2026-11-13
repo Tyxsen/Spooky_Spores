@@ -4,9 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "AIController.h"
+#include "Servants/ServantTask.h"
 #include "ServantAIController.generated.h"
 
 class ABaseZone;
+class AFieldPlot;
+class UResourceCounterComponent;
 struct FPathFollowingResult;
 
 // What the servant decided to do at its last decision.
@@ -17,13 +20,15 @@ enum class EServantWanderAction : uint8
 	Wait,
 	Wander,
 	Return,
-	Teleport
+	Teleport,
+	Harvest
 };
 
 /**
  * Makes an idle servant wander inside the base zone. Placed outside the zone, it walks back,
  * and is teleported in after MaxFailedReturnAttempts failed returns.
- * No Tick, no Behavior Tree: one decision timer, rescheduled after each move by OnMoveCompleted.
+ * An assigned FieldHarvest servant leaves the wander for a Grown field of the zone (harvest), then wanders again
+ * when none is left. No Tick, no Behavior Tree: one decision timer, rescheduled after each move by OnMoveCompleted.
  */
 UCLASS()
 class SPOOKY_SPORES_API AServantAIController : public AAIController
@@ -36,7 +41,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Servant|Wander")
 	void StartWandering();
 
-	// Stops the current move and cancels the next decision (task assignment will call this).
+	// Stops the current move and cancels the next decision. Also releases the harvest reservation.
+	// Called by OnUnPossess; a task assignment change does not call it (see OnServantAssignmentsChanged).
 	UFUNCTION(BlueprintCallable, Category = "Servant|Wander")
 	void StopWandering();
 
@@ -48,6 +54,13 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Servant|Wander")
 	EServantWanderAction GetLastAction() const;
+
+	// The field this servant is going to harvest, nullptr when not harvesting (or destroyed meanwhile).
+	UFUNCTION(BlueprintPure, Category = "Servant|Harvest")
+	AFieldPlot* GetHarvestTarget() const;
+
+	UFUNCTION(BlueprintPure, Category = "Servant|Harvest")
+	bool IsHarvesting() const;
 
 	// Pure decision rule, no UObject needed: callable from Automation Specs.
 	static EServantWanderAction DecideNextAction(bool bHasValidZone, bool bIsInZone, int32 FailedReturns, int32 MaxReturns);
@@ -67,6 +80,35 @@ private:
 	// Draws random points in the zone and projects them on the NavMesh, at most MaxProjectionAttempts times.
 	// A projected point outside the zone counts as a failed attempt. Never use OutPoint when false.
 	bool TryFindNavPointInZone(const ABaseZone& Zone, FVector& OutPoint) const;
+
+	// Projects Point on the NavMesh with the given extent. Never use OutPoint when false.
+	bool TryProjectOnNavMesh(const FVector& Point, const FVector& Extent, FVector& OutPoint) const;
+
+	// Task of the controlled servant, Unassigned if none or not registered.
+	EServantTask GetAssignedTask() const;
+
+	// PROVISIONAL (until the shared base inventory, TODO item 7): storage is resolved in FindHarvestStorage and
+	// credited in HarvestAndDeposit; these two functions are the only ones to change.
+	// Here: player 0's counter. nullptr when there is no player or no counter.
+	UResourceCounterComponent* FindHarvestStorage() const;
+
+	// Starts a harvest if the servant is assigned and an eligible field exists. True if the decision is a Harvest
+	// (the follow-up is then scheduled by the harvest itself).
+	bool TryStartHarvest(const ABaseZone& Zone);
+
+	// Runs when the servant is at the field (immediately or from OnMoveCompleted): harvests, or fails.
+	void ResolveHarvest(bool bReachedTarget);
+
+	// PROVISIONAL (until the shared base inventory, TODO item 7): credits the harvest (storage comes from
+	// FindHarvestStorage); these two functions are the only ones to change.
+	// False if the field was not harvested (no storage: the field stays Grown).
+	bool HarvestAndDeposit(AFieldPlot& Field);
+
+	// Releases the reservation and forgets the target. Safe when not harvesting.
+	void ReleaseHarvest();
+
+	UFUNCTION()
+	void OnServantAssignmentsChanged();
 
 	void MoveToZonePoint(const ABaseZone& Zone);
 	void TeleportIntoZone(const ABaseZone& Zone);
@@ -106,6 +148,18 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Servant|Wander", meta = (AllowPrivateAccess = "true", ClampMin = "10.0"))
 	float WanderWalkSpeed = 275.0f;
 
+	// Reach to the field, from the servant's capsule (the capsule radius is added by bStopOnOverlap: do not add it here).
+	UPROPERTY(EditAnywhere, Category = "Servant|Harvest", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float HarvestReach = 100.0f;
+
+	// Extent to project the field on the NavMesh. Keep it <= HarvestReach, or the servant stops too far to harvest.
+	UPROPERTY(EditAnywhere, Category = "Servant|Harvest", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float HarvestProjectionExtent = 100.0f;
+
+	// Pause after a harvest before the next decision (the next field, or the wander).
+	UPROPERTY(EditAnywhere, Category = "Servant|Harvest", meta = (AllowPrivateAccess = "true", ClampMin = "0.1"))
+	float HarvestNextDelay = 0.5f;
+
 	UPROPERTY(VisibleInstanceOnly, Category = "Servant|Wander", meta = (AllowPrivateAccess = "true"))
 	bool bIsWandering = false;
 
@@ -114,6 +168,16 @@ private:
 
 	UPROPERTY(VisibleInstanceOnly, Category = "Servant|Wander", meta = (AllowPrivateAccess = "true"))
 	EServantWanderAction LastAction = EServantWanderAction::None;
+
+	// True from the reservation of a field to the end of the harvest (success, failure or cancellation)
+	UPROPERTY(VisibleInstanceOnly, Category = "Servant|Harvest", meta = (AllowPrivateAccess = "true"))
+	bool bIsHarvesting = false;
+
+	// Set after a failed harvest: the next decision does not harvest, so an unreachable field cannot make us loop
+	UPROPERTY(VisibleInstanceOnly, Category = "Servant|Harvest", meta = (AllowPrivateAccess = "true"))
+	bool bSkipNextHarvest = false;
+
+	TWeakObjectPtr<AFieldPlot> HarvestTarget;
 
 	FTimerHandle DecisionTimer;
 };

@@ -31,12 +31,12 @@ CollisionChannels.h   alias des canaux de collision custom
 Core/        Character/ (Spooky_SporesCharacter, CameraManager), Controller/, GameMode/
 Interaction/ Grabbable, Interactable, InteractionComponent, GrabComponent, PhysicsGrabbable
 Narrative/   StoryTrigger
-Resources/   ResourceTypes, ResourceCounterComponent, ResourceDrop, HarvestableResource, Cauldron, FieldPlot
+Resources/   ResourceTypes, ResourceCounterComponent, ResourceDrop, HarvestableResource, Cauldron, FieldPlot, FieldPlotSubsystem
 Movement/    StaminaComponent
 Health/      HealthComponent
 Spells/      ManaComponent, SpellCastingComponent
 Enemies/     EnemySoldier, EnemyAIController, EnemyPathSpline, Destructible
-Servants/    Servant, ServantAIController, ServantSubsystem, ServantTask, ServantTaskMenuWidget
+Servants/    Servant, ServantAIController (errance, récolte), ServantSubsystem, ServantTask, ServantTaskMenuWidget
 Base/        BaseZone, BaseZoneSubsystem
 Tests/       Automation Specs (code de test du module, pas un domaine de gameplay)
 ```
@@ -101,7 +101,7 @@ La vitesse (`MaxWalkSpeed`) n'est modifiée qu'à un endroit, `HandleSprintState
 
 ## 6. Champs et chaudron
 
-**`AFieldPlot`** (`IInteractable`, réutilisable) : états `Empty` → `Growing` → `Grown` pilotés par `OnInteract` (une touche contextuelle). Planter : `TrySpendResource(SeedCost)` puis un `SetTimer` unique de `GrowthDuration` (pas de tick : une échéance, pas une valeur continue). Récolter : spawn des drops (graines + `Wheat`), retour à `Empty`.
+**`AFieldPlot`** (`IInteractable`, réutilisable) : états `Empty` → `Growing` → `Grown` pilotés par `OnInteract` (une touche contextuelle). Planter : `TrySpendResource(SeedCost)` puis un `SetTimer` unique de `GrowthDuration` (pas de tick : une échéance, pas une valeur continue). Deux chemins de récolte, un seul calcul des gains (`ComputeHarvestYield` : `Amount * SpawnCount` par type, d'après `HarvestDrops`) : le joueur (`OnInteract`) fait apparaître les drops au sol (graines + `Wheat`) ; le serviteur (`TryHarvestYield(OutYield)`, C++ seulement) reçoit les gains sans aucun drop, l'appelant décide où ils vont. Les deux remettent le champ à `Empty`. `IsReadyToHarvest()` (pure) est vrai si et seulement si l'état est `Grown`. `BeginPlay`/`EndPlay` enregistrent le champ auprès de `UFieldPlotSubsystem` (section 12). Piège : un `BP_FieldPlot` qui redéfinit `Event BeginPlay` ou `Event EndPlay` doit appeler le parent, sinon le champ ne s'enregistre pas (échec silencieux : aucun serviteur ne le voit).
 
 **`ACauldron`** (`IInteractable`, réutilisable) : états `Idle` → `Brewing` → `Ready`, un seul point d'entrée `OnInteract`.
 - **Recettes = données** : `TArray<FCauldronRecipe> Recipes` éditable (ingrédients `TMap<EResourceType,int32>`, `OutputType`, `OutputAmount`, `BrewDuration`). Ajouter une recette ne demande aucun C++.
@@ -168,9 +168,9 @@ La vitesse (`MaxWalkSpeed`) n'est modifiée qu'à un endroit, `HandleSprintState
 
 ---
 
-## 12. Serviteurs : pose, errance et affectation
+## 12. Serviteurs : pose, errance, affectation et récolte
 
-`Servants/` : `AServant` (Character), `AServantAIController` (errance), `UServantSubsystem` (tâches) et `UServantTaskMenuWidget` (menu) ; pas de classe commune avec `AEnemySoldier` (rôles différents, une seule implémentation ne justifie pas d'abstraction).
+`Servants/` : `AServant` (Character), `AServantAIController` (errance, récolte), `UServantSubsystem` (tâches) et `UServantTaskMenuWidget` (menu) ; pas de classe commune avec `AEnemySoldier` (rôles différents, une seule implémentation ne justifie pas d'abstraction).
 
 **Pose (touche L, `DoPlaceServant`)**, dans cet ordre : 1. `UInteractionComponent::GetPlacementPoint` (point au sol devant le joueur) ; 2. `TrySpendResource(Necrospore, 1)` ; 3. spawn de `ServantClass` (`BP_Servant`). Une pose impossible ne coûte donc jamais de Necrospore.
 
@@ -184,17 +184,26 @@ La vitesse (`MaxWalkSpeed`) n'est modifiée qu'à un endroit, `HandleSprintState
 - **Décision** (`MakeDecision`, règle pure `DecideNextAction`, `EServantWanderAction`) : `Wait` (pas de zone ou zone invalide, nouvel essai après `RetryDelay`), `Wander` (dans la zone : point tiré, projeté sur le NavMesh, pause de `MinWanderPause` à `MaxWanderPause` après l'arrivée), `Return` (hors zone : `MoveToLocation` vers un point de la zone), `Teleport`. La zone est relue via `UBaseZoneSubsystem` à chaque décision, sans cache.
 - **Point de destination** : `GetRandomPointInZone` puis `ProjectPointToNavigation` (extension verticale = `GetZoneExtent().Z` + `ProjectionVerticalMargin`), au plus `MaxProjectionAttempts` essais ; un point projeté hors zone compte comme un échec.
 - **Retour et téléportation** : tout retour raté (pas de point, `Failed`, `Aborted`, `Blocked`, arrêt sur le bord) incrémente `FailedReturnAttempts` ; un retour réussi le remet à 0. À `MaxFailedReturnAttempts` (3), `TeleportTo` dans la zone (le serviteur n'est ni laissé dehors ni la pose bloquée) ; un échec de téléportation est tracé.
-- **Démarrage et arrêt** : `StartWandering` (remet le compteur à 0, sans effet si déjà en errance) et `StopWandering` (arrête le déplacement, efface le timer ; un `OnMoveCompleted` tardif est ignoré). `StartWandering` est lancé par `OnPossess`. L'assignation d'une tâche ne les appelle pas (voir ci-dessous).
+- **Démarrage et arrêt** : `StartWandering` (remet le compteur à 0, sans effet si déjà en errance) et `StopWandering` (arrête le déplacement, libère la réservation de champ, efface le timer ; un `OnMoveCompleted` tardif est ignoré). `StartWandering` est lancé par `OnPossess`, `StopWandering` par `OnUnPossess` seulement. L'assignation d'une tâche n'appelle ni l'un ni l'autre : le contrôleur s'abonne à `OnAssignmentsChanged` (voir Récolte).
 - **Possession** : `AutoPossessAI = PlacedInWorldOrSpawned` (le défaut `PlacedInWorld` ne possède pas un serviteur spawné par la pose).
 - **Vitesse** : `WanderWalkSpeed` (275, sur le contrôleur) est appliquée à `MaxWalkSpeed` par `StartWandering`, errance et retour compris : la vitesse appartient au comportement, pas au défaut d'`AServant`.
 - **Animation et rotation** : `bUseAccelerationForPaths = true` sur `AServant` (l'`ABP_Unarmed` calcule `Should Move` depuis `GetCurrentAcceleration` ; sans cela il glissait sans cycle de marche). `bUseControllerRotationYaw` désactivé, `bOrientRotationToMovement` activé.
 - **Dépendances** : module `NavigationSystem` dans `Spooky_Spores.Build.cs`. `AcceptanceRadius` (50) n'inclut pas le rayon de capsule (`bStopOnOverlap` l'ajoute).
-- **Limite** : le NavMesh de `Lvl_Principal` a été réduit à la base (volume resserré à la main) ; un consommateur de navigation hors base (récolte de champ, défense) devra vérifier ou agrandir le `NavMeshBoundsVolume`.
+- **Limite** : le NavMesh de `Lvl_Principal` a été réduit à la base (volume resserré à la main) ; la récolte de champ en est un consommateur réel : un champ hors volume fait échouer la projection (`bSkipNextHarvest`, le serviteur erre), et la défense devra vérifier ou agrandir le `NavMeshBoundsVolume`.
+
+**Récolte de champ (`AServantAIController`)** : l'errance reste l'état de fond ; la récolte n'est qu'une décision de plus.
+- **Décision** : `EServantWanderAction::Harvest` (ajoutée en dernier). `MakeDecision` ne la tente que quand `DecideNextAction` a rendu `Wander` : elle ne remplace jamais `Return`, `Teleport` ni `Wait`, et `DecideNextAction` est inchangée. `TryStartHarvest` exige la tâche `FieldHarvest`, un stockage existant et un champ éligible : `Grown`, non réservé, dans `ABaseZone`, le plus proche en 2D.
+- **`UFieldPlotSubsystem`** (`Resources/`, `UWorldSubsystem`, modèle `UBaseZoneSubsystem`) : registre alimenté par `AFieldPlot::BeginPlay`/`EndPlay` (`TWeakObjectPtr`, jamais `TActorIterator`) et réservation par le contrôleur. API : `GetUnreservedHarvestableFields`, `TryReserve`, `Release`, `IsReserved`. Un réservataire détruit libère le champ ; `Release` n'agit que pour le réservataire.
+- **Déplacement** : si la distance 2D est `<= HarvestReach` + rayon de capsule, récolte immédiate. Sinon projection NavMesh (`HarvestProjectionExtent`) puis `MoveToLocation` avec `bStopOnOverlap` et `bProjectDestinationToNavigation = false`. `OnMoveCompleted` reste le seul endroit qui planifie la suite (`ResolveHarvest`) : succès puis `HarvestNextDelay`, sinon `RetryDelay`.
+- **Échecs** (projection impossible, `Aborted`, champ détruit ou déjà récolté, stockage disparu) : réservation libérée, `bSkipNextHarvest` : la décision suivante ne récolte pas (pause simple d'une décision, évite de boucler sur un champ inaccessible ; Timéo : « on garde la pause simple et si un jour je trouve ça utile de passer à un autre je le ferai »).
+- **Dépôt PROVISOIRE** : `FindHarvestStorage` résout le compteur du joueur 0 (`UGameplayStatics::GetPlayerPawn`), `HarvestAndDeposit` appelle `AFieldPlot::TryHarvestYield` puis `AddResource` par type : ces deux fonctions sont les seules à changer pour l'inventaire partagé (`TODO.md` item 7).
+- **Annulation** : `OnServantAssignmentsChanged` (abonné par `OnPossess`, désabonné par `OnUnPossess`) est idempotent, l'événement partant aussi à chaque (dé)enregistrement : il n'agit que si une récolte est en cours et que la tâche n'est plus `FieldHarvest` (un serviteur désenregistré compte comme `Unassigned`) : libère, `StopMovement`. Un champ vidé en route (joueur, destruction) n'annule pas le trajet : il est constaté à l'arrivée.
+- **Réglages** `Servant|Harvest` : `HarvestReach` 100, `HarvestProjectionExtent` 100 (à garder `<= HarvestReach`), `HarvestNextDelay` 0.5. Le contrôleur est la classe C++ utilisée directement, sans enfant Blueprint : ces valeurs ne sont pas éditables dans l'éditeur avant le jeu (créer un Blueprint enfant et le mettre dans l'`AI Controller Class` de `BP_Servant` pour les régler).
 
 **Affectation des tâches (`UServantSubsystem`)** : `UWorldSubsystem`, source unique de la tâche de chaque serviteur ; `AServant` ne stocke rien, donc une tâche ne change jamais sans diffusion.
 - **Registre** : `AServant::BeginPlay` enregistre, `EndPlay` retire (doublons et inconnus ignorés, `TWeakObjectPtr`, ordre d'enregistrement conservé). Chaque serviteur reçoit un numéro (« Serviteur N ») **jamais réutilisé** dans le monde, même après sa mort.
 - **`EServantTask`** (`ServantTask.h`) : trois valeurs, dont `Unassigned` (valeur par défaut d'un serviteur enregistré).
-- **`AssignTask`** renvoie `true` seulement si la tâche change. `OnAssignmentsChanged` est diffusé à chaque enregistrement, retrait ou changement effectif. L'assignation ne touche pas au contrôleur : tous les serviteurs restent en errance (aucun comportement de tâche pour l'instant, `TODO.md` item 2).
+- **`AssignTask`** renvoie `true` seulement si la tâche change. `OnAssignmentsChanged` est diffusé à chaque enregistrement, retrait ou changement effectif. L'assignation ne pilote pas le contrôleur : celui-ci s'abonne à `OnAssignmentsChanged` et relit la tâche à chaque décision. Seule `FieldHarvest` a un comportement (`AttackDefense` : `TODO.md` item 3).
 - **Menu (`UServantTaskMenuWidget`, `Abstract`)** : toute la logique est en C++ (sélection par clic puis clic sur une colonne, `AssignSelectedServant`, reconstruction complète des deux colonnes via l'événement `OnMenuRefreshRequested`). `InitializeMenu` reçoit le registre (le widget ne le cherche pas) ; pointeurs faibles vers le registre et le serviteur sélectionné. `InitializeMenu` abonne le widget ; `NativeConstruct` le réabonne s'il est réajouté à l'écran, `NativeDestruct` le désabonne ; aucune reconstruction pendant la destruction du monde (garde sur le monde du subsystem).
 - **Blueprints** : `WBP_ServantTaskMenu` (enfant, mise en page) et `WBP_ServantEntry` (un bouton par serviteur). La surbrillance passe par une fonction Blueprint unique par liste, `HighlightEntriesInList(List, Selection)`.
 
@@ -213,6 +222,7 @@ La vitesse (`MaxWalkSpeed`) n'est modifiée qu'à un endroit, `HandleSprintState
 - **API Blueprint** : `IsPointInZone`, `IsZoneValid`, `GetZoneExtent` (pures, composantes positives) ; `GetRandomPointInZone(OutPoint)` en `BlueprintCallable` + `BlueprintPure = false` (sinon UHT la rend pure et un tirage donnerait deux points par décision) ; renvoie faux plutôt qu'un `(0,0,0)` muet.
 - **Visibilité** : aucun `DrawDebug*` ni `Tick`. La boîte est visible en jeu car `Hidden In Game` est décoché sur `ZoneBox` de `BP_BaseZone` (réglage de dev à rétablir avant Release, `TODO.md`). Avec `NoCollision`, `show collision` ne la dessine pas.
 - **Tests** : `Tests/` (géométrie sans monde, valeurs par défaut du CDO, comportement avec monde). Rider : clic droit sur `Tests/` > *Run Unit Tests*, ou panneau Automation, filtre `SpookySpores`.
+- **Tests de la récolte** : `FieldPlotSpec` (états, `TryHarvestYield`, chemin joueur inchangé, registre et réservation de `UFieldPlotSubsystem`) et `ServantHarvestWorldSpec` (contrôleur avec monde) ; helpers dans `FieldPlotTestHelpers.h` (écriture des `UPROPERTY` privées par réflexion). `FTestWorldWrapper` n'a pas de NavMesh : seul le chemin « déjà à portée » réussit, le cas hors portée est testé en échec. Le serviteur en route (champ récolté en chemin, dé-assignation, `UnPossess`) n'est pas automatisé : testé à la main en PIE (`TODO.md`, dette).
 - **Tests des serviteurs** : `ServantSubsystemSpec` (registre, numéros, `AssignTask`, diffusions) et `ServantTaskMenuWidgetSpec` (logique seule, sans Slate ; widget instancié via `FScopedAllowAbstractClassAllocation` car la classe est `Abstract`). `UServantTaskTestListener` : écouteur d'un delegate dynamique, première `UCLASS` de `Tests/`, compilée dans toutes les configurations (UHT refuse une `UCLASS` sous `#if`), `Transient` et jamais utilisée par le jeu.
 
 ---

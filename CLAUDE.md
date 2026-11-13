@@ -112,6 +112,7 @@ Question systématique : **à quel moment cette ligne s'exécute-t-elle ?**
 - `UFUNCTION(BlueprintCallable)` `const` avec un paramètre de sortie devient **pure** automatiquement (UHT) : un nœud pur est réévalué à chaque pin de sortie, donc un tirage aléatoire donnerait deux valeurs. Ajouter `BlueprintPure = false`.
 - Un menu qui met le jeu en pause ne doit pas utiliser `FInputModeUIOnly` : il appelle `SetIgnoreInput(true)` et la touche de fermeture n'arrive plus. Utiliser `FInputModeGameAndUI` et une Input Action avec `Trigger when Paused`.
 - Dans un Blueprint, enchaîner une étape après un `For Each Loop` via son `Loop Body` au lieu de `Completed` (ou d'un `Sequence`) la saute quand la liste est vide et la répète par élément sinon.
+- `MoveToLocation` (échec, `AlreadyAtGoal`) et `StopMovement` (`Aborted`) appellent `OnMoveCompleted` de façon synchrone, avant que la fonction n'ait rendu la main : tout état que ce callback lit (`bIsWandering`, réservation, cible) doit être remis à zéro avant l'appel, sinon il replanifie ou résout un déplacement déjà annulé.
 
 ---
 
