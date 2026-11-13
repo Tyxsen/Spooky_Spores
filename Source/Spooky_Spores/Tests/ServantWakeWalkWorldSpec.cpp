@@ -5,14 +5,14 @@
 //
 // Corrected behaviour under test: a FieldHarvest servant that wanders, has no field job and is walking (decision timer inactive,
 // LastAction Wander) does NOT turn around on a wake signal (field Grown / Empty, or Seed added to player 0's counter). The private flag
-// bWakePending is raised; the next OnMoveCompleted (Success or Failed) consumes it and schedules the next decision in
-// FRandRange(0, MaxWakeDelay) instead of the normal pause (Success: MinWanderPause..MaxWanderPause, Failed: RetryDelay).
+// bWakePending is raised; the next OnMoveCompleted (Success or a failure code such as Invalid) consumes it and schedules the next decision in
+// FRandRange(0, MaxWakeDelay) instead of the normal pause (Success: MinWanderPause..MaxWanderPause, failure: RetryDelay).
 //
 // World: same recipe as ServantReplantWorldSpec (shared helpers in Tests/ServantFieldTestHelpers.h): Game world, time advances only through
 // TickTestWorld, servant movement tick disabled, NO NavMesh. Without NavMesh the servant never really walks, so:
 //   - "walking" is simulated by clearing every timer bound to the controller (its only one is the decision timer): this is exactly the state of
 //     a servant between MoveToLocation and OnMoveCompleted. The servant first rests (a real Wander decision) so LastAction is Wander;
-//   - "arrival" is a direct call to OnMoveCompleted with a Success / Failed result, as ServantWanderWorldSpec does.
+//   - "arrival" is a direct call to OnMoveCompleted with a Success / Invalid result (Invalid = the synchronous failure of MoveToLocation, as ServantWanderWorldSpec does).
 // "Decision happened" is observed through a plant (an Empty field in reach is planted when the servant has a seed); "pause" length is the
 // time before that plant. bWakePending is read by reflection (VisibleInstanceOnly, name given by the brief).
 // Not testable here (see the report): a wake signal DURING a field job (needs a trip, hence a NavMesh), and the reset of the flag by
@@ -359,7 +359,7 @@ void FServantWakeWalkWorldSpec::Define()
 		//   the flag is never raised -> the flag line and, after the arrival, the wake window turn red;
 		//   OnMoveCompleted does not consume the flag, or ignores it on Success -> the flag-after-arrival line / the wake window turn red;
 		//   the pause after the arrival stays MinWanderPause..MaxWanderPause -> the wake window expires first: red;
-		//   Failed arrival: the flag is ignored in the failure branch (RetryDelay kept) -> row 2 turns red.
+		//   Invalid arrival (synchronous failure of MoveTo): the flag is ignored in the failure branch (RetryDelay kept) -> row 2 turns red.
 		TArray<FWalkCase> Cases;
 		{
 			FWalkCase Row;
@@ -368,8 +368,8 @@ void FServantWakeWalkWorldSpec::Define()
 		}
 		{
 			FWalkCase Row;
-			Row.Name = TEXT("Failed arrival: the wake delay replaces RetryDelay");
-			Row.Arrival = EPathFollowingResult::Failed;
+			Row.Name = TEXT("Invalid arrival (synchronous failure of MoveTo): the wake delay replaces RetryDelay");
+			Row.Arrival = EPathFollowingResult::Invalid;
 			Cases.Add(Row);
 		}
 		// Mutation: the flag is raised for any resource type -> the flag line turns red (and the pause is not normal any more);
@@ -391,9 +391,9 @@ void FServantWakeWalkWorldSpec::Define()
 		}
 		{
 			FWalkCase Row;
-			Row.Name = TEXT("no signal, Failed arrival: RetryDelay kept");
+			Row.Name = TEXT("no signal, Invalid arrival (synchronous failure of MoveTo): RetryDelay kept");
 			Row.bSignal = false;
-			Row.Arrival = EPathFollowingResult::Failed;
+			Row.Arrival = EPathFollowingResult::Invalid;
 			Row.bExpectWake = false;
 			Cases.Add(Row);
 		}
