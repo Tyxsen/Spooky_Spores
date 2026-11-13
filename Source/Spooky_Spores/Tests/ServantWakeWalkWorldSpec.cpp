@@ -86,7 +86,6 @@ BEGIN_DEFINE_SPEC(FServantWakeWalkWorldSpec, "SpookySpores.Servants.WakeWalk.Wor
 	struct FWalkCase
 	{
 		FString Name;
-		EServantTask Task = EServantTask::FieldHarvest;
 		bool bSignal = true;
 		EResourceType SignalType = EResourceType::Seed;
 		EPathFollowingResult::Type Arrival = EPathFollowingResult::Success;
@@ -94,6 +93,7 @@ BEGIN_DEFINE_SPEC(FServantWakeWalkWorldSpec, "SpookySpores.Servants.WakeWalk.Wor
 	};
 	void RunWalkCase(const FWalkCase& Case);
 	void RunResetCase(bool bUnpossess);
+	void RunNotHarvestCase(EServantTask Task);
 
 END_DEFINE_SPEC(FServantWakeWalkWorldSpec)
 
@@ -212,7 +212,7 @@ void FServantWakeWalkWorldSpec::RunWalkCase(const FWalkCase& Case)
 	UResourceCounterComponent* Counter = SFT::SpawnPlayer(World, true, BaseWheat, Stock);
 	AFieldPlot* Field = SpawnField(TEXT("FieldWalk"), NearField, bSeedSignal ? EFieldState::Empty : EFieldState::Growing);
 	AServant* Servant = nullptr;
-	AServantAIController* Controller = SetupServant(TEXT("ServantWalk"), Servant, Case.Task);
+	AServantAIController* Controller = SetupServant(TEXT("ServantWalk"), Servant, EServantTask::FieldHarvest);
 	if (Controller == nullptr || !Field || !TestNotNull(TEXT("harness: counter"), Counter)) { return; }
 	if (!CheckWindows()) { return; }
 
@@ -241,15 +241,6 @@ void FServantWakeWalkWorldSpec::RunWalkCase(const FWalkCase& Case)
 
 	Arrive(Controller, Case.Arrival);
 	TestFalse(TEXT("the arrival consumes the flag (it is false afterwards in every case)"), IsWakePending(Controller));
-
-	if (Case.Task != EServantTask::FieldHarvest)
-	{
-		// A servant that is not on FieldHarvest never plants: the flag above is the only discriminating assertion
-		// (the pause that follows cannot be observed without a NavMesh).
-		TickFor(MaxWanderPause + TimerSlack);
-		FieldPlotTest::ExpectState(*this, TEXT("a servant not on FieldHarvest never plants"), Field, EFieldState::Empty);
-		return;
-	}
 
 	if (Case.bExpectWake)
 	{
@@ -298,6 +289,42 @@ void FServantWakeWalkWorldSpec::RunResetCase(bool bUnpossess)
 	TestFalse(TEXT("outside the wander a seed signal does not raise the flag"), IsWakePending(Controller));
 	TickFor(MaxWakeDelay + TimerSlack);
 	FieldPlotTest::ExpectState(*this, TEXT("no decision after the stop: the Empty field is untouched"), Field, EFieldState::Empty);
+}
+
+void FServantWakeWalkWorldSpec::RunNotHarvestCase(EServantTask Task)
+{
+	if (!RequireWorld()) { return; }
+	SFT::SpawnZone(World, TEXT("ZoneNotHarvest"));
+	UResourceCounterComponent* Counter = SFT::SpawnPlayer(World, true, BaseWheat, 0);
+	AFieldPlot* Field = SpawnField(TEXT("FieldNotHarvest"), NearField, EFieldState::Empty);
+	AActor* Planter = FieldPlotTest::SpawnPlainActor(World, TEXT("NotHarvestPlanter"));
+	AServant* Subject = nullptr;
+	AServant* Control = nullptr;
+	AServantAIController* SubjectController = SetupServant(TEXT("ServantNotHarvest"), Subject, Task);
+	AServantAIController* ControlController = SetupServant(TEXT("ServantControl"), Control, EServantTask::FieldHarvest);
+	if (SubjectController == nullptr || ControlController == nullptr || !Field || !Planter || !TestNotNull(TEXT("harness: counter"), Counter)) { return; }
+	if (!CheckWindows() || !TestTrue(TEXT("harness: GrowthDuration written"), FieldPlotTest::SetGrowthDuration(Field, WakeGrowth))) { return; }
+	UResourceCounterComponent* PlanterStock = FieldPlotTest::MakeCounter(Planter, 0, PlantCost);
+
+	// Both servants rest (real Wander decision), then both "walk". The control is on FieldHarvest: it proves that the signal below
+	// really reaches a controller's wake handler; without it a "flag stays false" assertion on the subject could pass for nothing.
+	if (!StartResting(SubjectController) || !StartResting(ControlController)) { return; }
+	StartWalking(SubjectController);
+	StartWalking(ControlController);
+
+	// Signal received by every servant from OnPossess: the field notification (Growing -> Grown). The player's stock stays 0.
+	TestTrue(TEXT("harness: the test plants the field"), Field->TryPlant(PlanterStock));
+	const bool bGrown = TickUntil([this, Field]() { return IsInState(Field, EFieldState::Grown); }, WakeGrowth + TimerSlack);
+	if (!TestTrue(TEXT("harness: the field finished growing during the walk"), bGrown)) { return; }
+	if (!TestTrue(TEXT("precondition: the same signal DID raise the flag of the FieldHarvest control servant"), IsWakePending(ControlController))) { return; }
+
+	TestFalse(TEXT("a servant not on FieldHarvest does not raise the flag on that signal"), IsWakePending(SubjectController));
+	TickFor(MinWanderPause);
+	Arrive(SubjectController, EPathFollowingResult::Success);
+	TestFalse(TEXT("after the arrival the flag is still false"), IsWakePending(SubjectController));
+	TickFor(MaxWanderPause + TimerSlack);
+	FieldPlotTest::ExpectState(*this, TEXT("a servant not on FieldHarvest never harvests"), Field, EFieldState::Grown);
+	SFT::ExpectCounters(*this, TEXT("counter untouched"), Counter, BaseWheat, 0);
 }
 
 void FServantWakeWalkWorldSpec::Define()
@@ -370,21 +397,9 @@ void FServantWakeWalkWorldSpec::Define()
 			Row.bExpectWake = false;
 			Cases.Add(Row);
 		}
-		// Mutation: the task is not checked when raising the flag -> the flag line turns red for these two rows.
-		{
-			FWalkCase Row;
-			Row.Name = TEXT("Unassigned servant: a Seed signal does not raise the flag");
-			Row.Task = EServantTask::Unassigned;
-			Row.bExpectWake = false;
-			Cases.Add(Row);
-		}
-		{
-			FWalkCase Row;
-			Row.Name = TEXT("AttackDefense servant: a Seed signal does not raise the flag");
-			Row.Task = EServantTask::AttackDefense;
-			Row.bExpectWake = false;
-			Cases.Add(Row);
-		}
+		// Note: the "not on FieldHarvest" cases are NOT here. A servant that is not on FieldHarvest never subscribes to the seed counter
+		// (WatchStorage is only called by TryStartFieldWork), so a Seed signal never reaches it: such a row could not fail. They use the
+		// field notification, which every servant receives from OnPossess (see "Field signal while walking").
 		for (const FWalkCase& Case : Cases)
 		{
 			It(*Case.Name, [this, Case]()
@@ -430,6 +445,18 @@ void FServantWakeWalkWorldSpec::Define()
 			TickFor(TickStep);
 			SFT::ExpectCounters(*this, TEXT("harvested then replanted with the yield's seed"), Counter, BaseWheat + YieldWheat, YieldSeed - PlantCost);
 			FieldPlotTest::ExpectState(*this, TEXT("replanted"), Field, EFieldState::Growing);
+		});
+
+		// Mutation: WakeIfIdle does not check the assigned task (raises the flag for any servant) -> the subject's flag line turns red.
+		//           The control FieldHarvest servant (precondition) guarantees the signal reaches the handler: if it did not, the test fails there.
+		It("Unassigned servant: a field that becomes Grown while it walks does not raise the flag", [this]()
+		{
+			RunNotHarvestCase(EServantTask::Unassigned);
+		});
+
+		It("AttackDefense servant: a field that becomes Grown while it walks does not raise the flag", [this]()
+		{
+			RunNotHarvestCase(EServantTask::AttackDefense);
 		});
 
 		// Mutation: only Grown raises the flag (Empty ignored) -> the flag line / the wake window turn red.
