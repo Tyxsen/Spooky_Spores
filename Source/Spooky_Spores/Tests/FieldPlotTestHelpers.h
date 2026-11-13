@@ -16,9 +16,42 @@
 #include "Engine/EngineTypes.h"
 #include "EngineUtils.h"
 #include "UObject/UnrealType.h"
+#include "Resources/ResourceCounterComponent.h"
+#include "Tests/ServantWanderTestHelpers.h"
 
 namespace FieldPlotTest
 {
+	// Test setup only: GrowthDuration and SeedCost are private tunables, written by reflection (names from the specs).
+	inline bool SetGrowthDuration(AFieldPlot* Field, double Seconds)
+	{
+		return ServantWanderTest::WriteNumber(Field, TEXT("GrowthDuration"), Seconds);
+	}
+
+	inline bool SetSeedCost(AFieldPlot* Field, int32 Cost)
+	{
+		return ServantWanderTest::WriteNumber(Field, TEXT("SeedCost"), static_cast<double>(Cost));
+	}
+
+	// Counter registered on a plain actor with the given stock (amounts <= 0 are not added).
+	inline UResourceCounterComponent* MakeCounter(AActor* Owner, int32 Wheat, int32 Seed)
+	{
+		if (Owner == nullptr)
+		{
+			return nullptr;
+		}
+		UResourceCounterComponent* Counter = NewObject<UResourceCounterComponent>(Owner);
+		Counter->RegisterComponent();
+		if (Wheat > 0)
+		{
+			Counter->AddResource(EResourceType::Wheat, Wheat);
+		}
+		if (Seed > 0)
+		{
+			Counter->AddResource(EResourceType::Seed, Seed);
+		}
+		return Counter;
+	}
+
 	// Writes the private CurrentState (test setup only). Returns false if the property is not found.
 	inline bool SetState(AFieldPlot* Field, EFieldState State)
 	{
@@ -137,6 +170,15 @@ namespace FieldPlotTest
 			++Count;
 		}
 		return Count;
+	}
+
+	// Asserts the state of a field (read by reflection) with a readable message.
+	inline void ExpectState(FAutomationTestBase& Test, const FString& What, const AFieldPlot* Field, EFieldState Expected)
+	{
+		EFieldState Actual = EFieldState::Empty;
+		if (!Test.TestTrue(FString::Printf(TEXT("%s: CurrentState readable by reflection"), *What), GetState(Field, Actual))) { return; }
+		Test.TestTrue(FString::Printf(TEXT("%s: expected state %s, got %s"), *What, *UEnum::GetValueAsString(Expected), *UEnum::GetValueAsString(Actual)),
+		              Actual == Expected);
 	}
 }
 
