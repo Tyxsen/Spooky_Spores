@@ -45,6 +45,11 @@
 			"Optional": true,
 			"TargetAllowList": [
 				"Editor"
+			],
+			"SupportedTargetPlatforms": [
+				"Win64",
+				"Mac",
+				"Linux"
 			]
 		}
 	]
