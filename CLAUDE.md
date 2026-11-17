@@ -144,5 +144,5 @@ Détail : `docs/WORKFLOW_AGENTS.md`. Agents dans `.claude/agents/`. La session p
 - **Points chauds, toujours sérialisés** : `EResourceType`, `*.Build.cs`, `Default*.ini`, `TODO.md`, `CLAUDE.md`, `documentation-technique.md`, `Lvl_Principal.umap`. Seul `consistency-keeper` met à jour les docs partagés, en fin de branche, et ne modifie jamais `CLAUDE.md`.
 - **Briefs aux agents** : citer les décisions de Timéo **mot pour mot**, sans reformuler. Spec : ≤ 100 lignes, sinon découper la feature.
 - **Spec et checklist d'intégration sont temporaires** : l'orchestrateur les supprime dans le dernier commit de la branche, avant la PR. Reste durable : le code, les tests, la doc technique.
-- Seul `bp-integrator` écrit dans l'éditeur (MCP Unreal), un seul à la fois, après compilation. L'orchestrateur vérifie les préconditions (branche, arbre propre, éditeur joignable via `ue_project_info`) **avant** de le lancer.
+- Seul `bp-integrator` écrit dans l'éditeur (MCP Unreal), un seul à la fois, après compilation. L'orchestrateur vérifie les préconditions (branche, arbre propre, éditeur joignable via `system_control.get_project_settings`) **avant** de le lancer.
 - Un agent qui doute le dit au lieu d'inventer ; il ne délègue à aucun autre agent.
