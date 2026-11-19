@@ -35,10 +35,10 @@ Resources/   ResourceTypes, ResourceCounterComponent, ResourceDrop, HarvestableR
 Movement/    StaminaComponent
 Health/      HealthComponent
 Spells/      ManaComponent, SpellCastingComponent
-Enemies/     EnemySoldier, EnemyAIController, EnemyPathSpline, Destructible
+Enemies/     EnemySoldier, EnemyAIController, EnemyPathSpline, EnemyWaveSpawner, Destructible
 Servants/    Servant, ServantAIController (errance, travail de champ), ServantSubsystem, ServantTask, ServantTaskMenuWidget
 Base/        BaseZone, BaseZoneSubsystem
-Tests/       Automation Specs (code de test du module, pas un domaine de gameplay) : specs par système, helpers partagés (FieldPlotTestHelpers.h, ServantFieldTestHelpers.h), ServantReplantWorldSpec, ServantWakeWalkWorldSpec
+Tests/       Automation Specs (code de test du module, pas un domaine de gameplay) : specs par système, helpers partagés (FieldPlotTestHelpers.h, ServantFieldTestHelpers.h, EnemyTestHelpers.h, EnemyTestActors.h), ServantReplantWorldSpec, ServantWakeWalkWorldSpec, EnemyWaveSpawnerSpec, EnemyTargetingWorldSpec
 ```
 
 **Content** (`Content/Spooky_Spores/`) : `Core/` (briques structurantes : Character, Controller, GameMode, Input), `Placeables/` (instances concrètes : Base, Interactables, Narrative, Destructibles, Resources, Servants), `UI/Widgets/`, `Characters/Mannequins/`, `Maps/`. Inspiré du [style guide d'Allar](https://github.com/Allar/ue5-style-guide).
@@ -154,17 +154,28 @@ La vitesse (`MaxWalkSpeed`) n'est modifiée qu'à un endroit, `HandleSprintState
 
 ## 11. Ennemi (soldat)
 
-`Enemies/` : `IDestructible` (expose le `UHealthComponent` d'une cible), `AEnemySoldier`, `AEnemyAIController`, `AEnemyPathSpline` (wrapper de `USplineComponent`). Machine à deux états dans le `Tick` du contrôleur (`EEnemyState`) :
+`Enemies/` : `IDestructible` (expose le `UHealthComponent` d'une cible), `AEnemySoldier`, `AEnemyAIController`, `AEnemyPathSpline` (wrapper de `USplineComponent`), `AEnemyWaveSpawner`. Machine à deux états dans le `Tick` du contrôleur (`EEnemyState`) :
 - **`Transit`** : suit la spline via un accumulateur `DistanceAlongSpline` (`MoveSpeed`) en visant un point en avance (`LookAheadDistance`, évite les à-coups). Passe en `Engage` au bout de la spline.
-- **`Engage`** : `FindNearestDestructible` (acteurs implémentant l'interface, rayon `TargetSearchRadius`), avance tant que la distance dépasse `AttackRange`, sinon attaque toutes les `AttackInterval`.
+- **`Engage`** : `FindNearestDestructible` choisit, parmi les acteurs implémentant `IDestructible` dont le `UHealthComponent` n'est pas mort, celui dont l'origine est dans `ABaseZone` (via `UBaseZoneSubsystem`, recherché à chaque choix, jamais mis en cache) et le plus proche en 2D (`DistSquared2D`), sans rayon maximal. La cible est rechoisie dès qu'elle est morte ou détruite (le timer d'attaque est alors coupé). Le soldat avance tant que la distance dépasse `AttackRange`, sinon attaque toutes les `AttackInterval`. Sans zone enregistrée ou sans destructible vivant dans la zone : le soldat reste immobile et un `UE_LOG(Error)` est émis une seule fois par soldat (aucun repli).
 
 **`AddMovementInput`, pas `MoveToLocation`** : la navigation NavMesh s'est révélée fragile (voir `CLAUDE.md` section 8) et n'alimentait pas l'Animation Blueprint. Le glissement observé venait très probablement de `bUseAccelerationForPaths = false` (corrigé et confirmé sur le serviteur, section 12). Limite assumée : marche en ligne droite, sans contourner. `bUseControllerRotationYaw` désactivé et `bOrientRotationToMovement` activé.
 
 **Distance d'attaque** : `GetClosestPointOnCollision` (surface réelle de la cible) moins `GetScaledCapsuleRadius()`, en 2D (`Size2D`), comme le moteur mesure l'arrivée.
 
-**Spline assignée à la main** : `PathSplineActor` (`EditInstanceOnly`), lue dans `OnPossess` (remplace une recherche `TActorIterator`, fragile). Un futur spawner devra l'assigner en spawn différé (`TODO.md`).
+**Spline** : `PathSplineActor` (`EditInstanceOnly` sur un soldat posé à la main), lue dans `OnPossess` (remplace une recherche `TActorIterator`, fragile). Un soldat spawné la reçoit par `AEnemySoldier::SetPathSplineActor` (C++ seul), appelé entre `SpawnActorDeferred` et `FinishSpawning` : sans cela `OnPossess` (`AutoPossessAI`) la lirait vide.
 
-**Mort** : `OnDeath` → `HandleDeath` → `AResourceDrop::SpawnDrops` (os, `EResourceType::Bone`).
+**Mort** : `OnDeath` → `HandleDeath` → `AResourceDrop::SpawnDrops` (os, `EResourceType::Bone`), puis `Destroy()`.
+
+**`AEnemyWaveSpawner`** (acteur placé, un par niveau, `BP_EnemyWaveSpawner` dans `Lvl_Principal`) :
+- `Waves` : tableau de `FEnemyWaveEntry` (`EnemyClass`, `Count`), 20 entrées par défaut (placeholder de 3 soldats chacune) ; `PathSplineActor` (`EditInstanceOnly`) : les soldats apparaissent au point 0, orientés selon la tangente (pitch et roll à 0).
+- Chaque soldat est créé en spawn différé (spline assignée avant `FinishSpawning`), un toutes les `SpawnStagger` (1,5 s ; le premier au démarrage de la vague).
+- Suivi par `OnDestroyed` de chaque soldat spawné (mort ou destruction quelconque) ; les soldats posés à la main ne comptent pas.
+- **Le chrono `WaveInterval` (180 s, placeholder) démarre quand tous les soldats de la vague sont morts et tous spawnés**, pas à intervalle fixe.
+- `StartWaves()` lance la vague 0 tout de suite (ignoré si une séquence tourne ; erreur loguée et rien lancé si spline nulle ou `Waves` vide). `bAutoStart` (faux par défaut) arme un timer `FirstWaveDelay` (180 s, non validé) dans `BeginPlay`. `StopWaves()` annule les timers et délie les soldats vivants (ils restent en jeu) ; aucun événement après.
+- Delegates : `OnWaveStarted(WaveIndex)`, `OnWaveCleared(WaveIndex)`, `OnAllWavesCleared` (après `OnWaveCleared` de la dernière vague : la séquence s'arrête, c'est la victoire par défaut du GDD, pas encore consommée). `GetWaveIndex()` : indice 0-based, -1 avant la première vague.
+- Une entrée sans `EnemyClass` (erreur loguée) ou avec `Count <= 0` donne une vague vide qui se termine aussitôt ; la séquence continue.
+- Pas de sous-système : aucun consommateur à servir. Aujourd'hui seule la touche de test `StartWaves` de `BP_FirstPersonCharacter` le déclenche (à supprimer, `TODO.md`).
+- Tests : `EnemyWaveSpawnerSpec` (spawn, cadence, fin de vague, dernière vague, démarrage, arrêt, erreurs de configuration) et `EnemyTargetingWorldSpec` (choix de cible dans la zone, retargeting, absence de cible). Le déplacement réel n'est pas automatisable (pas de NavMesh dans les mondes de test) : testé à la main en PIE.
 
 ---
 
@@ -236,6 +247,7 @@ La vitesse (`MaxWalkSpeed`) n'est modifiée qu'à un endroit, `HandleSprintState
 - Fracture Mode : `Show Bone Colors` pendant le développement.
 - Sphères d'état des champs et du chaudron (section 6).
 - `AEnemySoldier::DebugKill` (temporaire) : tue via `ApplyDamage` pour exercer toute la chaîne (santé → `OnDeath` → butin) ; touche de debug sur `BP_FirstPersonCharacter` ou bouton `CallInEditor`. À supprimer (`TODO.md`).
+- Touche de test `StartWaves` sur `BP_FirstPersonCharacter` (temporaire) : appelle `AEnemyWaveSpawner::StartWaves` sur le spawner du niveau. À supprimer (`TODO.md`).
 - **Panneau de contrôles** (`WBP_ControlsPanel`, pas un outil de dev) : texte statique des touches, togglé par Entrée (`DoToggleControlsPanel` → event Blueprint `OnToggleControlsPanel` : le C++ déclenche, le Blueprint affiche).
 - **Menu des serviteurs (pause)** : Tab → `DoToggleServantMenu` → `SetServantMenuOpen` (fonction privée du Character) : `SetPause`, curseur visible, `FInputModeGameAndUI` + `SetHideCursorDuringCapture(false)` (pas `UIOnly`, qui bloquerait Tab) ; à la fermeture `FInputModeGameOnly`. L'événement Blueprint `OnServantMenuToggled` affiche ou masque le widget. `IA_ToggleServantMenu` est la seule action avec `Trigger when Paused` : pendant la pause tout est figé sauf Tab et les clics UMG. Les actions maintenues (sprint) reçoivent `Completed` à la première frame de pause (confirmé en PIE). Pas de système de pause générique : la vue de gestion (`TODO.md` item 13) reprendra cette fonction.
 

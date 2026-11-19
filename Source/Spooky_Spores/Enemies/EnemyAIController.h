@@ -45,8 +45,8 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Movement")
 	float LookAheadDistance = 100.0f;
 
-	UPROPERTY(EditAnywhere, Category = "Combat")
-	float TargetSearchRadius = 2000.0f;
+	// Set once the "no target in the base zone" error has been logged, so it is not repeated every tick.
+	bool bHasLoggedNoTarget = false;
 
 	FTimerHandle AttackTimerHandle;
 };
