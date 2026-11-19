@@ -40,7 +40,7 @@ La partie se joue en **une run d'environ 1h à 1h30**, pas une partie persistant
 
 ### Déclenchement des vagues
 
-La toute première vague attend que le joueur ait terminé le tutoriel. Ensuite, les vagues suivantes arrivent sur un **chrono régulier**, indépendamment de ce que fait le joueur — pas de seuil de progression à atteindre. La difficulté augmente d'abord en **quantité** d'ennemis, puis en **puissance**, à mesure que la run avance.
+La toute première vague attend que le joueur ait terminé le tutoriel. Ensuite, chaque vague suivante arrive après un **chrono qui ne démarre qu'une fois tous les ennemis de la vague en cours tués** : le joueur peut ainsi se reposer et refaire sa base, qui a pu être détruite entre-temps. Le rythme dépend donc de la vitesse à laquelle le joueur vient à bout d'une vague — pas de seuil de progression à atteindre. La difficulté augmente d'abord en **quantité** d'ennemis, puis en **puissance**, à mesure que la run avance.
 
 ### Enjeu et conditions d'échec
 
@@ -153,6 +153,8 @@ Menu dédié (touche à définir), deux colonnes : à gauche les serviteurs non 
 ### Déblocage de la zone de fin
 
 Condition de déblocage : un **nombre de vagues survécues** (valeur exacte non fixée ici, à régler par playtest une fois le rythme des vagues calibré). Le nombre de serviteurs au moment du déclenchement ne conditionne pas ce déblocage, il sert uniquement à choisir la variante de cinématique (petite/moyenne/grande armée, voir section 2) — un seul levier à équilibrer plutôt que deux à combiner.
+
+**Victoire par défaut** : la partie compte **20 vagues par défaut** (valeur réglable). Si le joueur les tue toutes, la zone de fin lui est accessible même sans la puissance nécessaire : dans l'histoire, tous les villageois sont morts, il ne reste personne dans le village pour le défendre. Cette règle **s'ajoute** au seuil ci-dessus (le joueur peut toujours finir plus tôt, selon sa puissance), elle ne le remplace pas. La cinématique reste la même (variante choisie selon le nombre de serviteurs).
 
 ---
 
