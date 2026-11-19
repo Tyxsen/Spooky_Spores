@@ -30,6 +30,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Movement")
 	AEnemyPathSpline* GetPathSplineActor() const;
 
+	// C++ only. Must be called before FinishSpawning on a deferred spawn: OnPossess reads it.
+	void SetPathSplineActor(AEnemyPathSpline* NewPathSplineActor);
+
 	// TEMPORARY debug helper: kills the soldier through the regular damage path (health -> OnDeath -> drops).
 	// To remove once the player has a real way to kill soldiers.
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Debug")

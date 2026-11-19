@@ -47,6 +47,11 @@ AEnemyPathSpline* AEnemySoldier::GetPathSplineActor() const
 	return PathSplineActor;
 }
 
+void AEnemySoldier::SetPathSplineActor(AEnemyPathSpline* NewPathSplineActor)
+{
+	PathSplineActor = NewPathSplineActor;
+}
+
 void AEnemySoldier::DebugKill()
 {
 	// Lethal damage instead of calling HandleDeath directly, so the whole death chain is exercised.
