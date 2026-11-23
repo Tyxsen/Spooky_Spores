@@ -1,5 +1,5 @@
 // Automation Spec for the soft target reservation and the NavMesh move of the Engage state (item 3b).
-// Source of truth: docs/specs/enemy-navmesh-reservation.md (removed at merge), criteria C1 to C10 and "Cas limites".
+// Source of truth: docs/specs/enemy-navmesh-reservation.md (removed at merge), criteria C1 to C12 and "Cas limites".
 // Written from the spec only: the tests observe AEnemyAIController::GetCurrentTarget(), UEnemyTargetSubsystem::GetClaimCount() and
 // the requests recorded by the test seam (ATestEnemyAIController), never the position of a soldier (test worlds have no NavMesh).
 //
@@ -505,14 +505,39 @@ void FEnemyTargetReservationSpec::Define()
 
 		It("C4: a destroyed soldier releases its reservation", [this, ReleaseOnSoldierEnd]()
 		{
-			// Mutation: ReleaseClaim not called in EndPlay/OnUnPossess (A stays at 1 until the claimant is garbage collected, S3 goes to B).
+			// What this checks: the observable effect (the target is free again and a newcomer picks it as a free one).
+			// What it does NOT detect: removing the explicit ReleaseClaim from OnUnPossess/EndPlay. Destroying a pawn also destroys its
+			// AIController (AController::PawnPendingDestroy), a destroyed actor is invalid at once, so the weak key of the table is
+			// dead and GetClaimCount/PickTarget skip it with no release at all. The explicit release is covered by the
+			// "controller survives its pawn" test below.
+			// Mutation (honest): the table counts claimants that are no longer valid (e.g. a strong key, or no validity check in
+			// GetClaimCount/PickTarget): A stays at 1 and S3 goes to B.
 			ReleaseOnSoldierEnd(TEXT("C4 destroy"), [](AActor* Soldier) { Soldier->Destroy(); });
 		});
 
 		It("C4: a killed soldier releases its reservation", [this, ReleaseOnSoldierEnd]()
 		{
-			// Mutation: the release only happens on Destroy, not on death.
+			// Mutation (honest): a dead soldier is never ended (death neither destroys nor unpossesses it) while its claim keeps
+			// counting; or the validity check of the table is missing (same remark as the destroy case: the explicit ReleaseClaim
+			// is not what this detects when the controller dies with the pawn).
 			ReleaseOnSoldierEnd(TEXT("C4 death"), [](AActor* Soldier) { EnemyTest::KillActor(Soldier); });
+		});
+
+		It("C4/C12: a controller that survives its pawn (UnPossess of a living soldier) releases the claim explicitly", [this, ReleaseOnSoldierEnd]()
+		{
+			// Here the controller stays valid, so its weak key cannot save the day: only an explicit ReleaseClaim can bring A back to 0.
+			// Mutation: ReleaseClaim removed from OnUnPossess (A stays at 1 because the controller is alive, the newcomer S3 sees A as
+			// occupied and joins B, the nearest on the 1/1 tie), or the controller re-claiming a target while it has no pawn.
+			ReleaseOnSoldierEnd(TEXT("C4 unpossess"), [this](AActor* Soldier)
+			{
+				const APawn* Pawn = Cast<APawn>(Soldier);
+				AController* Controller = (Pawn != nullptr) ? Pawn->GetController() : nullptr;
+				if (!TestNotNull(TEXT("harness: the soldier has a controller"), Controller)) { return; }
+				Controller->UnPossess();
+				TestTrue(TEXT("precondition: the controller is still alive"), IsValid(Controller));
+				TestTrue(TEXT("precondition: the soldier is still alive"), IsValid(Soldier));
+				TestNull(TEXT("precondition: the controller no longer has a pawn"), Controller->GetPawn());
+			});
 		});
 
 		// Three targets in the zone, T1 held by S1, T2 held by S2; T3 free. When T1 ends, S1 must go to the FREE T3, not to the nearer T2.
@@ -558,8 +583,10 @@ void FEnemyTargetReservationSpec::Define()
 
 		It("C6: the sum of the claims of the destructibles equals the soldiers in Engage that have a target, at every stage", [this]()
 		{
-			// Mutation: any leak (release missing on death, destruction, target loss) or double count (a re-choice that adds without
-			// replacing) makes one of the checkpoints off by one.
+			// Mutation (honest): a re-choice after a target KILL that adds a claim without replacing the old one (the killed target is
+			// still valid, so its stale claim is counted: sum 4), or a table keyed per target instead of per controller. The soldier and
+			// target DESTRUCTION steps check the effect only: invalid weak keys/targets are skipped even with no explicit release
+			// (see the "controller survives its pawn" test for the explicit release).
 			if (!RequireWorld()) { return; }
 			if (!TestNotNull(TEXT("harness: zone"), SpawnLayoutZone())) { return; }
 			TArray<TWeakObjectPtr<ATestDestructible>> Targets;
@@ -688,6 +715,49 @@ void FEnemyTargetReservationSpec::Define()
 			TestEqual(TEXT("C8: no further request once in range"), Seam->RequestedTargets.Num(), 1);
 			TestTrue(TEXT("C8: the soldier keeps its target"), Seam->GetCurrentTarget() == Target);
 		});
+
+		// Not automated: "a move request in progress is stopped when the soldier enters the range" (C8, second half). The seam
+		// replaces the real path following, so StopMovement has nothing to stop; verify in PIE (a soldier walking to a target
+		// must stop walking when it starts attacking).
+
+		It("C11: a soldier pushed out of range with no move in progress asks again for the same target, once, without changing target or claim", [this]()
+		{
+			// Mutation: the request is conditioned on "never requested for this target" (no second request: the soldier stays idle out
+			// of range), or the relaunch re-chooses (the soldier is put nearer to B than to A, so a re-choice would switch to B), or
+			// the relaunch is repeated every tick (more than 2 requests over the 100 ticks), or releases/re-takes the claim.
+			if (!RequireWorld()) { return; }
+			if (!TestNotNull(TEXT("harness: zone"), SpawnLayoutZone())) { return; }
+			ATestDestructible* A = SpawnTarget(FVector(2500.0, 0.0, 0.0));
+			ATestDestructible* B = SpawnTarget(FVector(4500.0, 0.0, 0.0));
+			if (!TestTrue(TEXT("harness: targets"), A && B)) { return; }
+
+			ATestSeamEnemySoldier* Soldier = SpawnChosenSoldier(FVector::ZeroVector);
+			if (Soldier == nullptr) { return; }
+			ATestEnemyAIController* Seam = EnemyReservationTest::SeamOf(Soldier);
+			if (!TestNotNull(TEXT("harness: seam controller"), Seam)) { return; }
+			if (!TestTrue(TEXT("precondition: the soldier chose A"), Seam->GetCurrentTarget() == A)) { return; }
+			TickFor(TickStep);
+			if (!TestEqual(TEXT("precondition: one request so far"), Seam->RequestedTargets.Num(), 1)) { return; }
+
+			// Arrival: put the soldier next to A and wait for its first hit, which proves the arrival was registered (no move in progress).
+			Soldier->SetActorLocation(FVector(2400.0, 0.0, 0.0));
+			if (!TestTrue(TEXT("precondition: the soldier arrived and attacks"), TickUntil([A]() { return A->GetHealthPercent() < 1.0f; }, MaxWaitTime))) { return; }
+			if (!TestEqual(TEXT("precondition: no request while in range"), Seam->RequestedTargets.Num(), 1)) { return; }
+
+			// Pushed out of range, nearer to B (800 u) than to A (1200 u).
+			Soldier->SetActorLocation(FVector(3700.0, 0.0, 0.0));
+			if (!TestTrue(TEXT("C11: a new request is sent"), TickUntil([Seam]() { return Seam->RequestedTargets.Num() >= 2; }, 2.0))) { return; }
+			TestEqual(TEXT("C11: exactly one new request"), Seam->RequestedTargets.Num(), 2);
+			TestTrue(TEXT("C11: towards the same target (A)"), Seam->RequestedTargets[1].Get() == A);
+			TestTrue(TEXT("C11: the target did not change (not a re-choice, B is nearer)"), Seam->GetCurrentTarget() == A);
+			TestEqual(TEXT("C11: A is still reserved once"), Claims()->GetClaimCount(A), 1);
+			TestEqual(TEXT("C11: B is still free"), Claims()->GetClaimCount(B), 0);
+
+			TickFor(5.0); // 100 ticks, the seam never completes the move: it is still in progress
+			TestEqual(TEXT("C11: no further request while the relaunched move is in progress"), Seam->RequestedTargets.Num(), 2);
+			TestTrue(TEXT("C11: target unchanged after 100 ticks"), Seam->GetCurrentTarget() == A);
+			TestEqual(TEXT("C11: claim unchanged after 100 ticks"), Claims()->GetClaimCount(A), 1);
+		});
 	});
 
 	// ------------------------------------------------------------------------------------------------------------------------
@@ -786,6 +856,45 @@ void FEnemyTargetReservationSpec::Define()
 			TestNull(TEXT("C9: the soldier does not keep a target it was told it is already at"), Seam->GetCurrentTarget());
 			TestEqual(TEXT("C9: the claim is released"), Claims()->GetClaimCount(Target), 0);
 			TestEqual(TEXT("C9: only one request in that second (target excluded)"), Seam->RequestedTargets.Num(), 1);
+		});
+
+		It("C12: a move end reported synchronously inside the request (Blocked) leaves one exclusion, no claim and a single Error", [this]()
+		{
+			// Mutation: the controller writes its state (target, claim, "move requested") AFTER calling RequestMoveToTarget instead of
+			// before. The synchronous OnMoveCompleted then runs against a state that does not exist yet (it is ignored as "not
+			// awaited", or finds no target to exclude), and the late write resurrects target + claim + "moving": the target stays
+			// reserved and is not excluded, so the claim count is 1 and the soldier holds a target it never reaches. Also fails if
+			// the exclusion is applied twice/never, or the Error is logged per attempt.
+			if (!RequireWorld()) { return; }
+			AddExpectedErrorPlain(EnemyTest::ErrorNoReachableTarget, EAutomationExpectedErrorFlags::Contains, 1);
+			if (!TestNotNull(TEXT("harness: zone"), SpawnLayoutZone())) { return; }
+			ATestDestructible* Target = SpawnTarget(FVector(2500.0, 0.0, 0.0)); // the only candidate
+			if (Target == nullptr) { return; }
+			ATestSyncBlockedEnemySoldier* Soldier = Cast<ATestSyncBlockedEnemySoldier>(
+				SpawnSoldier(FVector::ZeroVector, ATestSyncBlockedEnemySoldier::StaticClass()));
+			ATestEnemyAIController* Seam = EnemyReservationTest::SeamOf(Soldier);
+			if (!TestNotNull(TEXT("harness: synchronous seam controller"), Seam)) { return; }
+			double Delay = 0.0;
+			if (!TestTrue(TEXT("harness: UnreachableRetryDelay is readable"), EnemyTest::ReadNumber(Seam, TEXT("UnreachableRetryDelay"), Delay))) { return; }
+			if (!TestTrue(TEXT("harness: the delay is positive"), Delay > 0.0)) { return; }
+
+			if (!TestTrue(TEXT("C12: the single target is requested"), TickUntil([Seam]() { return Seam->RequestedTargets.Num() >= 1; }, MaxWaitTime))) { return; }
+			const double FirstRequestTime = World->GetTimeSeconds();
+			TestNull(TEXT("C12: the soldier holds no target after the synchronous Blocked"), Seam->GetCurrentTarget());
+			TestEqual(TEXT("C12: no reservation"), Claims()->GetClaimCount(Target), 0);
+
+			// The only target is excluded: it is not chosen again before the delay (each tick would add a request otherwise).
+			TickFor(0.5 * Delay);
+			TestEqual(TEXT("C12: one request only, the target is excluded"), Seam->RequestedTargets.Num(), 1);
+			TestNull(TEXT("C12: still no target while waiting"), Seam->GetCurrentTarget());
+			TestEqual(TEXT("C12: still no reservation while waiting"), Claims()->GetClaimCount(Target), 0);
+
+			// The exclusion is temporary: the target is tried again after the delay (and fails again, still one Error in total).
+			const bool bRetried = TickUntil([Seam]() { return Seam->RequestedTargets.Num() >= 2; }, Delay + 2.0);
+			const double Elapsed = World->GetTimeSeconds() - FirstRequestTime;
+			TestTrue(TEXT("C12: a new attempt happens after the delay"), bRetried);
+			TestTrue(*FString::Printf(TEXT("C12: not before the delay (elapsed %.2f s for a delay of %.2f s)"), Elapsed, Delay), Elapsed >= Delay - TickStep);
+			TestEqual(TEXT("C12: no reservation after the retry either"), Claims()->GetClaimCount(Target), 0);
 		});
 	});
 

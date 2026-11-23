@@ -6,8 +6,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AITypes.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Navigation/PathFollowingComponent.h"
 #include "Components/BoxComponent.h"
 #include "Engine/World.h"
 #include "Enemies/Destructible.h"
@@ -106,6 +108,39 @@ public:
 	ATestSeamEnemySoldier()
 	{
 		AIControllerClass = ATestEnemyAIController::StaticClass();
+	}
+};
+
+// Second test seam: reproduces what MoveToLocation does when the move fails at once. The end of the move is reported SYNCHRONOUSLY,
+// from inside RequestMoveToTarget (before it returns), then the call answers RequestSuccessful. The production controller must have
+// written all its state (target, claim, "move requested") before calling RequestMoveToTarget, and must not write any of it back
+// afterwards, otherwise the callback is ignored or its effect is overwritten.
+UCLASS(NotBlueprintable, NotPlaceable)
+class ATestSyncBlockedEnemyAIController : public ATestEnemyAIController
+{
+	GENERATED_BODY()
+
+// -----------FUNCTIONS-----------
+protected:
+	virtual EPathFollowingRequestResult::Type RequestMoveToTarget(AActor* Target) override
+	{
+		Super::RequestMoveToTarget(Target); // records the request in RequestedTargets
+		OnMoveCompleted(FAIRequestID::InvalidRequest, FPathFollowingResult(EPathFollowingResult::Blocked, FPathFollowingResultFlags::None));
+		return EPathFollowingRequestResult::RequestSuccessful;
+	}
+};
+
+// A test soldier wired to the synchronous-failure seam above.
+UCLASS(NotBlueprintable, NotPlaceable)
+class ATestSyncBlockedEnemySoldier : public ATestEnemySoldier
+{
+	GENERATED_BODY()
+
+// -----------FUNCTIONS-----------
+public:
+	ATestSyncBlockedEnemySoldier()
+	{
+		AIControllerClass = ATestSyncBlockedEnemyAIController::StaticClass();
 	}
 };
 
