@@ -72,6 +72,28 @@ public:
 	}
 };
 
+// Test seam for the NavMesh move of the Engage state (test worlds have no NavMesh): records every move request instead of
+// moving, and answers with a configurable result. A soldier uses it through AIControllerClass.
+UCLASS(NotBlueprintable, NotPlaceable)
+class ATestEnemyAIController : public AEnemyAIController
+{
+	GENERATED_BODY()
+
+// -----------FUNCTIONS-----------
+protected:
+	virtual EPathFollowingRequestResult::Type RequestMoveToTarget(AActor* Target) override
+	{
+		RequestedTargets.Add(Target);
+		return NextResult;
+	}
+
+// -----------PROPERTIES-----------
+public:
+	// Not UPROPERTY on purpose: owned by the test, only compared by pointer.
+	TArray<TWeakObjectPtr<AActor>> RequestedTargets;
+	EPathFollowingRequestResult::Type NextResult = EPathFollowingRequestResult::RequestSuccessful;
+};
+
 namespace EnemyTest
 {
 	enum class EWaveEvent : uint8

@@ -15,6 +15,9 @@ AEnemySoldier::AEnemySoldier()
 	// Face movement direction instead of control rotation, so it turns to match AddMovementInput (spline or target chase).
 	bUseControllerRotationYaw = false;
 	GetCharacterMovement()->bOrientRotationToMovement = true;
+
+	// NavMesh moves impose a velocity, not an acceleration: without this the Anim Blueprint sees no acceleration and slides without walking.
+	GetCharacterMovement()->GetNavMovementProperties()->bUseAccelerationForPaths = true;
 }
 
 // Called when the game starts or when spawned
