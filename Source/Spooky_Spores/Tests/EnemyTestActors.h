@@ -94,6 +94,21 @@ public:
 	EPathFollowingRequestResult::Type NextResult = EPathFollowingRequestResult::RequestSuccessful;
 };
 
+// A test soldier wired to the test seam above: its Engage never touches the NavMesh (absent from test worlds). Reads of
+// GetCurrentTarget() and the subsystem claims are the observations; ATestEnemySoldier keeps the production controller.
+UCLASS(NotBlueprintable, NotPlaceable)
+class ATestSeamEnemySoldier : public ATestEnemySoldier
+{
+	GENERATED_BODY()
+
+// -----------FUNCTIONS-----------
+public:
+	ATestSeamEnemySoldier()
+	{
+		AIControllerClass = ATestEnemyAIController::StaticClass();
+	}
+};
+
 namespace EnemyTest
 {
 	enum class EWaveEvent : uint8

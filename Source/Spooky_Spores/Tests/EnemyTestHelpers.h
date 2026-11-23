@@ -125,6 +125,9 @@ namespace EnemyTest
 	// expected messages too (AutomationTest.cpp l.1717), so a short word like "destructible" also swallows (and counts) the assertion
 	// labels of the test itself ("...: no destructible was attacked").
 	inline const TCHAR* ErrorNoTarget = TEXT("found no living destructible");
+	// Spec 3b: the distinct Error "no reachable target" (the spec fixes no wording; matched on the common stem). Keep the labels of the
+	// assertions free of this stem, a failing assertion label is matched against the expected errors too.
+	inline const TCHAR* ErrorNoReachableTarget = TEXT("reachable");
 
 	struct FSpawnerConfig
 	{
