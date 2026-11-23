@@ -758,6 +758,62 @@ void FEnemyTargetReservationSpec::Define()
 			TestTrue(TEXT("C11: target unchanged after 100 ticks"), Seam->GetCurrentTarget() == A);
 			TestEqual(TEXT("C11: claim unchanged after 100 ticks"), Claims()->GetClaimCount(A), 1);
 		});
+
+		It("C13: a soldier whose attack timer is running deals no damage while pushed out of range, hits resume on return; a soldier left in range keeps hitting", [this]()
+		{
+			// Mutation 1: HandleAttackTimer has no range check (target A loses health while S1 is out of range -> red).
+			// Mutation 2: the range check also cuts the hits in range, or cancels the timer for good (control target B stops losing
+			// health, or A never loses health again after the return -> red).
+			// Durations come from the soldier's own GetAttackInterval() (default 1.5 s); the targets keep their default 100 health with
+			// 10 damage per hit by default: the test spans about 4 intervals plus a few more, far from killing a target (a dead target
+			// would end the attack and make later checks meaningless, hence the guards below). If AttackDamage is raised a lot or the
+			// target health lowered, the "alive" preconditions fail loudly instead of passing silently.
+			if (!RequireWorld()) { return; }
+			if (!TestNotNull(TEXT("harness: zone"), SpawnLayoutZone())) { return; }
+			ATestDestructible* A = SpawnTarget(FVector(2500.0, 0.0, 0.0));
+			ATestDestructible* B = SpawnTarget(FVector(4500.0, 0.0, 0.0));
+			if (!TestTrue(TEXT("harness: targets"), A && B)) { return; }
+
+			// S1 chooses A (nearest free); S2 then takes B (the only free one) and stands next to it, in range.
+			ATestSeamEnemySoldier* S1 = SpawnChosenSoldier(FVector::ZeroVector);
+			if (S1 == nullptr) { return; }
+			ATestSeamEnemySoldier* S2 = SpawnChosenSoldier(FVector(4400.0, 0.0, 0.0));
+			if (S2 == nullptr) { return; }
+			const AEnemyAIController* Controller1 = EnemyReservationTest::ControllerOf(S1);
+			const AEnemyAIController* Controller2 = EnemyReservationTest::ControllerOf(S2);
+			if (!TestTrue(TEXT("harness: S1 targets A and S2 targets B"),
+				Controller1 && Controller2 && Controller1->GetCurrentTarget() == A && Controller2->GetCurrentTarget() == B)) { return; }
+
+			const double Interval = S1->GetAttackInterval();
+			if (!TestTrue(TEXT("harness: a usable attack interval"), Interval > 0.1)) { return; }
+			const double HitWindow = Interval + 0.25; // one interval plus tick granularity and margin
+
+			// S1 arrives in range of A; both attack timers are running once each target took a first hit.
+			S1->SetActorLocation(FVector(2400.0, 0.0, 0.0));
+			if (!TestTrue(TEXT("precondition: both soldiers attack"),
+				TickUntil([A, B]() { return A->GetHealthPercent() < 1.0f && B->GetHealthPercent() < 1.0f; }, MaxWaitTime))) { return; }
+
+			// No tick ran since the hits were observed: the next hit of S1 is one interval away. Push S1 out of range.
+			S1->SetActorLocation(FVector(3700.0, 0.0, 0.0));
+			const float HealthA = A->GetHealthPercent();
+			const float HealthB = B->GetHealthPercent();
+			if (!TestTrue(TEXT("precondition: targets still alive"), HealthA > 0.5f && HealthB > 0.5f)) { return; }
+
+			TickFor(4.0 * Interval); // four attack intervals of world time
+			TestEqual(TEXT("C13: no damage on A while S1 is out of range"), A->GetHealthPercent(), HealthA);
+			// Four intervals contain at least three hits of a soldier that stays in range (the exact count depends on the timer phase).
+			TestTrue(TEXT("C13: the soldier left in range kept hitting B at each interval (at least 3 hits in 4 intervals)"),
+				B->GetHealthPercent() <= HealthB - 0.3f + KINDA_SMALL_NUMBER);
+			if (!TestTrue(TEXT("precondition: B survived the control window"), !B->IsDead())) { return; }
+
+			// Back in range: hits resume, then keep coming at the normal interval.
+			S1->SetActorLocation(FVector(2400.0, 0.0, 0.0));
+			const bool bResumed = TickUntil([A, HealthA]() { return A->GetHealthPercent() < HealthA; }, HitWindow);
+			if (!TestTrue(TEXT("C13: hits resume within one interval of the return to range"), bResumed)) { return; }
+			const float HealthAfterResume = A->GetHealthPercent();
+			TestTrue(TEXT("C13: and continue at the normal interval"),
+				TickUntil([A, HealthAfterResume]() { return A->GetHealthPercent() < HealthAfterResume; }, HitWindow));
+		});
 	});
 
 	// ------------------------------------------------------------------------------------------------------------------------
