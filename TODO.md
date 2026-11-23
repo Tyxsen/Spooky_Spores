@@ -3,9 +3,10 @@
 Seul le reste à faire figure ici. Le déjà fait est dans `git log` et `documentation-technique.md`. Pas de découpage par semaines : on déroule la file (règles : `CLAUDE.md` section 9). Release GitHub à chaque étape significative (`v0.2`, `v0.3`...).
 
 ## Prochaine session
-- **État** : 3b (ennemis : déplacement NavMesh en `Engage` + réservation souple des cibles) terminée et validée en PIE par Timéo le 2026-11-23 ; la branche `feature/enemy-navmesh-reservation` reste à fusionner dans `dev` par Timéo.
+- **État** : 3b (ennemis : déplacement NavMesh en `Engage` + réservation souple des cibles) terminée et validée en PIE par Timéo le 2026-11-23.
 - **Prochaine tâche** : item 2.2c, rôle « attaque/défense » des serviteurs, avec la règle d'errance de Timéo (item 2, plus bas).
 - **À savoir avant de commencer** :
+  - Penser à ajouter le fait que les serviteurs sont destructibles avec un certain nombre de points de vie pour pouvoir se faire attaquer par les ennemis.
   - la détection des ennemis vivants est à créer (rien n'existe côté serviteur) ;
   - le ciblage partagé et le déplacement des ennemis sont stabilisés (3b) ;
   - les mondes de test n'ont pas de NavMesh : prévoir une couture de test comme pour 3b (méthode virtuelle protégée autour de `MoveToLocation`, voir `documentation-technique.md` section 11) ;
