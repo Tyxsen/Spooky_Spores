@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "GameFramework/Controller.h"
 #include "EnemyTargetSubsystem.generated.h"
 
 class AController;

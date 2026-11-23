@@ -142,7 +142,8 @@ void AEnemyAIController::TickEngage(float DeltaSeconds)
 		return;
 	}
 
-	if (!bHasRequestedMove)
+	// Out of range with no move in progress: (re)send a request, e.g. after being pushed out of range.
+	if (!bIsMovingToTarget)
 	{
 		RequestMoveToCurrentTarget();
 	}
@@ -166,7 +167,6 @@ void AEnemyAIController::ChooseTarget()
 		TargetSubsystem->ReleaseClaim(this);
 	}
 	CurrentTarget.Reset();
-	bHasRequestedMove = false;
 
 	const APawn* ControlledPawn = GetPawn();
 	if (!ControlledPawn || !TargetSubsystem) return;
@@ -229,7 +229,6 @@ void AEnemyAIController::ChooseTarget()
 void AEnemyAIController::RequestMoveToCurrentTarget()
 {
 	// All state is written before the call: MoveToLocation may complete synchronously.
-	bHasRequestedMove = true;
 	bIsMovingToTarget = true;
 
 	const EPathFollowingRequestResult::Type Result = RequestMoveToTarget(CurrentTarget.Get());
@@ -288,7 +287,6 @@ void AEnemyAIController::HandleTargetUnreachable()
 		TargetSubsystem->ReleaseClaim(this);
 	}
 	CurrentTarget.Reset();
-	bHasRequestedMove = false;
 }
 
 bool AEnemyAIController::IsInAttackRange(const AEnemySoldier& Soldier, const AActor& Target) const

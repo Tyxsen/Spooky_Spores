@@ -95,10 +95,7 @@ private:
 	// Same, for the "every target is unreachable" error.
 	bool bHasLoggedNoReachableTarget = false;
 
-	// A move request was sent for the current target (only one per target).
-	bool bHasRequestedMove = false;
-
-	// The request is still awaited: OnMoveCompleted ignores any end while this is false.
+	// A move request is in progress: no new one is sent while true; OnMoveCompleted ignores any end while this is false.
 	bool bIsMovingToTarget = false;
 
 	// Unreachable targets and the world time at which they become eligible again.
