@@ -6,8 +6,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AITypes.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Navigation/PathFollowingComponent.h"
 #include "Components/BoxComponent.h"
 #include "Engine/World.h"
 #include "Enemies/Destructible.h"
@@ -69,6 +71,76 @@ public:
 		GetCharacterMovement()->DefaultLandMovementMode = MOVE_Flying;
 		// Only applied when there is no acceleration (CalcVelocity l.3910): it does not slow the spline following.
 		GetCharacterMovement()->BrakingDecelerationFlying = 8000.0f;
+	}
+};
+
+// Test seam for the NavMesh move of the Engage state (test worlds have no NavMesh): records every move request instead of
+// moving, and answers with a configurable result. A soldier uses it through AIControllerClass.
+UCLASS(NotBlueprintable, NotPlaceable)
+class ATestEnemyAIController : public AEnemyAIController
+{
+	GENERATED_BODY()
+
+// -----------FUNCTIONS-----------
+protected:
+	virtual EPathFollowingRequestResult::Type RequestMoveToTarget(AActor* Target) override
+	{
+		RequestedTargets.Add(Target);
+		return NextResult;
+	}
+
+// -----------PROPERTIES-----------
+public:
+	// Not UPROPERTY on purpose: owned by the test, only compared by pointer.
+	TArray<TWeakObjectPtr<AActor>> RequestedTargets;
+	EPathFollowingRequestResult::Type NextResult = EPathFollowingRequestResult::RequestSuccessful;
+};
+
+// A test soldier wired to the test seam above: its Engage never touches the NavMesh (absent from test worlds). Reads of
+// GetCurrentTarget() and the subsystem claims are the observations; ATestEnemySoldier keeps the production controller.
+UCLASS(NotBlueprintable, NotPlaceable)
+class ATestSeamEnemySoldier : public ATestEnemySoldier
+{
+	GENERATED_BODY()
+
+// -----------FUNCTIONS-----------
+public:
+	ATestSeamEnemySoldier()
+	{
+		AIControllerClass = ATestEnemyAIController::StaticClass();
+	}
+};
+
+// Second test seam: reproduces what MoveToLocation does when the move fails at once. The end of the move is reported SYNCHRONOUSLY,
+// from inside RequestMoveToTarget (before it returns), then the call answers RequestSuccessful. The production controller must have
+// written all its state (target, claim, "move requested") before calling RequestMoveToTarget, and must not write any of it back
+// afterwards, otherwise the callback is ignored or its effect is overwritten.
+UCLASS(NotBlueprintable, NotPlaceable)
+class ATestSyncBlockedEnemyAIController : public ATestEnemyAIController
+{
+	GENERATED_BODY()
+
+// -----------FUNCTIONS-----------
+protected:
+	virtual EPathFollowingRequestResult::Type RequestMoveToTarget(AActor* Target) override
+	{
+		Super::RequestMoveToTarget(Target); // records the request in RequestedTargets
+		OnMoveCompleted(FAIRequestID::InvalidRequest, FPathFollowingResult(EPathFollowingResult::Blocked, FPathFollowingResultFlags::None));
+		return EPathFollowingRequestResult::RequestSuccessful;
+	}
+};
+
+// A test soldier wired to the synchronous-failure seam above.
+UCLASS(NotBlueprintable, NotPlaceable)
+class ATestSyncBlockedEnemySoldier : public ATestEnemySoldier
+{
+	GENERATED_BODY()
+
+// -----------FUNCTIONS-----------
+public:
+	ATestSyncBlockedEnemySoldier()
+	{
+		AIControllerClass = ATestSyncBlockedEnemyAIController::StaticClass();
 	}
 };
 
