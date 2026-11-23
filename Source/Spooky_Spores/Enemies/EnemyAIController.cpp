@@ -315,5 +315,12 @@ void AEnemyAIController::HandleAttackTimer()
 	// The target may have died since the last tick; TickEngage then clears this timer and picks a new target.
 	if (!IsAliveDestructible(CurrentTarget.Get())) return;
 
-	Cast<AEnemySoldier>(GetPawn())->Attack(CurrentTarget.Get());
+	// The timer is not cleared on UnPossess, so the pawn can be null here.
+	AEnemySoldier* Soldier = Cast<AEnemySoldier>(GetPawn());
+	if (!Soldier) return;
+
+	// Skip the hit while pushed out of range: the timer keeps running and hits resume once back in range.
+	if (!IsInAttackRange(*Soldier, *CurrentTarget.Get())) return;
+
+	Soldier->Attack(CurrentTarget.Get());
 }
