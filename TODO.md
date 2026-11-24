@@ -3,7 +3,7 @@
 Seul le reste à faire figure ici. Le déjà fait est dans `git log` et `documentation-technique.md`. Pas de découpage par semaines : on déroule la file (règles : `CLAUDE.md` section 9). Release GitHub à chaque étape significative (`v0.2`, `v0.3`...).
 
 ## Prochaine session
-- **État** : 3b (ennemis : déplacement NavMesh en `Engage` + réservation souple des cibles) terminée, validée en PIE et fusionnée. 2.2c (rôle « attaque/défense » des serviteurs) terminée et validée en PIE par Timéo le 2026-11-24 ; sa branche (`feature/servant-combat`) est à fusionner par Timéo.
+- **État** : 3b (ennemis : déplacement NavMesh en `Engage` + réservation souple des cibles) terminée, validée en PIE et fusionnée. 2.2c (rôle « attaque/défense » des serviteurs) terminée et validée en PIE par Timéo le 2026-11-24.
 - **Prochaine tâche** : item 4, menu de paramètres (son, FOV, remappage des touches), annoncé par Timéo comme prochaine session.
 - **Rappels** : la dette « Avant toute Release » (section Dette technique) ; points chauds à ne pas modifier en parallèle : `EResourceType`, `*.Build.cs`, `Default*.ini`, `TODO.md`, `CLAUDE.md`, `documentation-technique.md`, `Lvl_Principal.umap` (`CLAUDE.md` section 10).
 
