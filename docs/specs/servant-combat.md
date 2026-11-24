@@ -14,6 +14,8 @@ Le serviteur assigné `AttackDefense` quitte l'errance pour tuer les ennemis viv
 - **Déplacement** : `MoveToActor` (la cible bouge), derrière la couture `RequestMoveToEnemy` (virtuelle protégée, tests sans NavMesh). État écrit avant l'appel (callbacks synchrones). Vitesse `CombatWalkSpeed` pendant le combat, `WanderWalkSpeed` rétablie à la fin.
 - **Fin** : `EndCombat(bFailed)` vide l'état, coupe le timer, `StopMovement` puis `ScheduleDecision` en dernier (`CombatNextDelay`, ou `RetryDelay` + `bSkipNextHarvest` en cas d'échec de déplacement). Sans ennemi, la décision suivante rend `Wander`.
 - **Dé-assignation** : `OnServantAssignmentsChanged` termine aussi un combat si la tâche n'est plus `AttackDefense`.
+- **Orientation** (Timéo, retour PIE : « Le serviteur ne se tourne pas vers l'ennemi si il est déjà dans la range au moment de choisir ce qu'il fait. ») : à chaque coup, `AServant` aligne son lacet (yaw seul, instantané) sur sa cible avant `Attack`, y compris quand il n'a pas marché.
+- **Réveil par détection** (Timéo, retour PIE : « Si le serviteur a choisi un point et qu'il s'y rend avant qu'un ennemi rentre dans la base, il continue d'y aller jusqu'à ce qu'il l'atteigne et ensuite attaque, je voudrais que le fait de détecter un ennemi ça annule le déplacement et envoie direct sur l'ennemi. ») : tant que la tâche est `AttackDefense`, hors combat et en errance (marche ou pause, jamais `Return`/`Teleport`), un timer répétitif `EnemyScanTimer` (période `EnemyScanInterval`) consulte `UEnemyRegistrySubsystem` ; dès qu'un ennemi éligible (vivant, origine en zone) existe, la marche d'errance est annulée et le combat démarre sur le plus proche du serviteur. État écrit avant `StopMovement` (callback synchrone) ; timer coupé en combat, en `StopWandering` et à la dé-assignation.
 - **Ennemi vs cible mobile** (Timéo : « J'aimerais si possible que ça suive le serviteur si il est en mouvement, pas forcément que ça check à chaque tick, peut-être toutes les secondes mais quelque chose comme ça. ») : dans `AEnemyAIController::TickEngage`, si la cible est un `APawn` hors portée, une nouvelle demande `MoveToLocation` vers sa position actuelle est émise au plus une fois par `RepathInterval` (EditAnywhere, `Enemy|Combat`, 1.0 s), sans attendre la fin du déplacement en cours. Cible non-pawn (destructible fixe) : comportement 3b inchangé. En plus, dans `OnMoveCompleted`, une fin `Success` hors portée sur un `APawn` n'exclut plus la cible 3 s (elle a bougé) ; les autres cas restent « inatteignable ».
 
 ## Critères d'acceptation
@@ -23,6 +25,8 @@ Le serviteur assigné `AttackDefense` quitte l'errance pour tuer les ennemis viv
 - [ ] `UEnemyRegistrySubsystem::GetLivingEnemies` contient un soldat enregistré vivant et exclut un soldat mort ou détruit.
 - [ ] Serviteur `AttackDefense` en zone + ennemi vivant en zone : à la décision suivante `IsFighting` vrai, `GetFightTarget` = l'ennemi le plus proche en 2D, `LastAction == Attack`, demande `RequestMoveToEnemy` enregistrée s'il est hors portée.
 - [ ] À portée, un coup de `AttackDamage` est appliqué dès le premier pas, puis un par `AttackInterval` (pas de coup hors portée).
+- [ ] Serviteur `AttackDefense` en marche d'errance, ennemi qui entre ensuite en zone : en `<= EnemyScanInterval` + marge, `IsFighting` vrai, marche d'errance annulée (pas d'arrivée au point d'errance), cible = ennemi le plus proche du serviteur. Un serviteur `Unassigned`/`FieldHarvest` ou en `Return` n'est jamais réveillé ainsi.
+- [ ] À portée au moment du coup (sans marche), le yaw du serviteur pointe vers l'ennemi (écart < 1°), à chaque coup ; le roll et le pitch sont inchangés.
 - [ ] Ennemi tué : `IsFighting` faux ; s'il en reste un en zone le serviteur le prend, sinon `IsWandering` vrai et `LastAction == Wander`.
 - [ ] Serviteur `Unassigned` ou `FieldHarvest` avec un ennemi en zone : jamais `IsFighting`, PV de l'ennemi inchangés ; un `FieldHarvest` en récolte garde `IsHarvesting` vrai quand il est frappé.
 - [ ] Un ennemi hors zone est ignoré ; un ennemi qui sort de la zone, ou une dé-assignation, met fin au combat (`IsFighting` faux, plus de dégâts).
@@ -51,11 +55,11 @@ TArray<AEnemySoldier*> GetLivingEnemies() const;
 - `AServant` (`Combat`, EditAnywhere) : `AttackDamage` 15, `AttackRange` 100, `AttackInterval` 1.2.
 - PV : `MaxHealth` du `UHealthComponent` de `BP_Servant`, 100 (défaut du composant).
 - `AEnemyAIController` (`Enemy|Combat`) : `RepathInterval` 1.0.
-- `AServantAIController` (`Servant|Combat`) : `CombatWalkSpeed` 400, `CombatNextDelay` 0.5 (non éditables avant le jeu, doc technique section 12).
+- `AServantAIController` (`Servant|Combat`) : `CombatWalkSpeed` 400, `CombatNextDelay` 0.5, `EnemyScanInterval` 0.5 (non éditables avant le jeu, doc technique section 12).
 
 ## Cas limites
 - `MoveToActor` finit de façon synchrone (`Failed`, `AlreadyAtGoal`) et `StopMovement` aussi : `bIsFighting` et `bIsMovingToEnemy` écrits avant l'appel ; `EndCombat` termine toujours par un `ScheduleDecision` explicite (sinon plus aucune décision planifiée si aucun déplacement n'était actif).
-- Assignation pendant une marche d'errance : pas de demi-tour, le combat démarre à la décision suivante (<= `MaxWanderPause`). Limite assumée : pas de réveil par spawn d'ennemi (il apparaît hors zone).
+- Assignation ou ennemi qui entre en zone pendant une marche d'errance : le scan d'ennemis (`EnemyScanInterval`) annule la marche et lance le combat ; plus de limite « pas de réveil » (remplacée par la décision de Timéo ci-dessus). Un serviteur déjà en `Return` ou `Teleport` n'est pas réveillé.
 - Serviteur hors zone (`Return`) : ni ciblable par les ennemis (origine hors zone) ni combattant.
 - Mort pendant le combat : `StopWandering` coupe `CombatTimer` avant `StopMovement`.
 - Dettes `TActorIterator` / `ExcludedTargets` : non touchées (voir hors périmètre).
