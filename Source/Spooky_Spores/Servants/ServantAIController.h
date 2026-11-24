@@ -174,6 +174,20 @@ private:
 	// True if the decision is an Attack (the follow-up is then scheduled by EndCombat).
 	bool TryStartCombat(const ABaseZone& Zone);
 
+	// The eligibility and choice rule of every fight: living enemy whose origin is in the zone, nearest to the servant (2D). nullptr if none.
+	AEnemySoldier* FindNearestEnemyInZone(const ABaseZone& Zone) const;
+
+	// Writes the fight state (target, flags, speed). Nothing is started: no timer, no step, no movement call.
+	void BeginCombat(AEnemySoldier& Enemy);
+
+	// Arms the combat timer and runs the first step at once (it may end the fight synchronously).
+	void RunCombat();
+
+	// Enemy scan timer: wakes a wandering AttackDefense servant (walking or paused) as soon as an eligible enemy exists.
+	// The walk is cancelled with the fight state already written (StopMovement calls OnMoveCompleted synchronously).
+	UFUNCTION()
+	void ScanForEnemies();
+
 	// One fight step (timer, and once at the start): ends the fight, strikes if in range, or (re)starts the chase.
 	UFUNCTION()
 	void CombatStep();
@@ -267,6 +281,10 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Servant|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "0.1"))
 	float CombatNextDelay = 0.5f;
 
+	// Period of the enemy scan that wakes a wandering AttackDefense servant (cancels its walk, starts the fight)
+	UPROPERTY(EditAnywhere, Category = "Servant|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "0.1"))
+	float EnemyScanInterval = 0.5f;
+
 	// True from the choice of an enemy to the end of the fight (kill, enemy out of the zone, unassignment, failed move, death)
 	UPROPERTY(VisibleInstanceOnly, Category = "Servant|Combat", meta = (AllowPrivateAccess = "true"))
 	bool bIsFighting = false;
@@ -299,4 +317,7 @@ private:
 
 	// Repeating, period AttackInterval, runs CombatStep during a fight
 	FTimerHandle CombatTimer;
+
+	// Repeating, period EnemyScanInterval, runs ScanForEnemies. Armed by StartWandering, cleared by StopWandering.
+	FTimerHandle EnemyScanTimer;
 };

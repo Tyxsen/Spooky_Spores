@@ -23,7 +23,7 @@ public:
 
 	virtual UHealthComponent* GetHealthComponent_Implementation() const override;
 
-	// Applies AttackDamage to Target. Ignored if Target is not valid.
+	// Turns the servant towards Target (yaw only, instant), then applies AttackDamage to it. Ignored if Target is not valid.
 	void Attack(AActor* Target);
 
 	UFUNCTION(BlueprintPure, Category = "Combat")

@@ -39,6 +39,15 @@ void AServant::Attack(AActor* Target)
 {
 	if (!IsValid(Target)) return;
 
+	// Face the target (yaw only, instant) at every hit, also when no walk preceded it. Same origin: keep the current yaw.
+	const FVector ToTarget = Target->GetActorLocation() - GetActorLocation();
+	if (ToTarget.SizeSquared2D() > UE_KINDA_SMALL_NUMBER)
+	{
+		FRotator FacingRotation = GetActorRotation();
+		FacingRotation.Yaw = ToTarget.Rotation().Yaw;
+		SetActorRotation(FacingRotation);
+	}
+
 	UGameplayStatics::ApplyDamage(Target, AttackDamage, GetController(), this, UDamageType::StaticClass());
 }
 

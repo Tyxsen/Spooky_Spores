@@ -51,10 +51,14 @@ void AServantAIController::StartWandering()
 	// A Return from a previous cycle must not count as a failed return in the new one
 	LastAction = EServantWanderAction::None;
 	ScheduleDecision(InitialDecisionDelay);
+	// Runs for the whole wandering; the scan itself checks the task and the state (no effect unless AttackDefense and idle or walking)
+	GetWorldTimerManager().SetTimer(EnemyScanTimer, this, &AServantAIController::ScanForEnemies, EnemyScanInterval, true);
 }
 
 void AServantAIController::StopWandering()
 {
+	// No scan may start a fight on a servant that stops wandering
+	GetWorldTimerManager().ClearTimer(EnemyScanTimer);
 	// Must be cleared before StopMovement: the synchronous Aborted callback would otherwise reschedule a decision
 	bIsWandering = false;
 	// Also before StopMovement: the callback returns early (not wandering), so it would not consume the flag
@@ -682,11 +686,29 @@ void AServantAIController::OnServantAssignmentsChanged()
 
 bool AServantAIController::TryStartCombat(const ABaseZone& Zone)
 {
-	const UEnemyRegistrySubsystem* Registry = GetWorld()->GetSubsystem<UEnemyRegistrySubsystem>();
-	const AServant* Servant = Cast<AServant>(GetPawn());
-	if (!Registry || !Servant || GetAssignedTask() != EServantTask::AttackDefense)
+	if (GetAssignedTask() != EServantTask::AttackDefense)
 	{
 		return false;
+	}
+
+	AEnemySoldier* NearestEnemy = FindNearestEnemyInZone(Zone);
+	if (!NearestEnemy)
+	{
+		return false;
+	}
+
+	BeginCombat(*NearestEnemy);
+	RunCombat();
+	return true;
+}
+
+AEnemySoldier* AServantAIController::FindNearestEnemyInZone(const ABaseZone& Zone) const
+{
+	const UEnemyRegistrySubsystem* Registry = GetWorld()->GetSubsystem<UEnemyRegistrySubsystem>();
+	const AServant* Servant = Cast<AServant>(GetPawn());
+	if (!Registry || !Servant)
+	{
+		return nullptr;
 	}
 
 	// Nearest to the servant (2D), no reservation: several servants may fight the same enemy
@@ -708,13 +730,12 @@ bool AServantAIController::TryStartCombat(const ABaseZone& Zone)
 			NearestEnemy = Enemy;
 		}
 	}
-	if (!NearestEnemy)
-	{
-		return false;
-	}
+	return NearestEnemy;
+}
 
-	// State first (CombatStep may end the fight synchronously), then the timer, then the first step at once
-	FightTarget = NearestEnemy;
+void AServantAIController::BeginCombat(AEnemySoldier& Enemy)
+{
+	FightTarget = &Enemy;
 	bIsFighting = true;
 	LastAction = EServantWanderAction::Attack;
 
@@ -722,10 +743,44 @@ bool AServantAIController::TryStartCombat(const ABaseZone& Zone)
 	{
 		ControlledCharacter->GetCharacterMovement()->MaxWalkSpeed = CombatWalkSpeed;
 	}
+}
 
-	GetWorldTimerManager().SetTimer(CombatTimer, this, &AServantAIController::CombatStep, Servant->GetAttackInterval(), true);
+void AServantAIController::RunCombat()
+{
+	// Timer first, then the first step at once: it may end the fight synchronously (which clears the timer)
+	GetWorldTimerManager().SetTimer(CombatTimer, this, &AServantAIController::CombatStep, CastChecked<AServant>(GetPawn())->GetAttackInterval(), true);
 	CombatStep();
-	return true;
+}
+
+void AServantAIController::ScanForEnemies()
+{
+	// Idle or walking a wander move only: never during a fight or a field job, nor during a Return / Teleport / post-fight pause
+	if (!bIsWandering || bIsFighting || bIsHarvesting || bIsPlanting || LastAction != EServantWanderAction::Wander
+		|| GetAssignedTask() != EServantTask::AttackDefense)
+	{
+		return;
+	}
+
+	const UBaseZoneSubsystem* ZoneSubsystem = GetWorld()->GetSubsystem<UBaseZoneSubsystem>();
+	const ABaseZone* Zone = ZoneSubsystem ? ZoneSubsystem->GetBaseZone() : nullptr;
+	if (!Zone || !Zone->IsZoneValid())
+	{
+		return;
+	}
+
+	AEnemySoldier* Enemy = FindNearestEnemyInZone(*Zone);
+	if (!Enemy)
+	{
+		return;
+	}
+
+	// Fight state first: the synchronous OnMoveCompleted of StopMovement then ignores the cancelled walk (no chase in progress)
+	// instead of scheduling a wander pause. The pending wander decision (paused case) is cleared afterwards, so none stays planned.
+	bWakePending = false;
+	BeginCombat(*Enemy);
+	StopMovement();
+	GetWorldTimerManager().ClearTimer(DecisionTimer);
+	RunCombat();
 }
 
 void AServantAIController::CombatStep()
