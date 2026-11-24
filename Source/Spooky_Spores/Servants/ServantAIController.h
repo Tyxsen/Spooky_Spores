@@ -174,7 +174,8 @@ private:
 	// True if the decision is an Attack (the follow-up is then scheduled by EndCombat).
 	bool TryStartCombat(const ABaseZone& Zone);
 
-	// The eligibility and choice rule of every fight: living enemy whose origin is in the zone, nearest to the servant (2D). nullptr if none.
+	// The eligibility and choice rule of every fight (scan and decision): living enemy whose origin is in the zone, not the enemy
+	// of a failed chase still in cooldown (FailedEnemyCooldown), nearest to the servant (2D). nullptr if none.
 	AEnemySoldier* FindNearestEnemyInZone(const ABaseZone& Zone) const;
 
 	// Writes the fight state (target, flags, speed). Nothing is started: no timer, no step, no movement call.
@@ -269,7 +270,8 @@ private:
 	UPROPERTY(VisibleInstanceOnly, Category = "Servant|Plant", meta = (AllowPrivateAccess = "true"))
 	bool bIsPlanting = false;
 
-	// Set after a failed harvest or planting: the next decision does no field work, so an unreachable field cannot make us loop
+	// Set after a failed harvest, planting or chase: the next decision starts neither field work nor a fight (it wanders).
+	// It is not enough alone against an unreachable enemy: the scan ignores it, so FailedEnemy covers the following seconds.
 	UPROPERTY(VisibleInstanceOnly, Category = "Servant|Harvest", meta = (AllowPrivateAccess = "true"))
 	bool bSkipNextHarvest = false;
 
@@ -285,6 +287,10 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Servant|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "0.1"))
 	float EnemyScanInterval = 0.5f;
 
+	// How long the enemy of a failed chase (unreachable, e.g. off the NavMesh) is ignored by the scan and by the decision.
+	UPROPERTY(EditAnywhere, Category = "Servant|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float FailedEnemyCooldown = 5.0f;
+
 	// True from the choice of an enemy to the end of the fight (kill, enemy out of the zone, unassignment, failed move, death)
 	UPROPERTY(VisibleInstanceOnly, Category = "Servant|Combat", meta = (AllowPrivateAccess = "true"))
 	bool bIsFighting = false;
@@ -294,6 +300,10 @@ private:
 
 	// The enemy being fought (bIsFighting)
 	TWeakObjectPtr<AEnemySoldier> FightTarget;
+
+	// Enemy of the last failed chase and the world time of the failure (FailedEnemyCooldown). Reset by StopWandering.
+	TWeakObjectPtr<AEnemySoldier> FailedEnemy;
+	float FailedEnemyTime = 0.0f;
 
 	// Upper bound of the random delay before an idle servant reacts to a field or seed change (spreads the rush).
 	UPROPERTY(EditAnywhere, Category = "Servant|Wake", meta = (AllowPrivateAccess = "true", ClampMin = "0.1"))

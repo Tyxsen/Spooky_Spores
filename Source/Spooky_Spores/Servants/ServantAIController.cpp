@@ -67,6 +67,9 @@ void AServantAIController::StopWandering()
 	ReleaseFieldTarget();
 	// Same for the fight: the combat timer is cut before StopMovement, and its callback must find no fight to end
 	ClearCombatState();
+	// No cooldown memory outlives the wandering (nor the possession)
+	FailedEnemy.Reset();
+	FailedEnemyTime = 0.0f;
 	StopMovement();
 	GetWorldTimerManager().ClearTimer(DecisionTimer);
 }
@@ -713,10 +716,18 @@ AEnemySoldier* AServantAIController::FindNearestEnemyInZone(const ABaseZone& Zon
 
 	// Nearest to the servant (2D), no reservation: several servants may fight the same enemy
 	const FVector ServantLocation = Servant->GetActorLocation();
+	// The enemy of a failed chase is ignored until its cooldown ends (a dead or destroyed one is not in the registry / not valid)
+	const AEnemySoldier* IgnoredEnemy = FailedEnemy.Get();
+	const bool bIgnoreFailedEnemy = IgnoredEnemy && (GetWorld()->GetTimeSeconds() - FailedEnemyTime) < FailedEnemyCooldown;
 	AEnemySoldier* NearestEnemy = nullptr;
 	double NearestDistanceSq = TNumericLimits<double>::Max();
 	for (AEnemySoldier* Enemy : Registry->GetLivingEnemies())
 	{
+		if (bIgnoreFailedEnemy && Enemy == IgnoredEnemy)
+		{
+			continue;
+		}
+
 		// Only the actor's origin counts, like the enemies' own targeting
 		if (!Zone.IsPointInZone(Enemy->GetActorLocation()))
 		{
@@ -871,6 +882,13 @@ void AServantAIController::ClearCombatState()
 
 void AServantAIController::EndCombat(bool bFailed)
 {
+	// The target must be read before ClearCombatState resets it
+	if (bFailed)
+	{
+		FailedEnemy = FightTarget;
+		FailedEnemyTime = GetWorld()->GetTimeSeconds();
+	}
+
 	// All the state first: StopMovement calls OnMoveCompleted synchronously
 	ClearCombatState();
 	bSkipNextHarvest = bFailed;
