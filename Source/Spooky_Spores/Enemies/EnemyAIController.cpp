@@ -146,6 +146,10 @@ void AEnemyAIController::TickEngage(float DeltaSeconds)
 	// Out of range with no move in progress: (re)send a request, e.g. after being pushed out of range.
 	if (!bIsMovingToTarget)
 	{
+		// A pawn target whose move ended (Success out of range, it moved) is re-requested at most once per RepathInterval,
+		// not at every tick. A fixed destructible keeps the 3b behaviour (immediate request).
+		if (CurrentTarget->IsA<APawn>() && GetWorld()->GetTimeSeconds() - LastMoveRequestTime < RepathInterval) return;
+
 		RequestMoveToCurrentTarget();
 		return;
 	}
@@ -178,6 +182,9 @@ void AEnemyAIController::ChooseTarget()
 		TargetSubsystem->ReleaseClaim(this);
 	}
 	CurrentTarget.Reset();
+
+	// A new target is requested at once: the repath throttle of TickEngage only applies to repeated requests on the same target.
+	LastMoveRequestTime = -RepathInterval;
 
 	const APawn* ControlledPawn = GetPawn();
 	if (!ControlledPawn || !TargetSubsystem) return;

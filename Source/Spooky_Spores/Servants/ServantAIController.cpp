@@ -25,6 +25,13 @@
 #include "Spooky_Spores.h"
 #include "TimerManager.h"
 
+namespace
+{
+	// MoveToActor stops at AttackRange * this factor (plus the agent and target capsule radii), measured in 2D.
+	// It must stay below 1 so the servant stops with a margin inside AttackRange, which is what the range test uses to start striking.
+	constexpr float AcceptanceRadiusFactor = 0.5f;
+}
+
 void AServantAIController::StartWandering()
 {
 	// Already wandering: restarting would interrupt the current move (Aborted) and count fake failed returns
@@ -780,8 +787,8 @@ EPathFollowingRequestResult::Type AServantAIController::RequestMoveToEnemy(AActo
 		return EPathFollowingRequestResult::Failed;
 	}
 
-	// Stops inside the reach (half of it, as a margin for the 2D reach test). The capsule radius comes from bStopOnOverlap.
-	return MoveToActor(Enemy, Servant->GetAttackRange() * 0.5f, /*bStopOnOverlap*/ true, /*bUsePathfinding*/ true,
+	// The capsule radius comes from bStopOnOverlap.
+	return MoveToActor(Enemy, Servant->GetAttackRange() * AcceptanceRadiusFactor, /*bStopOnOverlap*/ true, /*bUsePathfinding*/ true,
 					/*bCanStrafe*/ false, /*FilterClass*/ nullptr, /*bAllowPartialPath*/ false);
 }
 
