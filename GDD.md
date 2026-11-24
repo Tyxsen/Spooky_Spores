@@ -124,7 +124,7 @@ Liste des mécaniques déjà en place et à venir, et comment elles dépendent l
 
 ### Déjà en place (détail complet : `documentation-technique.md`)
 
-Interaction et manipulation physique (grab/lancer), récolte de ressources (nœuds → drops), plantation (`AFieldPlot`), chaudron (deux recettes : ressources → potion, os + potion → Necrospore), composant de santé générique, mana et premier sort, panneau de contrôles, environnement de base (colline, cabane, clôture délimitant le territoire), soldat ennemi (suit un chemin, attaque, laisse des os), résurrection (chaudron → Necrospore, pose d'un serviteur avec la touche L), zone de base, errance des serviteurs, menu d'assignation des tâches, récolte de champ par les serviteurs assignés (le serviteur crédite directement le compteur du joueur).
+Interaction et manipulation physique (grab/lancer), récolte de ressources (nœuds → drops), plantation (`AFieldPlot`), chaudron (deux recettes : ressources → potion, os + potion → Necrospore), composant de santé générique, mana et premier sort, panneau de contrôles, environnement de base (colline, cabane, clôture délimitant le territoire), soldat ennemi (suit un chemin, attaque, laisse des os), résurrection (chaudron → Necrospore, pose d'un serviteur avec la touche L), zone de base, errance des serviteurs, menu d'assignation des tâches, récolte de champ par les serviteurs assignés (le serviteur crédite directement le compteur du joueur), combat des serviteurs assignés « attaque/défense » (ils poursuivent et frappent les ennemis de la base ; les soldats peuvent les cibler, un serviteur tué disparaît sans os).
 
 ### De la mort du soldat au serviteur assigné
 
@@ -143,6 +143,8 @@ Interaction et manipulation physique (grab/lancer), récolte de ressources (nœu
 Menu dédié (touche à définir), deux colonnes : à gauche les serviteurs non assignés, à droite une section par catégorie de tâche (« attaque/défense », « récolte de champ », d'autres à ajouter au fil des besoins), chacune listant les serviteurs qui lui sont actuellement affectés. Glisser-déposer un serviteur d'une colonne à l'autre change son affectation.
 
 **Conséquence** : la récolte automatique découle de l'assignation à la catégorie « récolte de champ », pas d'un comportement indépendant sans supervision du joueur.
+
+**Errance de fond** : l'assignation n'enlève pas l'errance. Un serviteur assigné ne la quitte que s'il y a quelque chose à faire (un champ à gérer, un ennemi à tuer) et y revient dès qu'il n'y a plus rien, en attendant de nouvelles choses à faire.
 
 ### Vue de gestion top-down et construction de base
 
