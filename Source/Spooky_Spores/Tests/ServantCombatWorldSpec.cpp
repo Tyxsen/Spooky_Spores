@@ -292,7 +292,7 @@ void FServantCombatWorldSpec::Define()
 		It("C2: a soldier in Engage whose only destructible is a servant targets it (reserved), and has no such target once the servant is dead", [this]()
 		{
 			// Mutation: AServant is not a destructible / the soldier filters it out (no target, only the logged error), the servant is not
-			// seen as dead or destroyed (the soldier keeps it as target after its death), or the claim is not released.
+			// seen as dead or destroyed (the soldier keeps it as target after its death), or the soldier never re-decides after the loss (no "no target" error, or more than once).
 			if (!RequireWorld()) { return; }
 			// The servant is the only candidate: once it is dead the soldier finds nothing and logs its single "no target" error.
 			AddExpectedErrorPlain(EnemyTest::ErrorNoTarget, EAutomationExpectedErrorFlags::Contains, 1);
@@ -314,9 +314,14 @@ void FServantCombatWorldSpec::Define()
 			TestEqual(TEXT("C2: the servant is reserved by that soldier"), Claims->GetClaimCount(Servant), 1);
 
 			EnemyTest::KillActor(Servant);
-			const bool bLost = TickUntil([Controller]() { return Controller->GetCurrentTarget() == nullptr; }, 5.0);
-			TestTrue(TEXT("C2: after the servant died the soldier no longer has it as target"), bLost);
-			TestNull(TEXT("C2: and has no target at all (it was the only destructible)"), Controller->GetCurrentTarget());
+			// Destroying the servant nulls the soldier's weak target at once, so waiting for "no target" would end the test before the soldier
+			// ticked. Run a fixed span of world time instead: the soldier must really notice the loss, re-decide and log its single error.
+			// (The claim count is not asserted: the destroyed servant would be queried through a dangling pointer.)
+			TickFor(1.0);
+			TestNull(TEXT("C2: after the servant died the soldier has no target at all (it was the only destructible)"), Controller->GetCurrentTarget());
+			// Further ticks must not log the error again (once per soldier): the expected count of 1 is exact.
+			TickFor(0.5);
+			TestNull(TEXT("C2: and still none after more ticks"), Controller->GetCurrentTarget());
 		});
 	});
 
