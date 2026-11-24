@@ -76,9 +76,10 @@ namespace ServantWanderTest
 			if (Controller != nullptr && Controller->GetPathFollowingComponent() != nullptr)
 			{
 				Component = Controller->GetPathFollowingComponent();
-				Handle = Component->OnRequestFinished.AddLambda([this](FAIRequestID, const FPathFollowingResult&)
+				Handle = Component->OnRequestFinished.AddLambda([this](FAIRequestID, const FPathFollowingResult& Result)
 				{
 					++Count;
+						Codes.Add(Result.Code);
 				});
 			}
 		}
@@ -97,6 +98,8 @@ namespace ServantWanderTest
 		bool IsBound() const { return Component.IsValid(); }
 
 		int32 Count = 0;
+		// End code of every finished request, in order (Aborted = StopMovement, Success = arrival).
+		TArray<EPathFollowingResult::Type> Codes;
 
 	private:
 		TWeakObjectPtr<UPathFollowingComponent> Component;

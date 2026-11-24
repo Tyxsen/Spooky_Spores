@@ -81,6 +81,18 @@ BEGIN_DEFINE_SPEC(FServantCombatWorldSpec, "SpookySpores.Servants.Combat.World",
 	void TickWatching(double Seconds, TFunctionRef<void()> Observer);
 	void ExpectNeverFights(EServantTask Task, bool bHitTheServantFirst);
 
+	// Enemy-scan wake-up tests (spec "Reveil par detection").
+	// Observation budget before the wake-up under test: the pause of the failed wander is RetryDelay, so PreWatch + the wake window
+	// must stay below it, or the regular decision timer (not the scan) could be what starts the fight.
+	static constexpr double PreWatch = 0.6;
+	double EnemyScanInterval = 0.0;
+	// A wake-up must happen within EnemyScanInterval + slack (+ two ticks of granularity).
+	double WakeWindow() const { return EnemyScanInterval + TimerSlack + 2.0 * TickStep; }
+	bool ReadScanSettings(const FFighter& Fighter, bool bNeedPauseLength);
+	// Servant on the seam controller, first decision done: it is wandering (a real Wander decision, paused for RetryDelay: no NavMesh).
+	bool MakeWanderingFighter(FFighter& Out, const FVector& Location, EServantTask Task);
+	void ExpectWanderNotWoken(EServantTask Task);
+
 END_DEFINE_SPEC(FServantCombatWorldSpec)
 
 bool FServantCombatWorldSpec::RequireWorld()
@@ -202,6 +214,44 @@ void FServantCombatWorldSpec::ExpectNeverFights(EServantTask Task, bool bHitTheS
 	TestEqual(TEXT("no chase request was ever made"), F.Ctl->RequestedEnemies.Num(), 0);
 	const UServantSubsystem* Subsystem = World->GetSubsystem<UServantSubsystem>();
 	TestTrue(TEXT("the task is unchanged"), Subsystem != nullptr && Subsystem->GetServantTask(F.Servant) == Task);
+}
+
+bool FServantCombatWorldSpec::ReadScanSettings(const FFighter& Fighter, bool bNeedPauseLength)
+{
+	double MinWanderPause = 0.0;
+	const bool bRead = ServantWanderTest::ReadNumber(Fighter.Ctl, TEXT("EnemyScanInterval"), EnemyScanInterval)
+		&& ServantWanderTest::ReadNumber(Fighter.Ctl, TEXT("MinWanderPause"), MinWanderPause);
+	if (!TestTrue(TEXT("harness: EnemyScanInterval and MinWanderPause readable by reflection"), bRead)) { return false; }
+	// RetryDelay was read by MakeFighter. The scan must be clearly faster than any regular pause, or the tests cannot tell them apart.
+	return TestTrue(TEXT("harness: PreWatch + wake window must stay below RetryDelay and MinWanderPause (tunables changed?)"),
+		EnemyScanInterval > 0.0 && (!bNeedPauseLength || (PreWatch + WakeWindow() < RetryDelay && PreWatch + WakeWindow() < MinWanderPause)));
+}
+
+bool FServantCombatWorldSpec::MakeWanderingFighter(FFighter& Out, const FVector& Location, EServantTask Task)
+{
+	if (!MakeFighter(Out, TEXT("Servant"), Location, Task)) { return false; }
+	if (!ReadScanSettings(Out, true)) { return false; }
+	const AServantAIController* Ctl = Out.Ctl;
+	const bool bWandering = TickUntil([Ctl]() { return Ctl->IsWandering() && Ctl->GetLastAction() == EServantWanderAction::Wander; }, InitialDecisionDelay + TimerSlack);
+	return TestTrue(TEXT("precondition: the first decision was a Wander (nothing to fight yet) and the servant is wandering"), bWandering);
+}
+
+// A servant that must not be woken by the scan, an enemy that appears in reach AFTER the wander began (the scan is the only path to a fight).
+void FServantCombatWorldSpec::ExpectWanderNotWoken(EServantTask Task)
+{
+	if (!RequireWorld()) { return; }
+	if (SpawnZone() == nullptr) { return; }
+	FFighter F;
+	if (!MakeWanderingFighter(F, FVector(0.0, 0.0, 100.0), Task)) { return; }
+	ATestPassiveEnemySoldier* Enemy = MakeEnemy(TEXT("Enemy"), FVector(CentreDistance(0.5 * F.Range), 0.0, 100.0));
+	if (Enemy == nullptr) { return; }
+
+	bool bEverFighting = false;
+	TickWatching(PreWatch + WakeWindow(), [&]() { bEverFighting |= F.Ctl->IsFighting(); });
+	TestFalse(TEXT("never IsFighting after an enemy entered the zone"), bEverFighting);
+	TestNull(TEXT("no fight target"), F.Ctl->GetFightTarget());
+	TestEqual(TEXT("the enemy in reach was not hit"), HitsOn(Enemy), 0);
+	TestEqual(TEXT("no chase request"), F.Ctl->RequestedEnemies.Num(), 0);
 }
 
 void FServantCombatWorldSpec::Define()
@@ -707,6 +757,260 @@ void FServantCombatWorldSpec::Define()
 			TickWatching(3.0 * F.Interval, [&]() { bEverFighting |= F.Ctl->IsFighting(); });
 			TestFalse(TEXT("C9: the servant does not start another fight (it is Unassigned)"), bEverFighting);
 			TestEqual(TEXT("C9: no hit after the unassignment"), HitsOn(Enemy), 1);
+		});
+	});
+
+	// ------------------------------------------------------------------------------------------------------------------------
+	// Criterion "Reveil par detection": the enemy scan wakes a wandering AttackDefense servant (PIE feedback of Timeo).
+	// No NavMesh: the wander decision fails at once and the servant PAUSES (RetryDelay, 2 s) with LastAction Wander; the scan period (0.5 s)
+	// is far below that pause, so a fight that starts within EnemyScanInterval + slack of the enemy's arrival can only come from the scan.
+	// The WALK is reproduced with a real request in progress (ServantCombatTest::BeginInjectedWalk), see the walk test.
+	// ------------------------------------------------------------------------------------------------------------------------
+	Describe("Enemy scan wake-up (criterion 7a)", [this]()
+	{
+		It("Scan, pause: an enemy entering the zone wakes a paused AttackDefense servant within EnemyScanInterval; it takes the enemy nearest to the SERVANT, asks once, and the pending decision does not start a second fight", [this]()
+		{
+			// Mutation: no scan (the fight only starts at the pending decision, after RetryDelay: TickUntil times out); the scan picks the first
+			// registered / the nearest to the zone centre / the farthest (wrong target); the scan ignores the zone; after the wake the pending
+			// decision timer is not neutralised and decides again (a second RequestMoveToEnemy: Num 2, or a changed target).
+			if (!RequireWorld()) { return; }
+			ABaseZone* Zone = SpawnZone();
+			FFighter F;
+			if (Zone == nullptr || !MakeWanderingFighter(F, FVector(400.0, 0.0, 100.0), EServantTask::AttackDefense)) { return; }
+			TestFalse(TEXT("precondition: not fighting while no enemy exists"), F.Ctl->IsFighting());
+			// Registration order: Centre first (50 from the zone centre, 450 from the servant), Far, then Near (300 from the servant).
+			ATestPassiveEnemySoldier* Centre = MakeEnemy(TEXT("EnemyCentre"), FVector(-50.0, 0.0, 100.0));
+			ATestPassiveEnemySoldier* Far = MakeEnemy(TEXT("EnemyFar"), FVector(-300.0, 0.0, 100.0));
+			ATestPassiveEnemySoldier* Near = MakeEnemy(TEXT("EnemyNear"), FVector(100.0, 0.0, 100.0));
+			if (!TestTrue(TEXT("harness: enemies"), Centre && Far && Near)) { return; }
+			TestTrue(TEXT("precondition: all in the zone"), Zone->IsPointInZone(Centre->GetActorLocation()) && Zone->IsPointInZone(Far->GetActorLocation()) && Zone->IsPointInZone(Near->GetActorLocation()));
+			TestTrue(TEXT("precondition: Near is out of attack range (a chase request is expected, no hit)"), 300.0 - ServantCombatTest::CapsuleRadius(F.Servant) - ServantCombatTest::CapsuleRadius(Near) > F.Range);
+
+			const bool bWoken = TickUntil([&]() { return F.Ctl->IsFighting(); }, WakeWindow());
+			if (!TestTrue(TEXT("Scan: IsFighting within EnemyScanInterval + margin of the enemy entering the zone"), bWoken)) { return; }
+			TestTrue(TEXT("Scan: the target is the enemy nearest to the servant"), F.Ctl->GetFightTarget() == Near);
+			TestTrue(TEXT("Scan: one chase request, towards that enemy"), F.Ctl->RequestedEnemies.Num() == 1 && F.Ctl->RequestedEnemies[0].Get() == Near);
+
+			// Past the pending decision of the pause (RetryDelay) and a few scans: nothing may decide a second time.
+			TickFor(RetryDelay + CombatNextDelay);
+			TestTrue(TEXT("Scan: still the same single fight"), F.Ctl->IsFighting() && F.Ctl->GetFightTarget() == Near);
+			TestEqual(TEXT("Scan: still one chase request (no double decision, no re-scan during the fight)"), F.Ctl->RequestedEnemies.Num(), 1);
+			TestTrue(TEXT("Scan: no hit out of range, on any enemy"), HitsOn(Centre) == 0 && HitsOn(Far) == 0 && HitsOn(Near) == 0);
+		});
+
+		It("Scan, walk: an enemy entering the zone CANCELS the wander walk in progress (the servant does not go on to its point) and starts the fight", [this]()
+		{
+			// The PIE bug: the servant kept walking to its wander point and only then attacked. A real request is in progress here (hand-made
+			// path, status Moving); it can only end if the production code cancels it, since the pawn never moves.
+			// Mutation: the scan starts the fight but does not stop the movement (StopMovement missing): GetMoveStatus stays Moving and no
+			// request ends (Count 0); or the scan only fires once the walk is over (no fight within the window).
+			if (!RequireWorld()) { return; }
+			ABaseZone* Zone = SpawnZone();
+			FFighter F;
+			if (Zone == nullptr || !MakeWanderingFighter(F, FVector(400.0, 0.0, 100.0), EServantTask::AttackDefense)) { return; }
+			ServantWanderTest::FMoveRequestCounter Walk(F.Ctl);
+			if (!TestTrue(TEXT("harness: path following component bound"), Walk.IsBound())) { return; }
+			if (!TestTrue(TEXT("harness: a wander walk is in progress (status Moving)"), ServantCombatTest::BeginInjectedWalk(F.Ctl, F.Servant->GetActorLocation(), FVector(-300.0, 0.0, 100.0)))) { return; }
+			TestEqual(TEXT("precondition: the walk has not ended"), Walk.Count, 0);
+			ATestPassiveEnemySoldier* Enemy = MakeEnemy(TEXT("Enemy"), FVector(100.0, 0.0, 100.0)); // 300 u away: out of range
+			if (Enemy == nullptr) { return; }
+			TestTrue(TEXT("precondition: the enemy is in the zone"), Zone->IsPointInZone(Enemy->GetActorLocation()));
+
+			const bool bWoken = TickUntil([&]() { return F.Ctl->IsFighting(); }, WakeWindow());
+			if (!TestTrue(TEXT("Scan: IsFighting within EnemyScanInterval + margin, although a walk was in progress"), bWoken)) { return; }
+			TestTrue(TEXT("Scan: the target is the enemy"), F.Ctl->GetFightTarget() == Enemy);
+			TestEqual(TEXT("Scan: the wander walk ended exactly once"), Walk.Count, 1);
+			TestTrue(TEXT("Scan: and it was CANCELLED (Aborted), not completed"), Walk.Codes.Num() == 1 && Walk.Codes[0] == EPathFollowingResult::Aborted);
+			TestTrue(TEXT("Scan: no wander move is left in progress"), F.Ctl->GetMoveStatus() != EPathFollowingStatus::Moving);
+			TickFor(RetryDelay);
+			TestEqual(TEXT("Scan: the cancelled walk never completes or restarts later"), Walk.Count, 1);
+			TestTrue(TEXT("Scan: still fighting the same enemy"), F.Ctl->IsFighting() && F.Ctl->GetFightTarget() == Enemy);
+			TestEqual(TEXT("Scan: still one chase request"), F.Ctl->RequestedEnemies.Num(), 1);
+		});
+
+		It("Scan: only enemies whose origin is in the zone count, tested at the scan (spawned inside then gone out before it: no wake); once inside, it wakes", [this]()
+		{
+			// Mutation: the scan does not filter by zone (the outside enemy wakes the servant), or the zone test is cached at the enemy's
+			// registration (the enemy spawned inside, then moved out, still wakes it), or an enemy entering the zone later is never seen.
+			if (!RequireWorld()) { return; }
+			ABaseZone* Zone = SpawnZone();
+			FFighter F;
+			if (Zone == nullptr || !MakeWanderingFighter(F, FVector(450.0, 0.0, 100.0), EServantTask::AttackDefense)) { return; }
+			const double Offset = CentreDistance(0.5 * F.Range);
+			const FVector InsidePoint(450.0 - Offset, 0.0, 100.0);
+			const FVector OutsidePoint(450.0 + Offset, 0.0, 100.0);
+			TestTrue(TEXT("precondition: the inside point is in the zone, the outside point is not"), Zone->IsPointInZone(InsidePoint) && !Zone->IsPointInZone(OutsidePoint));
+			ATestPassiveEnemySoldier* Enemy = MakeEnemy(TEXT("Enemy"), InsidePoint); // registered with an in-zone origin...
+			if (Enemy == nullptr) { return; }
+			Enemy->SetActorLocation(OutsidePoint); // ...and gone out before any scan could run (no tick in between)
+
+			bool bEverFighting = false;
+			TickWatching(PreWatch, [&]() { bEverFighting |= F.Ctl->IsFighting(); });
+			TestFalse(TEXT("Scan: an enemy outside the zone never wakes the servant"), bEverFighting);
+			TestEqual(TEXT("Scan: no hit, no chase request"), HitsOn(Enemy) + F.Ctl->RequestedEnemies.Num(), 0);
+
+			Enemy->SetActorLocation(InsidePoint);
+			const bool bWoken = TickUntil([&]() { return F.Ctl->IsFighting(); }, WakeWindow());
+			TestTrue(TEXT("Scan: once the enemy is in the zone the servant is woken within EnemyScanInterval + margin"), bWoken);
+			TestTrue(TEXT("Scan: and fights it"), F.Ctl->GetFightTarget() == Enemy);
+			TestEqual(TEXT("Scan: it is in range, so the first hit lands at once"), HitsOn(Enemy), 1);
+		});
+
+		It("Scan: an Unassigned servant is never woken by an enemy entering the zone", [this]()
+		{
+			// Mutation: the scan does not look at the task (any wandering servant fights).
+			ExpectWanderNotWoken(EServantTask::Unassigned);
+		});
+
+		It("Scan: a FieldHarvest servant is never woken by an enemy entering the zone", [this]()
+		{
+			// Mutation: the scan only tests "assigned" instead of AttackDefense (a harvester fights).
+			ExpectWanderNotWoken(EServantTask::FieldHarvest);
+		});
+
+		It("Scan: an AttackDefense servant in Return (outside the zone) is not woken by an enemy of the zone", [this]()
+		{
+			// Mutation: the scan runs during a Return (the servant fights from outside the zone, or cancels its return).
+			if (!RequireWorld()) { return; }
+			ABaseZone* Zone = SpawnZone();
+			FFighter F;
+			if (Zone == nullptr || !MakeFighter(F, TEXT("Servant"), FVector(5000.0, 0.0, 100.0), EServantTask::AttackDefense)) { return; }
+			if (!ReadScanSettings(F, true)) { return; }
+			TestFalse(TEXT("precondition: the servant is outside the zone"), Zone->IsPointInZone(F.Servant->GetActorLocation()));
+			const AServantAIController* Ctl = F.Ctl;
+			if (!TestTrue(TEXT("precondition: the first decision is a Return"), TickUntil([Ctl]() { return Ctl->GetLastAction() == EServantWanderAction::Return; }, InitialDecisionDelay + TimerSlack))) { return; }
+			ATestPassiveEnemySoldier* Enemy = MakeEnemy(TEXT("Enemy"), FVector(0.0, 0.0, 100.0));
+			if (Enemy == nullptr) { return; }
+
+			bool bEverFighting = false;
+			TickWatching(PreWatch + WakeWindow(), [&]() { bEverFighting |= F.Ctl->IsFighting(); });
+			TestFalse(TEXT("Scan: never fighting while returning"), bEverFighting);
+			TestEqual(TEXT("Scan: no hit, no chase request"), HitsOn(Enemy) + F.Ctl->RequestedEnemies.Num(), 0);
+			ServantFieldTest::ExpectAction(*this, TEXT("Scan: the decision is still Return"), F.Ctl->GetLastAction(), EServantWanderAction::Return);
+		});
+
+		It("Scan: a servant assigned to AttackDefense DURING its wander is woken by the enemy already in the zone", [this]()
+		{
+			// Spec "Cas limites": an assignment during the wander must also reach the scan. Not asserted: whether the fight starts at the
+			// assignment itself or at the next scan (both are within the window).
+			// Mutation: the scan is only armed at the start of the wander (an assignment made afterwards never arms it: no fight within the window).
+			if (!RequireWorld()) { return; }
+			ABaseZone* Zone = SpawnZone();
+			FFighter F;
+			UServantSubsystem* Subsystem = World->GetSubsystem<UServantSubsystem>();
+			if (Zone == nullptr || !TestNotNull(TEXT("harness: subsystem"), Subsystem)) { return; }
+			if (!MakeWanderingFighter(F, FVector(0.0, 0.0, 100.0), EServantTask::Unassigned)) { return; }
+			ATestPassiveEnemySoldier* Enemy = MakeEnemy(TEXT("Enemy"), FVector(CentreDistance(0.5 * F.Range), 0.0, 100.0));
+			if (Enemy == nullptr) { return; }
+			bool bEverFighting = false;
+			TickWatching(PreWatch, [&]() { bEverFighting |= F.Ctl->IsFighting(); });
+			if (!TestFalse(TEXT("precondition: an Unassigned servant ignores the enemy"), bEverFighting)) { return; }
+
+			TestTrue(TEXT("harness: assignment changed the task"), Subsystem->AssignTask(F.Servant, EServantTask::AttackDefense));
+			const bool bWoken = TickUntil([&]() { return F.Ctl->IsFighting(); }, WakeWindow());
+			TestTrue(TEXT("Scan: IsFighting within EnemyScanInterval + margin of the assignment"), bWoken);
+			TestTrue(TEXT("Scan: the target is the enemy"), F.Ctl->GetFightTarget() == Enemy);
+			TestEqual(TEXT("Scan: in range, one hit at the start of the fight"), HitsOn(Enemy), 1);
+		});
+
+		It("Scan: unassigning a wandering AttackDefense servant stops the scan (an enemy entering the zone afterwards does not wake it)", [this]()
+		{
+			// Mutation: the scan timer is not cut at the unassignment (it keeps waking a servant that no longer has the role).
+			if (!RequireWorld()) { return; }
+			ABaseZone* Zone = SpawnZone();
+			FFighter F;
+			UServantSubsystem* Subsystem = World->GetSubsystem<UServantSubsystem>();
+			if (Zone == nullptr || !TestNotNull(TEXT("harness: subsystem"), Subsystem)) { return; }
+			if (!MakeWanderingFighter(F, FVector(0.0, 0.0, 100.0), EServantTask::AttackDefense)) { return; }
+			TestTrue(TEXT("harness: unassignment changed the task"), Subsystem->AssignTask(F.Servant, EServantTask::Unassigned));
+			ATestPassiveEnemySoldier* Enemy = MakeEnemy(TEXT("Enemy"), FVector(CentreDistance(0.5 * F.Range), 0.0, 100.0));
+			if (Enemy == nullptr) { return; }
+
+			bool bEverFighting = false;
+			TickWatching(PreWatch + WakeWindow(), [&]() { bEverFighting |= F.Ctl->IsFighting(); });
+			TestFalse(TEXT("Scan: never fighting after the unassignment"), bEverFighting);
+			TestEqual(TEXT("Scan: no hit, no chase request"), HitsOn(Enemy) + F.Ctl->RequestedEnemies.Num(), 0);
+		});
+
+		It("Scan: a controller that lost its pawn (UnPossess) no longer scans (no fight, no crash on a pawnless controller)", [this]()
+		{
+			// Spec: the scan timer is cut in StopWandering. Mutation: the timer survives UnPossess (a scan on a pawnless controller starts a fight
+			// or dereferences a null pawn).
+			if (!RequireWorld()) { return; }
+			ABaseZone* Zone = SpawnZone();
+			FFighter F;
+			if (Zone == nullptr || !MakeWanderingFighter(F, FVector(0.0, 0.0, 100.0), EServantTask::AttackDefense)) { return; }
+			F.Ctl->UnPossess();
+			TestTrue(TEXT("precondition: the controller has no pawn"), F.Ctl->GetPawn() == nullptr);
+			ATestPassiveEnemySoldier* Enemy = MakeEnemy(TEXT("Enemy"), FVector(CentreDistance(0.5 * F.Range), 0.0, 100.0));
+			if (Enemy == nullptr) { return; }
+
+			bool bEverFighting = false;
+			TickWatching(PreWatch + WakeWindow(), [&]() { bEverFighting |= F.Ctl->IsFighting(); });
+			TestFalse(TEXT("Scan: a pawnless controller never fights"), bEverFighting);
+			TestEqual(TEXT("Scan: no hit, no chase request"), HitsOn(Enemy) + F.Ctl->RequestedEnemies.Num(), 0);
+		});
+	});
+
+	// ------------------------------------------------------------------------------------------------------------------------
+	// Criterion "Orientation": at every strike the servant turns (yaw only, instantly) towards its target (PIE feedback of Timeo).
+	// ------------------------------------------------------------------------------------------------------------------------
+	Describe("Facing the target (criterion 7b)", [this]()
+	{
+		It("Facing: in range at the start (no walk), the yaw points at the enemy at EVERY strike, even when the enemy moves; pitch and roll are untouched", [this]()
+		{
+			// The servant starts with a non-zero pitch and roll and a yaw far from every direction used, and the enemy stands well above it,
+			// then goes to two other bearings (still in range) between strikes.
+			// Mutation: no alignment when the servant did not walk (yaw stays 170 deg: error > 100 deg at the first strike); alignment only on the
+			// first strike (the second and third errors are > 100 deg); sign or axis error (wrong bearing); the alignment uses a full look-at
+			// (the 400 u of height would pitch the servant: pitch deviation) or resets roll/pitch to zero.
+			if (!RequireWorld()) { return; }
+			ABaseZone* Zone = SpawnZone();
+			FFighter F;
+			if (Zone == nullptr || !MakeFighter(F, TEXT("Servant"), FVector(0.0, 0.0, 100.0), EServantTask::AttackDefense)) { return; }
+			constexpr double StartPitch = 7.0;
+			constexpr double StartRoll = 4.0;
+			F.Servant->SetActorRotation(FRotator(StartPitch, 170.0, StartRoll));
+			const FRotator Start = F.Servant->GetActorRotation();
+			if (!TestTrue(TEXT("harness: the servant kept the pitch and roll that were set"), FMath::IsNearlyEqual(Start.Pitch, StartPitch, 0.01) && FMath::IsNearlyEqual(Start.Roll, StartRoll, 0.01))) { return; }
+
+			const double Distance = CentreDistance(0.5 * F.Range);
+			auto PlaceAt = [Distance](double BearingDegrees)
+			{
+				const double Radians = FMath::DegreesToRadians(BearingDegrees);
+				return FVector(Distance * FMath::Cos(Radians), Distance * FMath::Sin(Radians), 500.0);
+			};
+			ATestPassiveEnemySoldier* Enemy = MakeEnemy(TEXT("Enemy"), PlaceAt(35.0));
+			if (Enemy == nullptr) { return; }
+			TestTrue(TEXT("precondition: the enemy is in the zone, the initial yaw is far from its bearing"),
+				Zone->IsPointInZone(Enemy->GetActorLocation()) && ServantCombatTest::YawErrorTowards(F.Servant, Enemy) > 30.0);
+
+			TArray<double> YawErrors;
+			TArray<double> AxisDeviations; // largest pitch / roll deviation from the start, per strike
+			auto Sample = [&]()
+			{
+				const FRotator Now = F.Servant->GetActorRotation();
+				YawErrors.Add(ServantCombatTest::YawErrorTowards(F.Servant, Enemy));
+				AxisDeviations.Add(FMath::Max(FMath::Abs(FRotator::NormalizeAxis(Now.Pitch - StartPitch)), FMath::Abs(FRotator::NormalizeAxis(Now.Roll - StartRoll))));
+			};
+
+			if (!StartFight(F)) { return; }
+			if (!TestEqual(TEXT("precondition: first strike landed, no walk"), HitsOn(Enemy), 1)) { return; }
+			Sample();
+			Enemy->SetActorLocation(PlaceAt(-140.0));
+			TestTrue(TEXT("second strike lands"), TickUntil([&]() { return HitsOn(Enemy) >= 2; }, F.Interval + TimerSlack));
+			Sample();
+			Enemy->SetActorLocation(PlaceAt(90.0));
+			TestTrue(TEXT("third strike lands"), TickUntil([&]() { return HitsOn(Enemy) >= 3; }, F.Interval + TimerSlack));
+			Sample();
+
+			if (!TestEqual(TEXT("three strikes sampled"), YawErrors.Num(), 3)) { return; }
+			for (int32 Index = 0; Index < YawErrors.Num(); ++Index)
+			{
+				TestTrue(FString::Printf(TEXT("Facing: strike %d, yaw within 1 degree of the enemy bearing (error %.2f deg)"), Index + 1, YawErrors[Index]), YawErrors[Index] < 1.0);
+				TestTrue(FString::Printf(TEXT("Facing: strike %d, pitch and roll unchanged (deviation %.3f deg)"), Index + 1, AxisDeviations[Index]), AxisDeviations[Index] < 0.01);
+			}
+			TestEqual(TEXT("Facing: the servant never asked to walk (all strikes were in range)"), F.Ctl->RequestedEnemies.Num(), 0);
 		});
 	});
 

@@ -10,6 +10,8 @@
 #include "AITypes.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "NavigationData.h"
+#include "AIController.h"
 #include "Servants/Servant.h"
 #include "Servants/ServantAIController.h"
 #include "Enemies/EnemySoldier.h"
@@ -144,6 +146,33 @@ namespace ServantCombatTest
 	inline double CentreDistanceForGap(const AServant* Servant, const ACharacter* Enemy, double Gap)
 	{
 		return CapsuleRadius(Servant) + CapsuleRadius(Enemy) + Gap;
+	}
+
+	// Puts the controller in the "walking" state without a NavMesh: a hand-made two-point path is handed to its path following component,
+	// so a REAL request is in progress (status Moving) until something calls StopMovement. The pawn never moves (movement tick disabled in
+	// these worlds), so it can never "arrive": the only way this walk ends is the production code cancelling it. False if the component
+	// did not accept the request (the caller must report a harness error, not skip the assertion silently).
+	inline bool BeginInjectedWalk(AAIController* Controller, const FVector& From, const FVector& To)
+	{
+		UPathFollowingComponent* Component = (Controller != nullptr) ? Controller->GetPathFollowingComponent() : nullptr;
+		if (Component == nullptr) { return false; }
+		TArray<FVector> Points;
+		Points.Add(From);
+		Points.Add(To);
+		FNavPathSharedPtr Path = MakeShareable(new FNavigationPath(Points));
+		FAIMoveRequest Request(To);
+		Request.SetUsePathfinding(false).SetAcceptanceRadius(5.0f);
+		Component->RequestMove(Request, Path);
+		return Controller->GetMoveStatus() == EPathFollowingStatus::Moving;
+	}
+
+	// Absolute angle in degrees between the actor's yaw and the 2D direction from it towards Target.
+	inline double YawErrorTowards(const AActor* Actor, const AActor* Target)
+	{
+		FVector Direction = Target->GetActorLocation() - Actor->GetActorLocation();
+		Direction.Z = 0.0;
+		const double ExpectedYaw = Direction.Rotation().Yaw;
+		return FMath::Abs(FRotator::NormalizeAxis(Actor->GetActorRotation().Yaw - ExpectedYaw));
 	}
 
 	// Detaches the soldier's own death reaction (HandleDeath) so that a lethal hit leaves a DEAD soldier that is still alive in the
