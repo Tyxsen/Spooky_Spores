@@ -23,6 +23,9 @@
 #include "Enemies/EnemyPathSpline.h"
 #include "Enemies/EnemySoldier.h"
 #include "Enemies/EnemyTargetSubsystem.h"
+#include "Servants/Servant.h"
+#include "AITypes.h"
+#include "Navigation/PathFollowingComponent.h"
 #include "Components/BoxComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -56,6 +59,8 @@ BEGIN_DEFINE_SPEC(FEnemyTargetReservationSpec, "SpookySpores.Enemies.TargetReser
 	ABaseZone* SpawnZone(const FVector& Center, const FVector& Scale);
 	ABaseZone* SpawnLayoutZone();
 	ATestDestructible* SpawnTarget(const FVector& Location);
+	// A servant standing still (its movement tick is off, no floor in the test world): a destructible that is a PAWN (it can move).
+	AServant* SpawnServantTarget(const FVector& Location);
 	AController* SpawnPlainController();
 	ATestEnemySoldier* SpawnSoldier(const FVector& Location, TSubclassOf<ATestEnemySoldier> SoldierClass);
 	ATestSeamEnemySoldier* SpawnSeamSoldier(const FVector& Location);
@@ -95,6 +100,18 @@ ATestDestructible* FEnemyTargetReservationSpec::SpawnTarget(const FVector& Locat
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	return World->SpawnActor<ATestDestructible>(ATestDestructible::StaticClass(), FTransform(Location), Params);
+}
+
+AServant* FEnemyTargetReservationSpec::SpawnServantTarget(const FVector& Location)
+{
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AServant* Servant = World->SpawnActor<AServant>(AServant::StaticClass(), FTransform(Location), Params);
+	if (Servant != nullptr && Servant->GetCharacterMovement() != nullptr)
+	{
+		Servant->GetCharacterMovement()->SetComponentTickEnabled(false);
+	}
+	return Servant;
 }
 
 AController* FEnemyTargetReservationSpec::SpawnPlainController()
@@ -951,6 +968,136 @@ void FEnemyTargetReservationSpec::Define()
 			TestTrue(TEXT("C12: a new attempt happens after the delay"), bRetried);
 			TestTrue(*FString::Printf(TEXT("C12: not before the delay (elapsed %.2f s for a delay of %.2f s)"), Elapsed, Delay), Elapsed >= Delay - TickStep);
 			TestEqual(TEXT("C12: no reservation after the retry either"), Claims()->GetClaimCount(Target), 0);
+		});
+	});
+
+	// ------------------------------------------------------------------------------------------------------------------------
+	// Servant combat (docs/specs/servant-combat.md, criterion 10): a target that is a PAWN moves. A move that ends in Success out of
+	// range does not make it unreachable (it has moved), and the soldier follows it by re-requesting at most once per RepathInterval.
+	// A fixed destructible keeps the 3b behaviour: "no re-request" is already covered by C7 (none over 100 ticks, 5 s > RepathInterval)
+	// and C11 (one re-request only after being pushed out of range).
+	// The end of the move is reported by hand (OnMoveCompleted is public): the seam never completes a request by itself.
+	// ------------------------------------------------------------------------------------------------------------------------
+	Describe("Moving target, servant combat (criterion 10)", [this]()
+	{
+		// Soldier chosen on the nearest target of the layout, with its first request recorded.
+		auto EndMove = [](ATestEnemyAIController* Seam, EPathFollowingResult::Type Result)
+		{
+			Seam->OnMoveCompleted(FAIRequestID::InvalidRequest, FPathFollowingResult(Result, FPathFollowingResultFlags::None));
+		};
+
+		It("SC10: a move that ends in Success out of range on a servant does not exclude it: same target, same claim, re-requested once per RepathInterval", [this, EndMove]()
+		{
+			// Mutation 1: Success out of range still excludes the target 3 s whatever it is (the soldier switches to the farther
+			// destructible D, the claim on the servant is released, the new request goes to D).
+			// Mutation 2: the RepathInterval throttle (LastMoveRequestTime) is removed for pawn targets: a request is made at every tick
+			// after the move ended, so the "no request before ~0.8 x RepathInterval" and the upper bound below fail.
+			// Mutation 3: no re-request at all after the interval (the soldier stands still behind a moving servant).
+			if (!RequireWorld()) { return; }
+			if (!TestNotNull(TEXT("harness: zone"), SpawnLayoutZone())) { return; }
+			AServant* Servant = SpawnServantTarget(FVector(2500.0, 0.0, 0.0));
+			ATestDestructible* Other = SpawnTarget(FVector(4500.0, 0.0, 0.0));
+			if (!TestTrue(TEXT("harness: targets"), Servant && Other)) { return; }
+			ATestSeamEnemySoldier* Soldier = SpawnChosenSoldier(FVector::ZeroVector);
+			ATestEnemyAIController* Seam = EnemyReservationTest::SeamOf(Soldier);
+			if (!TestNotNull(TEXT("harness: seam controller"), Seam)) { return; }
+			TickFor(TickStep);
+			if (!TestTrue(TEXT("precondition: the servant (nearest) is the target"), Seam->GetCurrentTarget() == Servant)) { return; }
+			if (!TestEqual(TEXT("precondition: one request, towards the servant"), Seam->RequestedTargets.Num(), 1)) { return; }
+
+			double Interval = 0.0;
+			if (!TestTrue(TEXT("harness: RepathInterval readable by reflection"), EnemyTest::ReadNumber(Seam, TEXT("RepathInterval"), Interval))) { return; }
+			if (!TestTrue(TEXT("harness: RepathInterval long enough for the tick step"), Interval >= 10.0 * TickStep)) { return; }
+
+			EndMove(Seam, EPathFollowingResult::Success); // still 2400 u away: the servant moved, the soldier did not arrive
+			// The first request was one tick ago: the throttle must hold the next one back until RepathInterval after it.
+			TickFor(0.7 * Interval);
+			TestEqual(TEXT("SC10: no new request before ~0.8 x RepathInterval (throttled, not one per tick)"), Seam->RequestedTargets.Num(), 1);
+			TestTrue(TEXT("SC10: the target is kept while waiting"), Seam->GetCurrentTarget() == Servant);
+			TestEqual(TEXT("SC10: the claim is kept while waiting"), Claims()->GetClaimCount(Servant), 1);
+			const bool bAsked = TickUntil([Seam]() { return Seam->RequestedTargets.Num() >= 2; }, 0.3 * Interval + 0.3);
+			TestTrue(TEXT("SC10: a new request follows once RepathInterval has elapsed"), bAsked);
+			TickFor(0.2 * Interval);
+			TestEqual(TEXT("SC10: exactly one new request in the whole window (upper bound)"), Seam->RequestedTargets.Num(), 2);
+			TestTrue(TEXT("SC10: the new request is towards the servant"), Seam->RequestedTargets.Num() >= 2 && Seam->RequestedTargets[1].Get() == Servant);
+			TestTrue(TEXT("SC10: the target is still the servant"), Seam->GetCurrentTarget() == Servant);
+			TestEqual(TEXT("SC10: the servant is still reserved"), Claims()->GetClaimCount(Servant), 1);
+			TestEqual(TEXT("SC10: the other destructible stays free"), Claims()->GetClaimCount(Other), 0);
+		});
+
+		It("SC10: a move that ends in failure on a servant excludes it as before: the soldier switches to the other destructible", [this, EndMove]()
+		{
+			// Mutation: the exclusion is removed for pawns whatever the result (the soldier asks for the servant again instead of D).
+			if (!RequireWorld()) { return; }
+			if (!TestNotNull(TEXT("harness: zone"), SpawnLayoutZone())) { return; }
+			AServant* Servant = SpawnServantTarget(FVector(2500.0, 0.0, 0.0));
+			ATestDestructible* Other = SpawnTarget(FVector(4500.0, 0.0, 0.0));
+			if (!TestTrue(TEXT("harness: targets"), Servant && Other)) { return; }
+			ATestSeamEnemySoldier* Soldier = SpawnChosenSoldier(FVector::ZeroVector);
+			ATestEnemyAIController* Seam = EnemyReservationTest::SeamOf(Soldier);
+			if (!TestNotNull(TEXT("harness: seam controller"), Seam)) { return; }
+			TickFor(TickStep);
+			if (!TestTrue(TEXT("precondition: the servant is the target"), Seam->GetCurrentTarget() == Servant)) { return; }
+
+			EndMove(Seam, EPathFollowingResult::Blocked);
+			TestTrue(TEXT("SC10: the soldier moves on to the other destructible"), TickUntil([Seam, Other]() { return Seam->GetCurrentTarget() == Other; }, 1.0));
+			TestEqual(TEXT("SC10: the claim on the servant is released"), Claims()->GetClaimCount(Servant), 0);
+			TestEqual(TEXT("SC10: the other destructible is claimed"), Claims()->GetClaimCount(Other), 1);
+			TestTrue(TEXT("SC10: the last request goes to the other destructible"), Seam->RequestedTargets.Num() >= 2 && Seam->RequestedTargets.Last().Get() == Other);
+		});
+
+		It("SC10: a move that ends in Success out of range on a FIXED destructible is still 'unreachable' (excluded)", [this, EndMove]()
+		{
+			// Mutation: the Success exception is applied to every target instead of pawns only (the fixed destructible is kept: the
+			// soldier stays on N instead of moving on to F, and a blocked wave would never end).
+			if (!RequireWorld()) { return; }
+			if (!TestNotNull(TEXT("harness: zone"), SpawnLayoutZone())) { return; }
+			ATestDestructible* Near = SpawnTarget(FVector(2500.0, 0.0, 0.0));
+			ATestDestructible* Far = SpawnTarget(FVector(4500.0, 0.0, 0.0));
+			if (!TestTrue(TEXT("harness: targets"), Near && Far)) { return; }
+			ATestSeamEnemySoldier* Soldier = SpawnChosenSoldier(FVector::ZeroVector);
+			ATestEnemyAIController* Seam = EnemyReservationTest::SeamOf(Soldier);
+			if (!TestNotNull(TEXT("harness: seam controller"), Seam)) { return; }
+			TickFor(TickStep);
+			if (!TestTrue(TEXT("precondition: the nearest is the target"), Seam->GetCurrentTarget() == Near)) { return; }
+
+			EndMove(Seam, EPathFollowingResult::Success);
+			TestTrue(TEXT("SC10: the soldier moves on to the other destructible"), TickUntil([Seam, Far]() { return Seam->GetCurrentTarget() == Far; }, 1.0));
+			TestEqual(TEXT("SC10: the claim on the first one is released"), Claims()->GetClaimCount(Near), 0);
+		});
+
+		It("SC10: a servant target that moved is followed: a new request towards it after RepathInterval, not before, not every tick", [this]()
+		{
+			// Mutation: no re-request towards a pawn while a move is in progress (Num stays 1), a re-request every tick or without the
+			// interval (Num > 1 before RepathInterval, or more than 1 + elapsed/RepathInterval), or an interval other than RepathInterval.
+			if (!RequireWorld()) { return; }
+			if (!TestNotNull(TEXT("harness: zone"), SpawnLayoutZone())) { return; }
+			AServant* Servant = SpawnServantTarget(FVector(2500.0, 0.0, 0.0));
+			if (Servant == nullptr) { return; }
+			ATestSeamEnemySoldier* Soldier = SpawnChosenSoldier(FVector::ZeroVector);
+			ATestEnemyAIController* Seam = EnemyReservationTest::SeamOf(Soldier);
+			if (!TestNotNull(TEXT("harness: seam controller"), Seam)) { return; }
+			double Interval = 0.0;
+			if (!TestTrue(TEXT("harness: RepathInterval readable by reflection"), EnemyTest::ReadNumber(Seam, TEXT("RepathInterval"), Interval))) { return; }
+			if (!TestTrue(TEXT("harness: RepathInterval is long enough for the tick step"), Interval >= 8.0 * TickStep)) { return; }
+			TickFor(TickStep);
+			if (!TestTrue(TEXT("precondition: one request, towards the servant"), Seam->RequestedTargets.Num() == 1 && Seam->RequestedTargets[0].Get() == Servant)) { return; }
+			const double FirstRequestTime = World->GetTimeSeconds();
+
+			// The servant walks away by more than any attack range, still inside the zone.
+			Servant->SetActorLocation(FVector(3300.0, 0.0, 0.0));
+			TickFor(0.8 * Interval);
+			TestEqual(TEXT("SC10: no new request before RepathInterval"), Seam->RequestedTargets.Num(), 1);
+			const bool bFollowed = TickUntil([Seam]() { return Seam->RequestedTargets.Num() >= 2; }, 0.2 * Interval + 0.3);
+			const double Elapsed = World->GetTimeSeconds() - FirstRequestTime;
+			TestTrue(TEXT("SC10: a new request is sent after RepathInterval"), bFollowed);
+			TestTrue(*FString::Printf(TEXT("SC10: not before the interval (elapsed %.2f s for %.2f s)"), Elapsed, Interval), Elapsed >= Interval - 2.0 * TickStep);
+			TestTrue(TEXT("SC10: towards the servant"), Seam->RequestedTargets.Num() >= 2 && Seam->RequestedTargets[1].Get() == Servant);
+			TestTrue(TEXT("SC10: the target and its claim did not change"), Seam->GetCurrentTarget() == Servant && Claims()->GetClaimCount(Servant) == 1);
+
+			// Never faster than once per interval: over 2.5 intervals at most two more requests.
+			TickFor(2.5 * Interval);
+			TestTrue(TEXT("SC10: at most one request per RepathInterval"), Seam->RequestedTargets.Num() <= 4);
 		});
 	});
 

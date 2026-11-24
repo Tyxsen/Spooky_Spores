@@ -7,6 +7,9 @@
 #include "Base/BaseZone.h"
 #include "Base/BaseZoneSubsystem.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/PrimitiveComponent.h"
+#include "Enemies/EnemyRegistrySubsystem.h"
+#include "Enemies/EnemySoldier.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -21,6 +24,13 @@
 #include "Servants/ServantSubsystem.h"
 #include "Spooky_Spores.h"
 #include "TimerManager.h"
+
+namespace
+{
+	// MoveToActor stops at AttackRange * this factor (plus the agent and target capsule radii), measured in 2D.
+	// It must stay below 1 so the servant stops with a margin inside AttackRange, which is what the range test uses to start striking.
+	constexpr float AcceptanceRadiusFactor = 0.5f;
+}
 
 void AServantAIController::StartWandering()
 {
@@ -41,18 +51,37 @@ void AServantAIController::StartWandering()
 	// A Return from a previous cycle must not count as a failed return in the new one
 	LastAction = EServantWanderAction::None;
 	ScheduleDecision(InitialDecisionDelay);
+	// Runs for the whole wandering; the scan itself checks the task and the state (no effect unless AttackDefense and idle or walking)
+	GetWorldTimerManager().SetTimer(EnemyScanTimer, this, &AServantAIController::ScanForEnemies, EnemyScanInterval, true);
 }
 
 void AServantAIController::StopWandering()
 {
+	// No scan may start a fight on a servant that stops wandering
+	GetWorldTimerManager().ClearTimer(EnemyScanTimer);
 	// Must be cleared before StopMovement: the synchronous Aborted callback would otherwise reschedule a decision
 	bIsWandering = false;
 	// Also before StopMovement: the callback returns early (not wandering), so it would not consume the flag
 	bWakePending = false;
 	// Also before StopMovement: the reservation must not outlive the field job, and the Aborted callback must not resolve it
 	ReleaseFieldTarget();
+	// Same for the fight: the combat timer is cut before StopMovement, and its callback must find no fight to end
+	ClearCombatState();
+	// No cooldown memory outlives the wandering (nor the possession)
+	FailedEnemy.Reset();
+	FailedEnemyTime = 0.0f;
 	StopMovement();
 	GetWorldTimerManager().ClearTimer(DecisionTimer);
+}
+
+bool AServantAIController::IsFighting() const
+{
+	return bIsFighting;
+}
+
+AActor* AServantAIController::GetFightTarget() const
+{
+	return bIsFighting ? FightTarget.Get() : nullptr;
 }
 
 AFieldPlot* AServantAIController::GetHarvestTarget() const
@@ -109,6 +138,21 @@ void AServantAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFo
 
 	if (!bIsWandering)
 	{
+		return;
+	}
+
+	// A chase move ends here. Success (even out of reach, the enemy moved) is judged by the next CombatStep; a failure ends the fight.
+	// Our own StopMovement calls clear bIsMovingToEnemy first, so they are ignored.
+	if (bIsFighting)
+	{
+		if (bIsMovingToEnemy)
+		{
+			bIsMovingToEnemy = false;
+			if (!Result.IsSuccess())
+			{
+				EndCombat(/*bFailed*/ true);
+			}
+		}
 		return;
 	}
 
@@ -225,8 +269,10 @@ void AServantAIController::MakeDecision()
 
 	LastAction = DecideNextAction(bHasValidZone, bIsInZone, FailedReturnAttempts, MaxFailedReturnAttempts);
 
-	// Wandering stays the background state: field work only replaces a Wander decision (never a Return)
-	if (LastAction == EServantWanderAction::Wander && !bSkipHarvest && TryStartFieldWork(*Zone))
+	// Wandering stays the background state: field work and combat only replace a Wander decision (never a Return).
+	// The skip flag (failed job) blocks both, so an unreachable field or enemy cannot make us loop.
+	if (LastAction == EServantWanderAction::Wander && !bSkipHarvest
+		&& (TryStartFieldWork(*Zone) || TryStartCombat(*Zone)))
 	{
 		return;
 	}
@@ -622,14 +668,240 @@ void AServantAIController::OnStorageResourceChanged(EResourceType Type, int32 Ne
 
 void AServantAIController::OnServantAssignmentsChanged()
 {
-	// Fired on every (un)registration and assignment: only a field job in progress whose task was removed is cancelled.
-	// An unregistered servant (EndPlay) counts as Unassigned.
+	// Fired on every (un)registration and assignment: only a fight (resp. a field job) in progress whose task was removed is ended
+	// (resp. cancelled). An unregistered servant (EndPlay) counts as Unassigned.
+	if (bIsFighting)
+	{
+		if (GetAssignedTask() != EServantTask::AttackDefense)
+		{
+			EndCombat(/*bFailed*/ false);
+		}
+		return;
+	}
+
 	if ((!bIsHarvesting && !bIsPlanting) || GetAssignedTask() == EServantTask::FieldHarvest)
 	{
 		return;
 	}
 
 	CancelFieldWork();
+}
+
+bool AServantAIController::TryStartCombat(const ABaseZone& Zone)
+{
+	if (GetAssignedTask() != EServantTask::AttackDefense)
+	{
+		return false;
+	}
+
+	AEnemySoldier* NearestEnemy = FindNearestEnemyInZone(Zone);
+	if (!NearestEnemy)
+	{
+		return false;
+	}
+
+	BeginCombat(*NearestEnemy);
+	RunCombat();
+	return true;
+}
+
+AEnemySoldier* AServantAIController::FindNearestEnemyInZone(const ABaseZone& Zone) const
+{
+	const UEnemyRegistrySubsystem* Registry = GetWorld()->GetSubsystem<UEnemyRegistrySubsystem>();
+	const AServant* Servant = Cast<AServant>(GetPawn());
+	if (!Registry || !Servant)
+	{
+		return nullptr;
+	}
+
+	// Nearest to the servant (2D), no reservation: several servants may fight the same enemy
+	const FVector ServantLocation = Servant->GetActorLocation();
+	// The enemy of a failed chase is ignored until its cooldown ends (a dead or destroyed one is not in the registry / not valid)
+	const AEnemySoldier* IgnoredEnemy = FailedEnemy.Get();
+	const bool bIgnoreFailedEnemy = IgnoredEnemy && (GetWorld()->GetTimeSeconds() - FailedEnemyTime) < FailedEnemyCooldown;
+	AEnemySoldier* NearestEnemy = nullptr;
+	double NearestDistanceSq = TNumericLimits<double>::Max();
+	for (AEnemySoldier* Enemy : Registry->GetLivingEnemies())
+	{
+		if (bIgnoreFailedEnemy && Enemy == IgnoredEnemy)
+		{
+			continue;
+		}
+
+		// Only the actor's origin counts, like the enemies' own targeting
+		if (!Zone.IsPointInZone(Enemy->GetActorLocation()))
+		{
+			continue;
+		}
+
+		const double DistanceSq = FVector::DistSquared2D(ServantLocation, Enemy->GetActorLocation());
+		if (DistanceSq < NearestDistanceSq)
+		{
+			NearestDistanceSq = DistanceSq;
+			NearestEnemy = Enemy;
+		}
+	}
+	return NearestEnemy;
+}
+
+void AServantAIController::BeginCombat(AEnemySoldier& Enemy)
+{
+	FightTarget = &Enemy;
+	bIsFighting = true;
+	LastAction = EServantWanderAction::Attack;
+
+	if (ACharacter* ControlledCharacter = GetCharacter())
+	{
+		ControlledCharacter->GetCharacterMovement()->MaxWalkSpeed = CombatWalkSpeed;
+	}
+}
+
+void AServantAIController::RunCombat()
+{
+	// Timer first, then the first step at once: it may end the fight synchronously (which clears the timer)
+	GetWorldTimerManager().SetTimer(CombatTimer, this, &AServantAIController::CombatStep, CastChecked<AServant>(GetPawn())->GetAttackInterval(), true);
+	CombatStep();
+}
+
+void AServantAIController::ScanForEnemies()
+{
+	// Idle or walking a wander move only: never during a fight or a field job, nor during a Return / Teleport / post-fight pause
+	if (!bIsWandering || bIsFighting || bIsHarvesting || bIsPlanting || LastAction != EServantWanderAction::Wander
+		|| GetAssignedTask() != EServantTask::AttackDefense)
+	{
+		return;
+	}
+
+	const UBaseZoneSubsystem* ZoneSubsystem = GetWorld()->GetSubsystem<UBaseZoneSubsystem>();
+	const ABaseZone* Zone = ZoneSubsystem ? ZoneSubsystem->GetBaseZone() : nullptr;
+	if (!Zone || !Zone->IsZoneValid())
+	{
+		return;
+	}
+
+	AEnemySoldier* Enemy = FindNearestEnemyInZone(*Zone);
+	if (!Enemy)
+	{
+		return;
+	}
+
+	// Fight state first: the synchronous OnMoveCompleted of StopMovement then ignores the cancelled walk (no chase in progress)
+	// instead of scheduling a wander pause. The pending wander decision (paused case) is cleared afterwards, so none stays planned.
+	bWakePending = false;
+	BeginCombat(*Enemy);
+	StopMovement();
+	GetWorldTimerManager().ClearTimer(DecisionTimer);
+	RunCombat();
+}
+
+void AServantAIController::CombatStep()
+{
+	AServant* Servant = Cast<AServant>(GetPawn());
+	AEnemySoldier* Enemy = FightTarget.Get();
+
+	const UBaseZoneSubsystem* ZoneSubsystem = GetWorld()->GetSubsystem<UBaseZoneSubsystem>();
+	const ABaseZone* Zone = ZoneSubsystem ? ZoneSubsystem->GetBaseZone() : nullptr;
+
+	// Dead, destroyed or out of the zone (origin, like the enemies' targeting): the fight is over
+	if (!Servant || !Enemy || Enemy->IsDead() || !Zone || !Zone->IsZoneValid() || !Zone->IsPointInZone(Enemy->GetActorLocation()))
+	{
+		EndCombat(/*bFailed*/ false);
+		return;
+	}
+
+	if (IsInAttackRange(*Servant, *Enemy))
+	{
+		if (bIsMovingToEnemy)
+		{
+			// Flag first: StopMovement calls OnMoveCompleted synchronously
+			bIsMovingToEnemy = false;
+			StopMovement();
+		}
+
+		Servant->Attack(Enemy);
+		return;
+	}
+
+	// Out of reach with no chase in progress: (re)send a request
+	if (bIsMovingToEnemy)
+	{
+		return;
+	}
+
+	// All state is written before the call: MoveToActor may complete synchronously
+	bIsMovingToEnemy = true;
+	const EPathFollowingRequestResult::Type RequestResult = RequestMoveToEnemy(Enemy);
+
+	// OnMoveCompleted already handled the end of this request (synchronous completion)
+	if (!bIsMovingToEnemy)
+	{
+		return;
+	}
+
+	if (RequestResult != EPathFollowingRequestResult::RequestSuccessful)
+	{
+		bIsMovingToEnemy = false;
+		EndCombat(/*bFailed*/ true);
+	}
+}
+
+EPathFollowingRequestResult::Type AServantAIController::RequestMoveToEnemy(AActor* Enemy)
+{
+	const AServant* Servant = Cast<AServant>(GetPawn());
+	if (!Servant)
+	{
+		return EPathFollowingRequestResult::Failed;
+	}
+
+	// The capsule radius comes from bStopOnOverlap.
+	return MoveToActor(Enemy, Servant->GetAttackRange() * AcceptanceRadiusFactor, /*bStopOnOverlap*/ true, /*bUsePathfinding*/ true,
+					/*bCanStrafe*/ false, /*FilterClass*/ nullptr, /*bAllowPartialPath*/ false);
+}
+
+bool AServantAIController::IsInAttackRange(const AServant& Servant, const AActor& Target) const
+{
+	FVector ClosestPoint = Target.GetActorLocation();
+	if (const UPrimitiveComponent* TargetCollision = Cast<UPrimitiveComponent>(Target.GetRootComponent()))
+	{
+		FVector CollisionPoint;
+		if (TargetCollision->GetClosestPointOnCollision(Servant.GetActorLocation(), CollisionPoint) >= 0.0f)
+			ClosestPoint = CollisionPoint;
+	}
+
+	const float Distance = (Servant.GetActorLocation() - ClosestPoint).Size2D() - Servant.GetCapsuleComponent()->GetScaledCapsuleRadius();
+	return Distance <= Servant.GetAttackRange();
+}
+
+void AServantAIController::ClearCombatState()
+{
+	bIsFighting = false;
+	bIsMovingToEnemy = false;
+	FightTarget.Reset();
+	GetWorldTimerManager().ClearTimer(CombatTimer);
+}
+
+void AServantAIController::EndCombat(bool bFailed)
+{
+	// The target must be read before ClearCombatState resets it
+	if (bFailed)
+	{
+		FailedEnemy = FightTarget;
+		FailedEnemyTime = GetWorld()->GetTimeSeconds();
+	}
+
+	// All the state first: StopMovement calls OnMoveCompleted synchronously
+	ClearCombatState();
+	bSkipNextHarvest = bFailed;
+
+	if (ACharacter* ControlledCharacter = GetCharacter())
+	{
+		ControlledCharacter->GetCharacterMovement()->MaxWalkSpeed = WanderWalkSpeed;
+	}
+
+	// If a chase was running, the callback schedules a wander pause: the explicit schedule below replaces it. Always LAST,
+	// otherwise no decision is planned when no move was active.
+	StopMovement();
+	ScheduleDecision(bFailed ? RetryDelay : CombatNextDelay);
 }
 
 void AServantAIController::MoveToZonePoint(const ABaseZone& Zone)

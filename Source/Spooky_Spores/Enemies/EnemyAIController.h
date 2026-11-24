@@ -89,6 +89,14 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Movement|Navigation")
 	float ApproachAcceptanceRadius = 50.0f;
 
+	// Minimum time between two move requests towards a target that is a pawn (it moves): the soldier follows it without
+	// re-planning every tick. A fixed destructible is never re-requested.
+	UPROPERTY(EditAnywhere, Category = "Enemy|Combat", meta = (ClampMin = "0.1"))
+	float RepathInterval = 1.0f;
+
+	// World time of the last move request towards the current target
+	double LastMoveRequestTime = 0.0;
+
 	// Set once the "no target in the base zone" error has been logged, so it is not repeated every tick.
 	bool bHasLoggedNoTarget = false;
 

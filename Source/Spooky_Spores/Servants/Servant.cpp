@@ -5,6 +5,8 @@
 
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Health/HealthComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "Servants/ServantAIController.h"
 #include "Servants/ServantSubsystem.h"
 
@@ -12,6 +14,8 @@ AServant::AServant()
 {
 	// Nothing to update every frame for now
 	PrimaryActorTick.bCanEverTick = false;
+
+	HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("HealthComponent"));
 
 	// The default (PlacedInWorld) would not possess a servant spawned by the player
 	AIControllerClass = AServantAIController::StaticClass();
@@ -26,9 +30,48 @@ AServant::AServant()
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 }
 
+UHealthComponent* AServant::GetHealthComponent_Implementation() const
+{
+	return HealthComponent;
+}
+
+void AServant::Attack(AActor* Target)
+{
+	if (!IsValid(Target)) return;
+
+	// Face the target (yaw only, instant) at every hit, also when no walk preceded it. Same origin: keep the current yaw.
+	const FVector ToTarget = Target->GetActorLocation() - GetActorLocation();
+	if (ToTarget.SizeSquared2D() > UE_KINDA_SMALL_NUMBER)
+	{
+		FRotator FacingRotation = GetActorRotation();
+		FacingRotation.Yaw = ToTarget.Rotation().Yaw;
+		SetActorRotation(FacingRotation);
+	}
+
+	UGameplayStatics::ApplyDamage(Target, AttackDamage, GetController(), this, UDamageType::StaticClass());
+}
+
+float AServant::GetAttackRange() const
+{
+	return AttackRange;
+}
+
+float AServant::GetAttackInterval() const
+{
+	return AttackInterval;
+}
+
+void AServant::HandleDeath()
+{
+	// No drop, no animation. EndPlay unregisters the servant (its assignment is lost); unpossession frees its field reservation.
+	Destroy();
+}
+
 void AServant::BeginPlay()
 {
 	Super::BeginPlay();
+
+	HealthComponent->OnDeath.AddDynamic(this, &AServant::HandleDeath);
 
 	// The subsystem may be missing (unsupported world type): the servant simply stays out of the registry
 	if (UWorld* World = GetWorld())
