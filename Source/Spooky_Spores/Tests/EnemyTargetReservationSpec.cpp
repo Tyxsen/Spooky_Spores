@@ -986,10 +986,13 @@ void FEnemyTargetReservationSpec::Define()
 			Seam->OnMoveCompleted(FAIRequestID::InvalidRequest, FPathFollowingResult(Result, FPathFollowingResultFlags::None));
 		};
 
-		It("SC10: a move that ends in Success out of range on a servant does not exclude it: same target, same claim, a new request at once", [this, EndMove]()
+		It("SC10: a move that ends in Success out of range on a servant does not exclude it: same target, same claim, re-requested once per RepathInterval", [this, EndMove]()
 		{
-			// Mutation: Success out of range still excludes the target 3 s whatever it is (the soldier switches to the farther destructible
-			// D, the claim on the servant is released, the new request goes to D).
+			// Mutation 1: Success out of range still excludes the target 3 s whatever it is (the soldier switches to the farther
+			// destructible D, the claim on the servant is released, the new request goes to D).
+			// Mutation 2: the RepathInterval throttle (LastMoveRequestTime) is removed for pawn targets: a request is made at every tick
+			// after the move ended, so the "no request before ~0.8 x RepathInterval" and the upper bound below fail.
+			// Mutation 3: no re-request at all after the interval (the soldier stands still behind a moving servant).
 			if (!RequireWorld()) { return; }
 			if (!TestNotNull(TEXT("harness: zone"), SpawnLayoutZone())) { return; }
 			AServant* Servant = SpawnServantTarget(FVector(2500.0, 0.0, 0.0));
@@ -1002,9 +1005,20 @@ void FEnemyTargetReservationSpec::Define()
 			if (!TestTrue(TEXT("precondition: the servant (nearest) is the target"), Seam->GetCurrentTarget() == Servant)) { return; }
 			if (!TestEqual(TEXT("precondition: one request, towards the servant"), Seam->RequestedTargets.Num(), 1)) { return; }
 
+			double Interval = 0.0;
+			if (!TestTrue(TEXT("harness: RepathInterval readable by reflection"), EnemyTest::ReadNumber(Seam, TEXT("RepathInterval"), Interval))) { return; }
+			if (!TestTrue(TEXT("harness: RepathInterval long enough for the tick step"), Interval >= 10.0 * TickStep)) { return; }
+
 			EndMove(Seam, EPathFollowingResult::Success); // still 2400 u away: the servant moved, the soldier did not arrive
-			const bool bAsked = TickUntil([Seam]() { return Seam->RequestedTargets.Num() >= 2; }, 0.3);
-			TestTrue(TEXT("SC10: a new request follows within a few ticks (not after RepathInterval)"), bAsked);
+			// The first request was one tick ago: the throttle must hold the next one back until RepathInterval after it.
+			TickFor(0.7 * Interval);
+			TestEqual(TEXT("SC10: no new request before ~0.8 x RepathInterval (throttled, not one per tick)"), Seam->RequestedTargets.Num(), 1);
+			TestTrue(TEXT("SC10: the target is kept while waiting"), Seam->GetCurrentTarget() == Servant);
+			TestEqual(TEXT("SC10: the claim is kept while waiting"), Claims()->GetClaimCount(Servant), 1);
+			const bool bAsked = TickUntil([Seam]() { return Seam->RequestedTargets.Num() >= 2; }, 0.3 * Interval + 0.3);
+			TestTrue(TEXT("SC10: a new request follows once RepathInterval has elapsed"), bAsked);
+			TickFor(0.2 * Interval);
+			TestEqual(TEXT("SC10: exactly one new request in the whole window (upper bound)"), Seam->RequestedTargets.Num(), 2);
 			TestTrue(TEXT("SC10: the new request is towards the servant"), Seam->RequestedTargets.Num() >= 2 && Seam->RequestedTargets[1].Get() == Servant);
 			TestTrue(TEXT("SC10: the target is still the servant"), Seam->GetCurrentTarget() == Servant);
 			TestEqual(TEXT("SC10: the servant is still reserved"), Claims()->GetClaimCount(Servant), 1);

@@ -616,11 +616,13 @@ void FServantCombatWorldSpec::Define()
 			ExpectNeverFights(EServantTask::Unassigned, false);
 		});
 
-		It("C8: a FieldHarvest servant never fights, even hurt by an enemy: it stays alive, assigned, and does not retaliate", [this]()
+		It("C8 (partial): a hurt FieldHarvest servant does not retaliate and stays alive, assigned; IsHarvesting is NOT covered here", [this]()
 		{
 			// Mutation: the role is not tested, or a hit makes the servant fight back / changes its task.
-			// Not automated: "IsHarvesting stays true when hit": a servant only stays in harvest while it WALKS to a field (needs a NavMesh
-			// projection, see the report). Here we check what is observable without it: no fight, no retaliation, task kept.
+			// NOT covered: the second half of criterion 8 ("IsHarvesting is kept when a harvesting FieldHarvest servant is hit"). A servant
+			// is only in harvest while it WALKS to a field, which needs a NavMesh projection that test worlds do not have. That part is
+			// checked by hand in PIE (see TODO.md, technical debt "tests non automatises"). This test only checks: no fight, no
+			// retaliation, task kept, servant alive.
 			ExpectNeverFights(EServantTask::FieldHarvest, true);
 		});
 
@@ -733,10 +735,46 @@ void FServantCombatWorldSpec::Define()
 			TestTrue(TEXT("Edge: the servant still wanders"), F.Ctl->IsWandering());
 		});
 
+		It("Edge: a servant that stays ALIVE but loses its controller (UnPossess) in the middle of a fight stops fighting for good", [this]()
+		{
+			// Spec: "Mort pendant le combat : StopWandering coupe CombatTimer avant StopMovement". UnPossess runs OnUnPossess ->
+			// StopWandering, the same path as the death, but the servant is NOT destroyed: nothing else (EndPlay, unregistration,
+			// OnAssignmentsChanged -> EndCombat) can mask a missing cleanup, unlike in the death test below.
+			// Mutation: StopWandering does not clear the combat state (ClearCombatState removed): IsFighting stays true and the fight target
+			// is kept, and/or CombatTimer keeps ticking on a pawnless controller (a further decision or chase request follows).
+			if (!RequireWorld()) { return; }
+			ABaseZone* Zone = SpawnZone();
+			FFighter F;
+			if (Zone == nullptr || !MakeFighter(F, TEXT("Servant"), FVector(0.0, 0.0, 100.0), EServantTask::AttackDefense)) { return; }
+			ATestPassiveEnemySoldier* Enemy = MakeEnemy(TEXT("Enemy"), FVector(CentreDistance(0.5 * F.Range), 0.0, 100.0));
+			if (Enemy == nullptr) { return; }
+			if (!StartFight(F)) { return; }
+			TestEqual(TEXT("precondition: one hit"), HitsOn(Enemy), 1);
+			const int32 RequestsBefore = F.Ctl->RequestedEnemies.Num();
+			TWeakObjectPtr<AServant> WeakServant(F.Servant);
+
+			F.Ctl->UnPossess();
+
+			TestTrue(TEXT("precondition: the servant is still alive"), WeakServant.IsValid() && !ServantCombatTest::HealthOf(F.Servant)->IsDead());
+			TestTrue(TEXT("precondition: the controller has no pawn any more"), F.Ctl->GetPawn() == nullptr);
+			TestFalse(TEXT("IsFighting is false right after the controller lost its pawn"), F.Ctl->IsFighting());
+			TestNull(TEXT("no fight target is kept"), F.Ctl->GetFightTarget());
+			TestFalse(TEXT("no wander either"), F.Ctl->IsWandering());
+
+			// Long enough for a pending combat step AND for a rescheduled decision (RetryDelay, pause) to fire.
+			bool bEverFighting = false;
+			TickWatching(3.0 * F.Interval + RetryDelay + InitialDecisionDelay, [&]() { bEverFighting |= F.Ctl->IsFighting(); });
+			TestFalse(TEXT("it never fights again on a pawnless controller"), bEverFighting);
+			TestEqual(TEXT("no hit after UnPossess"), HitsOn(Enemy), 1);
+			TestEqual(TEXT("no new chase request after UnPossess"), F.Ctl->RequestedEnemies.Num(), RequestsBefore);
+			TestFalse(TEXT("no decision was rescheduled (not wandering)"), F.Ctl->IsWandering());
+		});
+
 		It("Edge: a servant killed in the middle of a fight stops fighting: no further hit, no leftover registration", [this]()
 		{
-			// Mutation: the fight timer outlives the servant's death (StopWandering does not cut CombatTimer) and keeps striking, or the
-			// dead servant stays registered. Weak: when the controller is destroyed with the pawn, the timer dies with it either way.
+			// Mutation: the dead servant stays registered, or is not destroyed. WEAK on the timer: the death goes through EndPlay,
+			// UnregisterServant and OnAssignmentsChanged -> EndCombat, which mask a StopWandering that forgets to cut the combat; the
+			// UnPossess test above is the one that covers it.
 			if (!RequireWorld()) { return; }
 			ABaseZone* Zone = SpawnZone();
 			FFighter F;
