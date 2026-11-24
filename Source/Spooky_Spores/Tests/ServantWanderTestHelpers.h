@@ -79,7 +79,7 @@ namespace ServantWanderTest
 				Handle = Component->OnRequestFinished.AddLambda([this](FAIRequestID, const FPathFollowingResult& Result)
 				{
 					++Count;
-						Codes.Add(Result.Code);
+					Codes.Add(Result.Code);
 				});
 			}
 		}

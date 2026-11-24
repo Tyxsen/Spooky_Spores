@@ -93,6 +93,13 @@ BEGIN_DEFINE_SPEC(FServantCombatWorldSpec, "SpookySpores.Servants.Combat.World",
 	bool MakeWanderingFighter(FFighter& Out, const FVector& Location, EServantTask Task);
 	void ExpectWanderNotWoken(EServantTask Task);
 
+	// Unreachable-enemy tests (spec "Ennemi inatteignable"): a servant whose chase of a lone out-of-range enemy fails synchronously.
+	double FailedEnemyCooldown = 0.0;
+	double FailTime = 0.0; // world time at which the failed request was seen (up to one tick after the real failure)
+	// Spawns zone, servant (AttackDefense) and one out-of-range enemy, lets the first chase fail, then waits for the Wander decision that
+	// follows (a pause of RetryDelay, the servant wanders). Fills Out/OutEnemy/FailTime/FailedEnemyCooldown.
+	bool MakeFailedChase(FFighter& Out, ATestPassiveEnemySoldier*& OutEnemy);
+
 END_DEFINE_SPEC(FServantCombatWorldSpec)
 
 bool FServantCombatWorldSpec::RequireWorld()
@@ -252,6 +259,29 @@ void FServantCombatWorldSpec::ExpectWanderNotWoken(EServantTask Task)
 	TestNull(TEXT("no fight target"), F.Ctl->GetFightTarget());
 	TestEqual(TEXT("the enemy in reach was not hit"), HitsOn(Enemy), 0);
 	TestEqual(TEXT("no chase request"), F.Ctl->RequestedEnemies.Num(), 0);
+}
+
+bool FServantCombatWorldSpec::MakeFailedChase(FFighter& Out, ATestPassiveEnemySoldier*& OutEnemy)
+{
+	ABaseZone* Zone = SpawnZone();
+	if (Zone == nullptr || !MakeFighter(Out, TEXT("Servant"), FVector(0.0, 0.0, 100.0), EServantTask::AttackDefense)) { return false; }
+	if (!ReadScanSettings(Out, true)) { return false; }
+	if (!TestTrue(TEXT("harness: FailedEnemyCooldown readable by reflection"), ServantWanderTest::ReadNumber(Out.Ctl, TEXT("FailedEnemyCooldown"), FailedEnemyCooldown))) { return false; }
+	// The scenario needs room: RetryDelay (post-failure pause) + one wake window must fit inside the cooldown.
+	if (!TestTrue(TEXT("harness: FailedEnemyCooldown > RetryDelay + wake window (tunables changed?)"), FailedEnemyCooldown > RetryDelay + WakeWindow() + 4.0 * TickStep)) { return false; }
+	OutEnemy = MakeEnemy(TEXT("Enemy"), FVector(CentreDistance(Out.Range + 150.0), 0.0, 100.0));
+	if (OutEnemy == nullptr) { return false; }
+	TestTrue(TEXT("precondition: the enemy is in the zone"), Zone->IsPointInZone(OutEnemy->GetActorLocation()));
+
+	Out.Ctl->bFailSynchronously = true;
+	const ATestCombatServantAIController* Ctl = Out.Ctl;
+	if (!TestTrue(TEXT("precondition: the first decision requests a chase"), TickUntil([Ctl]() { return Ctl->RequestedEnemies.Num() >= 1; }, InitialDecisionDelay + TimerSlack))) { return false; }
+	FailTime = World->GetTimeSeconds();
+	TestFalse(TEXT("precondition: the chase failed at once (not fighting)"), Out.Ctl->IsFighting());
+	// The decision that follows the failure (RetryDelay later) is a Wander, with the enemy still in the zone: it is what the memory must produce.
+	const bool bWander = TickUntil([Ctl]() { return Ctl->GetLastAction() == EServantWanderAction::Wander && Ctl->IsWandering(); }, RetryDelay + 2.0 * TimerSlack);
+	return TestTrue(TEXT("precondition: after the failure the next decision is a Wander (the unreachable enemy is not retried at once)"), bWander)
+		&& TestEqual(TEXT("precondition: still a single chase request"), Out.Ctl->RequestedEnemies.Num(), 1);
 }
 
 void FServantCombatWorldSpec::Define()
@@ -916,6 +946,8 @@ void FServantCombatWorldSpec::Define()
 		It("Scan: unassigning a wandering AttackDefense servant stops the scan (an enemy entering the zone afterwards does not wake it)", [this]()
 		{
 			// Mutation: the scan timer is not cut at the unassignment (it keeps waking a servant that no longer has the role).
+			// Positive control at the end: the same enemy, still in reach, wakes the servant once it is assigned AttackDefense again. Without
+			// it this test would stay green if the enemy were invisible to the servant for any other reason (zone, registration, range).
 			if (!RequireWorld()) { return; }
 			ABaseZone* Zone = SpawnZone();
 			FFighter F;
@@ -930,24 +962,36 @@ void FServantCombatWorldSpec::Define()
 			TickWatching(PreWatch + WakeWindow(), [&]() { bEverFighting |= F.Ctl->IsFighting(); });
 			TestFalse(TEXT("Scan: never fighting after the unassignment"), bEverFighting);
 			TestEqual(TEXT("Scan: no hit, no chase request"), HitsOn(Enemy) + F.Ctl->RequestedEnemies.Num(), 0);
+
+			// Positive control: the enemy is visible to a servant that has the role.
+			TestTrue(TEXT("harness: reassignment changed the task"), Subsystem->AssignTask(F.Servant, EServantTask::AttackDefense));
+			const bool bWoken = TickUntil([&]() { return F.Ctl->IsFighting(); }, WakeWindow());
+			TestTrue(TEXT("Control: once assigned AttackDefense again, the same enemy wakes the servant within the window"), bWoken);
+			TestTrue(TEXT("Control: and it is the target"), F.Ctl->GetFightTarget() == Enemy);
 		});
 
-		It("Scan: a controller that lost its pawn (UnPossess) no longer scans (no fight, no crash on a pawnless controller)", [this]()
+		It("Scan: a controller that lost its pawn (UnPossess) while wandering is fully stopped: not wandering, never fights, no request, no crash", [this]()
 		{
-			// Spec: the scan timer is cut in StopWandering. Mutation: the timer survives UnPossess (a scan on a pawnless controller starts a fight
-			// or dereferences a null pawn).
+			// HONEST SCOPE: the scan timer handle is a private, non-reflected FTimerHandle, so "the timer was cut" is not observable, and a
+			// scan that survived UnPossess would be stopped by the null-pawn guard anyway: this test does NOT fail on a surviving scan timer alone.
+			// What it proves, from the outside: StopWandering ran (IsWandering cleared; no decision fires later although a pause of
+			// RetryDelay was pending), and a pawnless controller facing an eligible enemy neither fights nor requests a chase nor crashes.
+			// Mutation: OnUnPossess no longer calls StopWandering (IsWandering stays true; the pending decision or the scan then acts on
+			// the pawnless controller: a chase request, a fight, or a null dereference).
 			if (!RequireWorld()) { return; }
 			ABaseZone* Zone = SpawnZone();
 			FFighter F;
 			if (Zone == nullptr || !MakeWanderingFighter(F, FVector(0.0, 0.0, 100.0), EServantTask::AttackDefense)) { return; }
 			F.Ctl->UnPossess();
 			TestTrue(TEXT("precondition: the controller has no pawn"), F.Ctl->GetPawn() == nullptr);
+			TestFalse(TEXT("StopWandering ran: the controller is no longer wandering"), F.Ctl->IsWandering());
 			ATestPassiveEnemySoldier* Enemy = MakeEnemy(TEXT("Enemy"), FVector(CentreDistance(0.5 * F.Range), 0.0, 100.0));
 			if (Enemy == nullptr) { return; }
 
 			bool bEverFighting = false;
-			TickWatching(PreWatch + WakeWindow(), [&]() { bEverFighting |= F.Ctl->IsFighting(); });
-			TestFalse(TEXT("Scan: a pawnless controller never fights"), bEverFighting);
+			// Long enough for the pending decision of the pause (RetryDelay) to have fired if StopWandering had not cancelled it.
+			TickWatching(RetryDelay + TimerSlack, [&]() { bEverFighting |= F.Ctl->IsFighting() || F.Ctl->IsWandering(); });
+			TestFalse(TEXT("Scan: a pawnless controller never fights nor resumes wandering"), bEverFighting);
 			TestEqual(TEXT("Scan: no hit, no chase request"), HitsOn(Enemy) + F.Ctl->RequestedEnemies.Num(), 0);
 		});
 	});
@@ -1011,6 +1055,71 @@ void FServantCombatWorldSpec::Define()
 				TestTrue(FString::Printf(TEXT("Facing: strike %d, pitch and roll unchanged (deviation %.3f deg)"), Index + 1, AxisDeviations[Index]), AxisDeviations[Index] < 0.01);
 			}
 			TestEqual(TEXT("Facing: the servant never asked to walk (all strikes were in range)"), F.Ctl->RequestedEnemies.Num(), 0);
+		});
+	});
+
+	// ------------------------------------------------------------------------------------------------------------------------
+	// Criterion "Poursuite en echec": an enemy whose chase failed is ignored for FailedEnemyCooldown (spec "Ennemi inatteignable").
+	// The chase fails synchronously (seam bFailSynchronously), so a new fight on the enemy is observable as a NEW chase request
+	// (IsFighting is already false again when the request returns). After the failure the servant wanders (pause of RetryDelay).
+	// ------------------------------------------------------------------------------------------------------------------------
+	Describe("Unreachable enemy (criterion 7c)", [this]()
+	{
+		It("Failed chase: the lone enemy is not fought again before FailedEnemyCooldown, neither by the scan (pause or walk) nor by the decision; afterwards it is taken again", [this]()
+		{
+			// Mutation: the failure is not remembered (the scan wakes the servant within EnemyScanInterval: a 2nd request, or the injected
+			// walk is aborted), only the scan honours the memory (the decision at FailTime + 2 x RetryDelay requests again before the
+			// cooldown), only the decision honours it (the scan aborts the injected walk), the enemy is excluded for good (no new request
+			// after the cooldown: TickUntil times out), or the delay is never reached (same). A cooldown much shorter than 5 s would also fail the
+			// "no request before the cooldown" check.
+			if (!RequireWorld()) { return; }
+			FFighter F;
+			ATestPassiveEnemySoldier* Enemy = nullptr;
+			if (!MakeFailedChase(F, Enemy)) { return; }
+
+			// Walk phase: a real wander walk is in progress and the scan runs; it must neither abort it nor start a fight. Shorter than
+			// RetryDelay (MakeFailedChase leaves us at the start of the pause), so the pending decision cannot interfere.
+			ServantWanderTest::FMoveRequestCounter Walk(F.Ctl);
+			if (!TestTrue(TEXT("harness: path following component bound"), Walk.IsBound())) { return; }
+			if (!TestTrue(TEXT("harness: a wander walk is in progress"), ServantCombatTest::BeginInjectedWalk(F.Ctl, F.Servant->GetActorLocation(), FVector(-300.0, 0.0, 100.0)))) { return; }
+			TickFor(WakeWindow());
+			TestEqual(TEXT("Cooldown: no new chase request during a wander walk (the scan ignores the failed enemy)"), F.Ctl->RequestedEnemies.Num(), 1);
+			TestEqual(TEXT("Cooldown: the wander walk was not cancelled by the scan"), Walk.Count, 0);
+			TestTrue(TEXT("Cooldown: the wander walk is still in progress"), F.Ctl->GetMoveStatus() == EPathFollowingStatus::Moving);
+
+			// Until the end of the cooldown (margin of 3 ticks: FailTime is read up to one tick after the real failure): the decisions too.
+			TickFor(FMath::Max(0.0, FailTime + FailedEnemyCooldown - 3.0 * TickStep - World->GetTimeSeconds()));
+			TestEqual(TEXT("Cooldown: no chase request at all before FailedEnemyCooldown has elapsed"), F.Ctl->RequestedEnemies.Num(), 1);
+			TestFalse(TEXT("Cooldown: not fighting"), F.Ctl->IsFighting());
+
+			// After the delay the enemy is eligible again: a new request, towards it (scan or next decision, at most RetryDelay later).
+			const double Remaining = FMath::Max(0.0, FailTime + FailedEnemyCooldown - World->GetTimeSeconds());
+			const bool bRetaken = TickUntil([&]() { return F.Ctl->RequestedEnemies.Num() >= 2; }, Remaining + RetryDelay + CombatNextDelay + 2.0 * TimerSlack);
+			TestTrue(TEXT("After the cooldown: the enemy is taken again (a new chase request)"), bRetaken);
+			TestTrue(TEXT("After the cooldown: the new request is towards the same enemy"), F.Ctl->RequestedEnemies.Num() >= 2 && F.Ctl->RequestedEnemies[1].Get() == Enemy);
+			TestTrue(TEXT("After the cooldown: not before FailedEnemyCooldown (world time)"), World->GetTimeSeconds() >= FailTime + FailedEnemyCooldown - 4.0 * TickStep);
+		});
+
+		It("Failed chase: a SECOND eligible enemy is taken at once (within EnemyScanInterval), even farther than the failed one, which is not retried instead", [this]()
+		{
+			// The memory is per enemy, not a global "stop chasing".
+			// Mutation: the memory is ignored (the nearest, the failed one, is requested again: Requests[1] is the first enemy), or it blocks
+			// every enemy / the whole servant (the second enemy never gets a request within the window).
+			if (!RequireWorld()) { return; }
+			FFighter F;
+			ATestPassiveEnemySoldier* First = nullptr;
+			if (!MakeFailedChase(F, First)) { return; }
+
+			// Farther from the servant than the failed one (opposite side), so that only the exclusion can explain the choice.
+			ATestPassiveEnemySoldier* Second = MakeEnemy(TEXT("EnemySecond"), FVector(-CentreDistance(F.Range + 250.0), 0.0, 100.0));
+			if (Second == nullptr) { return; }
+			TestTrue(TEXT("precondition: the second enemy is in the zone and farther than the failed one"),
+				FVector::Dist2D(F.Servant->GetActorLocation(), Second->GetActorLocation()) > FVector::Dist2D(F.Servant->GetActorLocation(), First->GetActorLocation())
+				&& FMath::Abs(Second->GetActorLocation().X) < 500.0); // default zone: X in [-500, 500]
+
+			const bool bTaken = TickUntil([&]() { return F.Ctl->RequestedEnemies.Num() >= 2; }, WakeWindow());
+			TestTrue(TEXT("Second enemy: a chase request within EnemyScanInterval + margin (the failed enemy is still in cooldown)"), bTaken);
+			TestTrue(TEXT("Second enemy: the request is towards the second enemy, not the failed one"), F.Ctl->RequestedEnemies.Num() >= 2 && F.Ctl->RequestedEnemies[1].Get() == Second);
 		});
 	});
 
