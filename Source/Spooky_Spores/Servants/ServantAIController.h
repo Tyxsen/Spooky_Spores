@@ -9,7 +9,9 @@
 #include "ServantAIController.generated.h"
 
 class ABaseZone;
+class AEnemySoldier;
 class AFieldPlot;
+class AServant;
 class UResourceCounterComponent;
 struct FPathFollowingResult;
 
@@ -23,7 +25,8 @@ enum class EServantWanderAction : uint8
 	Return,
 	Teleport,
 	Harvest,
-	Plant
+	Plant,
+	Attack
 };
 
 /**
@@ -31,6 +34,8 @@ enum class EServantWanderAction : uint8
  * and is teleported in after MaxFailedReturnAttempts failed returns.
  * An assigned FieldHarvest servant leaves the wander for a Grown field of the zone (harvest), then wanders again
  * when none is left. It also replants (on the spot after a harvest, or an Empty field) while the player's seeds allow it.
+ * An assigned AttackDefense servant leaves the wander for the nearest (2D) living enemy whose origin is in the zone, chases it and
+ * strikes it every AttackInterval until it dies or leaves the zone, then wanders again (no reservation: several servants may share an enemy).
  * Field and seed changes wake an idle servant early (OnFieldChanged, OnResourceChanged); the decision timer stays the safety net.
  * A signal received while the servant walks does not turn it around: it is remembered (bWakePending) and shortens the pause that follows the move.
  * No Tick, no Behavior Tree: one decision timer, rescheduled after each move by OnMoveCompleted.
@@ -74,6 +79,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Servant|Plant")
 	bool IsPlanting() const;
 
+	UFUNCTION(BlueprintPure, Category = "Servant|Combat")
+	bool IsFighting() const;
+
+	// The enemy this servant is fighting, nullptr outside a fight (or destroyed meanwhile).
+	UFUNCTION(BlueprintPure, Category = "Servant|Combat")
+	AActor* GetFightTarget() const;
+
 	// Pure decision rule, no UObject needed: callable from Automation Specs.
 	static EServantWanderAction DecideNextAction(bool bHasValidZone, bool bIsInZone, int32 FailedReturns, int32 MaxReturns);
 
@@ -84,6 +96,9 @@ public:
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
+
+	// Starts the chase of Enemy (MoveToActor: the target moves). Virtual so tests can replace it (test worlds have no NavMesh).
+	virtual EPathFollowingRequestResult::Type RequestMoveToEnemy(AActor* Enemy);
 
 private:
 	void MakeDecision();
@@ -154,6 +169,24 @@ private:
 
 	UFUNCTION()
 	void OnServantAssignmentsChanged();
+
+	// Starts a fight if the servant is assigned to AttackDefense and a living enemy of the zone exists: the nearest one (2D).
+	// True if the decision is an Attack (the follow-up is then scheduled by EndCombat).
+	bool TryStartCombat(const ABaseZone& Zone);
+
+	// One fight step (timer, and once at the start): ends the fight, strikes if in range, or (re)starts the chase.
+	UFUNCTION()
+	void CombatStep();
+
+	// Same measure as the enemy soldier's attack test: closest point of the target collision, minus the capsule radius, in 2D.
+	bool IsInAttackRange(const AServant& Servant, const AActor& Target) const;
+
+	// Clears the fight state and its timer. Does not touch the movement nor the decision timer.
+	void ClearCombatState();
+
+	// Ends the fight: state cleared BEFORE StopMovement (its callback is synchronous), then the next decision is
+	// scheduled LAST (CombatNextDelay, or RetryDelay and no field work / fight for one decision when bFailed).
+	void EndCombat(bool bFailed);
 
 	void MoveToZonePoint(const ABaseZone& Zone);
 	void TeleportIntoZone(const ABaseZone& Zone);
@@ -226,6 +259,24 @@ private:
 	UPROPERTY(VisibleInstanceOnly, Category = "Servant|Harvest", meta = (AllowPrivateAccess = "true"))
 	bool bSkipNextHarvest = false;
 
+	// Speed while chasing and fighting; WanderWalkSpeed is restored when the fight ends.
+	UPROPERTY(EditAnywhere, Category = "Servant|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "10.0"))
+	float CombatWalkSpeed = 400.0f;
+
+	// Pause after a fight before the next decision (the next enemy, or the wander).
+	UPROPERTY(EditAnywhere, Category = "Servant|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "0.1"))
+	float CombatNextDelay = 0.5f;
+
+	// True from the choice of an enemy to the end of the fight (kill, enemy out of the zone, unassignment, failed move, death)
+	UPROPERTY(VisibleInstanceOnly, Category = "Servant|Combat", meta = (AllowPrivateAccess = "true"))
+	bool bIsFighting = false;
+
+	// A chase request is in progress: no new one is sent while true; OnMoveCompleted ignores any end while this is false.
+	bool bIsMovingToEnemy = false;
+
+	// The enemy being fought (bIsFighting)
+	TWeakObjectPtr<AEnemySoldier> FightTarget;
+
 	// Upper bound of the random delay before an idle servant reacts to a field or seed change (spreads the rush).
 	UPROPERTY(EditAnywhere, Category = "Servant|Wake", meta = (AllowPrivateAccess = "true", ClampMin = "0.1"))
 	float MaxWakeDelay = 0.5f;
@@ -245,4 +296,7 @@ private:
 	TWeakObjectPtr<UResourceCounterComponent> WatchedStorage;
 
 	FTimerHandle DecisionTimer;
+
+	// Repeating, period AttackInterval, runs CombatStep during a fight
+	FTimerHandle CombatTimer;
 };

@@ -1,4 +1,6 @@
 #include "Enemies/EnemySoldier.h"
+#include "Engine/World.h"
+#include "Enemies/EnemyRegistrySubsystem.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Health/HealthComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -26,6 +28,30 @@ void AEnemySoldier::BeginPlay()
 	Super::BeginPlay();
 
 	HealthComponent->OnDeath.AddDynamic(this, &AEnemySoldier::HandleDeath);
+
+	// The subsystem may be missing (unsupported world type): the soldier simply stays out of the registry
+	if (UEnemyRegistrySubsystem* Registry = GetWorld()->GetSubsystem<UEnemyRegistrySubsystem>())
+	{
+		Registry->RegisterEnemy(this);
+	}
+}
+
+void AEnemySoldier::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (const UWorld* World = GetWorld())
+	{
+		if (UEnemyRegistrySubsystem* Registry = World->GetSubsystem<UEnemyRegistrySubsystem>())
+		{
+			Registry->UnregisterEnemy(this);
+		}
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
+bool AEnemySoldier::IsDead() const
+{
+	return HealthComponent->IsDead();
 }
 
 void AEnemySoldier::Attack(AActor* Target)

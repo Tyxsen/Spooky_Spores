@@ -27,6 +27,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Combat")
 	float GetAttackInterval() const;
 
+	// True once the health component is dead (the actor may still exist until HandleDeath destroys it).
+	UFUNCTION(BlueprintPure, Category = "Combat")
+	bool IsDead() const;
+
 	UFUNCTION(BlueprintPure, Category = "Movement")
 	AEnemyPathSpline* GetPathSplineActor() const;
 
@@ -39,7 +43,9 @@ public:
 	void DebugKill();
 
 protected:
+	// Register in / unregister from the UEnemyRegistrySubsystem
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
 	UFUNCTION()

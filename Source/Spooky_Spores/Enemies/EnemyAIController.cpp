@@ -5,6 +5,7 @@
 #include "AI/Navigation/NavigationTypes.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/Pawn.h"
 #include "NavigationSystem.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "TimerManager.h"
@@ -146,6 +147,16 @@ void AEnemyAIController::TickEngage(float DeltaSeconds)
 	if (!bIsMovingToTarget)
 	{
 		RequestMoveToCurrentTarget();
+		return;
+	}
+
+	// A pawn target moves: follow it, at most once per RepathInterval (not every tick). A fixed destructible never needs it.
+	if (CurrentTarget->IsA<APawn>() && GetWorld()->GetTimeSeconds() - LastMoveRequestTime >= RepathInterval)
+	{
+		// Stopped explicitly with the flag down: the callback of the superseded move must not be read as the end of ours
+		bIsMovingToTarget = false;
+		StopMovement();
+		RequestMoveToCurrentTarget();
 	}
 }
 
@@ -230,6 +241,7 @@ void AEnemyAIController::RequestMoveToCurrentTarget()
 {
 	// All state is written before the call: MoveToLocation may complete synchronously.
 	bIsMovingToTarget = true;
+	LastMoveRequestTime = GetWorld()->GetTimeSeconds();
 
 	const EPathFollowingRequestResult::Type Result = RequestMoveToTarget(CurrentTarget.Get());
 
@@ -267,11 +279,15 @@ void AEnemyAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFoll
 	if (!bIsMovingToTarget) return;
 	bIsMovingToTarget = false;
 
-	// In range: the next TickEngage starts the attack. Anything else (failure, or success out of range) means unreachable.
+	// In range: the next TickEngage starts the attack.
 	const AEnemySoldier* Soldier = Cast<AEnemySoldier>(GetPawn());
 	const AActor* Target = CurrentTarget.Get();
 	if (Soldier && Target && IsInAttackRange(*Soldier, *Target)) return;
 
+	// A pawn target that moved away during a successful move is not unreachable: the next TickEngage sends a new request.
+	if (Target && Target->IsA<APawn>() && Result.IsSuccess()) return;
+
+	// Anything else (failure, or success out of range on a fixed target) means unreachable.
 	HandleTargetUnreachable();
 }
 
