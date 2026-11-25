@@ -62,10 +62,6 @@ protected:
 	UPROPERTY(EditAnywhere, Category ="Input")
 	UInputAction* LaunchObjectsAction;
 
-	/** Toggle controls panel Input Action */
-	UPROPERTY(EditAnywhere, Category ="Input")
-	UInputAction* ToggleControlsAction;
-
 	/** Cast a spell Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")
 	UInputAction* CastSpellAction;
@@ -73,10 +69,6 @@ protected:
 	/** Place a servant (consumes a Necrospore) Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")
 	UInputAction* PlaceServantAction;
-
-	/** Toggle servant task menu Input Action (must have bTriggerWhenPaused, the menu pauses the game) */
-	UPROPERTY(EditAnywhere, Category = "Input")
-	UInputAction* ToggleServantMenuAction = nullptr;
 
 	/** SERVANTS */
 	/** Servant class spawned when a Necrospore is placed (set to the Blueprint child in BP_FirstPersonCharacter) */
@@ -127,10 +119,6 @@ protected:
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoLaunchObjects();
 
-	/** Handles UI interface for controls panel */
-	UFUNCTION(BlueprintImplementableEvent, Category="UI")
-	void OnToggleControlsPanel();
-
 	/** Handles sprint if stamina is above zero */
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	virtual void DoSprintStart();
@@ -146,30 +134,13 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	virtual void DoPlaceServant();
 
-	/** Show or hide the servant task menu widget (pause, cursor and input mode are already handled in C++) */
-	UFUNCTION(BlueprintImplementableEvent, Category = "UI")
-	void OnServantMenuToggled(bool bIsOpen);
-
 	UFUNCTION()
 	void HandleSprintStateChanged(bool bNewIsSprinting);
 
 	/** Set up input action bindings */
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
 
-private:
-	void DoToggleControlsPanel();
-
-	void DoToggleServantMenu();
-
-	/** Pauses the game and gives the cursor to the menu, or the reverse. Not a generic pause system (single consumer). */
-	void SetServantMenuOpen(bool bOpen);
-
-	bool bIsServantMenuOpen = false;
-
 public:
-
-	UFUNCTION(BlueprintPure, Category = "UI")
-	bool IsServantMenuOpen() const { return bIsServantMenuOpen; }
 
 	/** Returns the first person mesh **/
 	USkeletalMeshComponent* GetFirstPersonMesh() const { return FirstPersonMesh; }
