@@ -4,32 +4,35 @@ Seul le reste à faire figure ici. Le déjà fait est dans `git log` et `documen
 
 ## Prochaine session
 - **État** : 3b (ennemis : déplacement NavMesh en `Engage` + réservation souple des cibles) terminée, validée en PIE et fusionnée. 2.2c (rôle « attaque/défense » des serviteurs) terminée et validée en PIE par Timéo le 2026-11-24.
-- **Prochaine tâche** : item 4, menu de paramètres (son, FOV, remappage des touches), annoncé par Timéo comme prochaine session.
+- **Prochaine tâche** : item 6, UI hors du Character (PlayerController/HUD) + despawn des drops au sol. File réordonnée le 2026-11-25 selon les dépendances (6 avant tout nouveau menu, 7 avant 8 et 15, 9 avant la roue de sorts, sauvegarde après stabilisation de l'état).
 - **Rappels** : la dette « Avant toute Release » (section Dette technique) ; points chauds à ne pas modifier en parallèle : `EResourceType`, `*.Build.cs`, `Default*.ini`, `TODO.md`, `CLAUDE.md`, `documentation-technique.md`, `Lvl_Principal.umap` (`CLAUDE.md` section 10).
 
 ## En cours
 (rien)
 
 ## File d'attente (dans l'ordre)
-Les numéros sont des identifiants stables (cités ailleurs : « item 6 », « items 7-8 »...) : les items faits sont retirés sans renuméroter.
-4. Menu de paramètres : son, FOV, remappage des touches (Enhanced Input, Player Mappable Keys)
-5. Sauvegarde (voir plus bas)
+Les numéros sont des identifiants stables (cités ailleurs : « item 6 », « items 7-8 »...) : les items faits sont retirés sans renuméroter. **L'ordre de lecture fait foi, pas l'ordre des numéros** (file réordonnée le 2026-11-25 ; les suffixes `a`/`b` scindent un item sans le renuméroter).
 6. UI hors du Character (PlayerController/HUD) + despawn des drops au sol après délai
+4a. Menu de paramètres, version FOV seul, **conçu extensible**. Timéo : « je veux être sûr que ça soit modulable et nickel pour rajouter d'autres options plus tard même si dans cette partie il n'y a que le FOV ». Ajouter un réglage plus tard doit se limiter à déclarer une entrée (nom, type, bornes, valeur par défaut, application) sans toucher au code du widget ni de la persistance ; les réglages sont sauvegardés sur disque. Premier consommateur du nouveau foyer d'UI de l'item 6. Le son est sorti de la file (voir « Plus tard ») ; le remappage est l'item 4b
 7. Vrai inventaire (stacks, slots, UI liste)
    - Cible de Timéo : « un objet dans la base à côté du coeur du joueur qui va en fait être un inventaire virtuel à distance qui sera en fait mon inventaire et celui des serviteurs, une sorte d'inventaire partagé en remote dans lequel les serviteurs pourront piocher pour replanter ». Décision de récolte : « quand c'est le serviteur qui récolte, les drops n'apparaissent pas mais au contraire que ça s'ajoute directement dans l'inventaire partagé ».
    - Stockage provisoire (décidé le 2026-11-09) : c'est le compteur du joueur 0 (`UResourceCounterComponent`), la Necrospore y est une ressource comptée. Chaque accès reste isolé à un endroit précis, pour que le passage au vrai inventaire ne touche que ceux-là : pose de Necrospore, `DoPlaceServant` (`TrySpendResource`) ; récolte serviteur, dans `AServantAIController` (même fichier), `FindHarvestStorage` (résolution), `HarvestAndDeposit` (crédit), `TryPlantOnField` (dépense des graines) et `WatchStorage` (abonnement à `OnResourceChanged`).
+5a. Conception de la sauvegarde : spec seule, sans implémentation (voir « Sauvegarde » plus bas). Après l'inventaire, pour que chaque spec suivante précise « ce que ce système sauvegarde »
 8. UI drag-and-drop + barre de raccourcis (9 emplacements). Le menu des serviteurs passe de la sélection par clic au glisser-déposer (seul le widget change, l'API C++ reste)
-9. Objets équipables + contrôles contextuels
+9. Objets équipables + contrôles contextuels. Refonte des entrées (Input Mapping Contexts) ; tranche le conflit du clic droit (lancer / roue de sorts)
+4b. Remappage des touches (Enhanced Input, Player Mappable Keys), **après l'item 9** : remapper avant la refonte des contextes serait du travail jeté. S'ajoute comme un réglage du menu de l'item 4a
 10. Roue de sorts (clic droit maintenu) + mana généralisé (4 emplacements, recharge ~5 s)
 11. Sorts 2 et 3
 12. Sort 4
-13. Vue de gestion top-down (pause à l'entrée) — **indissociable de l'item 14**. Reprendre la pause du menu des serviteurs (fonction privée du Character), premier consommateur
+18. Passe d'équilibrage : placeholders du spawner de vagues et du combat (voir Dette technique, « À régler »), une fois les dégâts du joueur en place
+13. Vue de gestion top-down (pause à l'entrée) — **indissociable de l'item 14**. Reprendre la pause du menu des serviteurs (déplacée hors du Character par l'item 6), premier consommateur
 14. Construction façon city-builder (grille, placement, rotation, déplacement, aperçu vert/rouge). Cases du chemin vers le village verrouillées en permanence (`GDD.md` section 3). Indissociable du 13. L'agrandissement de la base doit mettre à jour `BP_BaseZone`.
 15. Construction ↔ ressources (coût, effets des bâtiments)
+5b. Implémentation de la sauvegarde, une fois l'état stable (inventaire, sorts, bâtiments), en un seul passage
 16. Zone de fin : trigger box le long du chemin, accessible après un seuil de vagues survécues (à fixer par playtest) **et** accès garanti quand `AEnemyWaveSpawner::OnAllWavesCleared` est émis (20 vagues tuées par défaut, village vide : le joueur a gagné par défaut, même sans la puissance nécessaire, `GDD.md` section 4), indicateur visuel (`GDD.md` section 2)
 17. Victoire + clôture narrative : à l'entrée de la zone de fin, choix terminer / continuer ; cinématique à variantes selon le nombre de serviteurs (`GDD.md` section 2)
 
-## Sauvegarde (à concevoir avant la progression)
+## Sauvegarde (conception : item 5a, implémentation : item 5b)
 Positions des objets saisissables · nœuds récoltés et drops au sol · `bHasTriggered` des `AStoryTrigger` · ressources du `UResourceCounterComponent` · plus tard : plantations, serviteurs, potions, état de la base. Données externes : c'est ici qu'on durcit (NaN, valeurs hors bornes).
 
 ## Dette technique
@@ -68,5 +71,6 @@ Positions des objets saisissables · nœuds récoltés et drops au sol · `bHasT
 - **Ennemis** : un soldat sans destructible vivant dans la base reste immobile et la vague ne se termine jamais (un seul `UE_LOG(Error)`, pas de filet de chrono : proposition rejetée par Timéo) · si toutes les cibles sont inatteignables (NavMesh mal posé), le soldat attend indéfiniment (un seul `UE_LOG(Error)` distinct) · pas d'évitement entre soldats : la réservation réduit l'empilement sans l'annuler (cas tous réservés) · `DistanceAlongSpline` avance au temps et non à la position réelle du soldat (pré-existant) · cibles des soldats aujourd'hui : les destructibles de la base **et** les serviteurs (`AServant` est un `IDestructible`) dont l'origine est dans la zone de base ; côté destructibles, ce sont les `BP_Harvestable_Stone_Destructible` (Timéo en a ajouté dans `Lvl_Principal` pour le test de 3b ; les `GC_Mushroom` ne sont pas des cibles ; le cœur du joueur n'existe pas encore)
 
 ## Plus tard (visuel, son, idées)
+- **Réglage du son** (volumes général/musique/effets, sorti de l'item 4 le 2026-11-25) : à ajouter comme entrée du menu de l'item 4a quand le jeu aura des sons à régler ; un slider ne contrôlerait rien d'audible aujourd'hui
 - **Visuel/son** : matériaux réels (champignon, drops, nœuds, `AFieldPlot`) · apparence de l'UI · son et effet au ramassage · rotation/flottement des drops · redressement doux · particules d'impact et tremblement de l'objet frappé · Niagara des sorts · plus de fragments · remplacer le `DrawDebugLine` de `UInteractionComponent` par une surbrillance/réticule · habiller les abords hors zone jouable (`GDD.md` section 3)
 - **Idées à rediscuter** : attraction des drops vers le joueur · fusion des drops identiques · repousse des arbres et pierres · sélection de recette au chaudron (dès 2 recettes ; l'UI drag-and-drop attend l'inventaire, items 7-8) · écran de gestion commun à onglets (inventaire, serviteurs) ouvert par Tab, à trancher à l'item 7 (Timéo : « La solution que tu proposes d'avoir des onglets peut être très intéressante. J'y réfléchirai quand je serai à l'inventaire »)
