@@ -58,6 +58,7 @@ Chargé à chaque session **et par chaque sous-agent** : uniquement les règles,
 - `UInteractionComponent` fait **uniquement de la détection** (un trace par frame) ; `UGrabComponent` uniquement de la télékinésie. **Le Character arbitre** (touche E contextuelle) : aucun composant n'en appelle un autre.
 - Tous les traces s'appuient sur l'override de `GetActorEyesViewPoint()` du Character (la caméra réelle, pas le défaut du moteur).
 - Les widgets **reçoivent** leurs dépendances, ils ne les cherchent pas.
+- **Le PlayerController possède l'UI** (`UIEntries` / `FUIWidgetEntry`) : ajouter une UI = ajouter une entrée dans le BP du contrôleur, sans C++ dans le Character. Un widget qui a besoin du pawn implémente `IPlayerUIWidget`, de façon idempotente (rappelé à chaque `OnPossess` / `OnUnPossess`).
 - Types de ressources : `EResourceType` (`Resources/ResourceTypes.h`). Ajouter un type = une valeur + une entrée dans `WBP_ResourceCounter`.
 
 ## 5. Collisions
