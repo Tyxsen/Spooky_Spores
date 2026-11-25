@@ -13,7 +13,8 @@ Unreal Engine 5.8.3. Architecture **actuelle**, par système (pas d'historique).
 ## 2. Architecture globale
 
 ```
-Player (ASpooky_SporesCharacter)
+PlayerController (ASpooky_SporesPlayerController)  → possède toute l'UI (section 15)
+Player (ASpooky_SporesCharacter)                    → aucun code d'UI
    ├── UInteractionComponent     → détecte ce que le joueur regarde
    ├── UGrabComponent            → manipule physiquement l'objet détecté
    ├── UResourceCounterComponent → compte les ressources
@@ -38,7 +39,8 @@ Spells/      ManaComponent, SpellCastingComponent
 Enemies/     EnemySoldier, EnemyAIController, EnemyPathSpline, EnemyWaveSpawner, EnemyTargetSubsystem, EnemyRegistrySubsystem, Destructible
 Servants/    Servant (santé, attaque), ServantAIController (errance, travail de champ, combat), ServantSubsystem, ServantTask, ServantTaskMenuWidget
 Base/        BaseZone, BaseZoneSubsystem
-Tests/       Automation Specs (code de test du module, pas un domaine de gameplay) : specs par système, helpers partagés (FieldPlotTestHelpers.h, ServantFieldTestHelpers.h, EnemyTestHelpers.h, EnemyTestActors.h), ServantReplantWorldSpec, ServantWakeWalkWorldSpec, EnemyWaveSpawnerSpec, EnemyTargetingWorldSpec, EnemyTargetReservationSpec, EnemyRegistrySpec, ServantCombatWorldSpec, ServantCombatTestHelpers.h
+UI/          PlayerUIWidget (interface IPlayerUIWidget), UIWidgetEntry (FUIWidgetEntry)
+Tests/       Automation Specs (code de test du module, pas un domaine de gameplay) : un fichier par système, voir `Tests/`
 ```
 
 **Content** (`Content/Spooky_Spores/`) : `Core/` (briques structurantes : Character, Controller, GameMode, Input), `Placeables/` (instances concrètes : Base, Interactables, Narrative, Destructibles, Resources, Servants), `UI/Widgets/`, `Characters/Mannequins/`, `Maps/`. Inspiré du [style guide d'Allar](https://github.com/Allar/ue5-style-guide).
@@ -86,8 +88,9 @@ Un objet implémente l'une des interfaces, l'autre ou les deux (ségrégation de
 **Spawn différé** : `AResourceDrop::SpawnDrops` (statique, partagée par nœuds, champs et butin ennemi) utilise `SpawnActorDeferred` → `InitializeDrop(Type, Amount)` → `FinishSpawning`, car `SpawnActor` exécute `BeginPlay` et les overlaps avant de rendre la main (un drop était ramassé avant d'avoir ses données). `FResourceDropEntry` vit dans `ResourceTypes.h` (évite un include circulaire).
 
 **`AResourceDrop`** : preset `ResourceDrop` (les drops s'ignorent entre eux). `BeginPlay` : saut initial (`VRandCone`, vélocité), puis `PickupDelay` pendant lequel les overlaps sont ignorés. Atterrissage (normale `Z >= MinGroundNormalZ` 0.7) : physique coupée, yaw conservé, position recalée via les `Bounds` du mesh (fonctionne sur pente). `TryCollect` renvoie un `bool` (pas de double ramassage) et exige un `UResourceCounterComponent` sur le ramasseur (un ennemi n'en a pas).
+- **Durée de vie** : `DropLifetime` (300 s, `Resources|Lifetime`), appliquée par `SetLifeSpan` en fin de `BeginPlay`. `<= 0` : le drop ne disparaît jamais. L'expiration est un `Destroy` silencieux, sans crédit. Un ramassage avant l'expiration détruit le drop, ce qui annule le timer du moteur. Valable pour tous les chemins de `SpawnDrops` (nœuds, champs au joueur, butin ennemi) ; le serviteur ne fait apparaître aucun drop (section 6). Les drops du joueur restent des drops au sol (Timéo : « Oui quand c'est le joueur je veux des drops quand même. »).
 
-**UI** : `WBP_ResourceEntry` (une ressource, filtrée par `Equal (Enum)`) et `WBP_ResourceCounter` reçoivent le compteur (`InitializeCounter`) au lieu de le chercher, pour ne pas dépendre de l'ordre d'initialisation Character/UI.
+**UI** : `WBP_ResourceEntry` (une ressource, filtrée par `Equal (Enum)`) reçoit le compteur (`InitializeCounter`). `WBP_ResourceCounter`, `WBP_StaminaBar` et `WBP_CauldronProgress` implémentent `IPlayerUIWidget` (`Initialize For Player`) : ils reçoivent le Pawn et en extraient leur composant au lieu de le chercher dans le monde (le chaudron fait un `GetActorOfClass`, voir `TODO.md`). Voir section 15.
 
 ---
 
@@ -234,7 +237,7 @@ La vitesse (`MaxWalkSpeed`) n'est modifiée qu'à un endroit, `HandleSprintState
 - **Registre** : `AServant::BeginPlay` enregistre, `EndPlay` retire (doublons et inconnus ignorés, `TWeakObjectPtr`, ordre d'enregistrement conservé). Chaque serviteur reçoit un numéro (« Serviteur N ») **jamais réutilisé** dans le monde, même après sa mort.
 - **`EServantTask`** (`ServantTask.h`) : trois valeurs, dont `Unassigned` (valeur par défaut d'un serviteur enregistré).
 - **`AssignTask`** renvoie `true` seulement si la tâche change. `OnAssignmentsChanged` est diffusé à chaque enregistrement, retrait ou changement effectif. L'assignation ne pilote pas le contrôleur : celui-ci s'abonne à `OnAssignmentsChanged` et relit la tâche à chaque décision. `FieldHarvest` (travail de champ) et `AttackDefense` (combat) ont un comportement ; `Unassigned` erre seulement.
-- **Menu (`UServantTaskMenuWidget`, `Abstract`)** : toute la logique est en C++ (sélection par clic puis clic sur une colonne, `AssignSelectedServant`, reconstruction complète des deux colonnes via l'événement `OnMenuRefreshRequested`). `InitializeMenu` reçoit le registre (le widget ne le cherche pas) ; pointeurs faibles vers le registre et le serviteur sélectionné. `InitializeMenu` abonne le widget ; `NativeConstruct` le réabonne s'il est réajouté à l'écran, `NativeDestruct` le désabonne ; aucune reconstruction pendant la destruction du monde (garde sur le monde du subsystem).
+- **Menu (`UServantTaskMenuWidget`, `Abstract`)** : implémente `IPlayerUIWidget`, créé et possédé par le `PlayerController` (entrée `ServantMenu`, section 15). Toute la logique est en C++ (sélection par clic puis clic sur une colonne, `AssignSelectedServant`, reconstruction complète des deux colonnes via l'événement `OnMenuRefreshRequested`). `InitializeMenu` reçoit le registre (le widget ne le cherche pas) ; pointeurs faibles vers le registre et le serviteur sélectionné. `InitializeMenu` abonne le widget ; `NativeConstruct` le réabonne s'il est réajouté à l'écran, `NativeDestruct` le désabonne ; aucune reconstruction pendant la destruction du monde (garde sur le monde du subsystem).
 - **Blueprints** : `WBP_ServantTaskMenu` (enfant, mise en page) et `WBP_ServantEntry` (un bouton par serviteur). La surbrillance passe par une fonction Blueprint unique par liste, `HighlightEntriesInList(List, Selection)`.
 
 ---
@@ -267,7 +270,18 @@ La vitesse (`MaxWalkSpeed`) n'est modifiée qu'à un endroit, `HandleSprintState
 - Sphères d'état des champs et du chaudron (section 6).
 - `AEnemySoldier::DebugKill` (temporaire) : tue via `ApplyDamage` pour exercer toute la chaîne (santé → `OnDeath` → butin) ; touche de debug sur `BP_FirstPersonCharacter` ou bouton `CallInEditor`. À supprimer (`TODO.md`).
 - Touche de test `StartWaves` sur `BP_FirstPersonCharacter` (temporaire) : appelle `AEnemyWaveSpawner::StartWaves` sur le spawner du niveau. À supprimer (`TODO.md`).
-- **Panneau de contrôles** (`WBP_ControlsPanel`, pas un outil de dev) : texte statique des touches, togglé par Entrée (`DoToggleControlsPanel` → event Blueprint `OnToggleControlsPanel` : le C++ déclenche, le Blueprint affiche).
-- **Menu des serviteurs (pause)** : Tab → `DoToggleServantMenu` → `SetServantMenuOpen` (fonction privée du Character) : `SetPause`, curseur visible, `FInputModeGameAndUI` + `SetHideCursorDuringCapture(false)` (pas `UIOnly`, qui bloquerait Tab) ; à la fermeture `FInputModeGameOnly`. L'événement Blueprint `OnServantMenuToggled` affiche ou masque le widget. `IA_ToggleServantMenu` est la seule action avec `Trigger when Paused` : pendant la pause tout est figé sauf Tab et les clics UMG. Les actions maintenues (sprint) reçoivent `Completed` à la première frame de pause (confirmé en PIE). Pas de système de pause générique : la vue de gestion (`TODO.md` item 13) reprendra cette fonction.
 
 ![Présentation des 3 types de debug actuel du projet](Documentation_Documents/Debug.png)
+
+---
+
+## 15. UI (propriétaire : PlayerController)
+
+`UI/` : `IPlayerUIWidget` (`InitializeForPlayer(Controller, Pawn)`), `FUIWidgetEntry`. `ASpooky_SporesPlayerController` (`Core/Controller/`) crée, affiche et pilote tous les widgets ; le `Character` n'a plus aucun code d'UI. Le contrôleur survit au changement de pawn, contrairement au Character.
+
+- **Données** : `TArray<FUIWidgetEntry> UIEntries` (`EditAnywhere`, sur `BP_FirstPersonPlayerController`). Une entrée : `Id` (clé unique ; vide ou doublon = entrée ignorée, erreur loguée), `WidgetClass`, `ZOrder`, `bOpenAtStart`, `bPausesGame`, `ToggleAction` (optionnelle). Ajouter une UI = ajouter une entrée, sans code. Règle : `ZOrder` des HUD inférieur à celui des menus.
+- **API** : `OpenUI`, `CloseUI`, `ToggleUI`, `IsUIOpen`, `GetUIWidget` (Blueprint), délégué `OnUIOpenChanged(Id, bOpen)` à chaque changement réel. Un widget fermé est `Collapsed`, ouvert `Visible` (créé une fois, `AddToPlayerScreen`).
+- **Modal** : si au moins une UI ouverte a `bPausesGame`, `ApplyModalState(true)` : `SetPause`, curseur visible, `FInputModeGameAndUI` + `SetHideCursorDuringCapture(false)` (pas `UIOnly`, qui ignorerait la touche de fermeture) ; à la dernière fermeture `FInputModeGameOnly`. Une `ToggleAction` d'une entrée pausante doit avoir `Trigger When Paused`, sinon l'UI ne se ferme plus. Pas de système de pause générique à part cela : la vue de gestion (`TODO.md` item 13) réutilise `bPausesGame` / `ApplyModalState`.
+- **Pawn** : `InitializeForPlayer` est appelé à la création puis à chaque changement de pawn. `OnPossess` appelle `UnPossess` : un changement envoie donc `InitializeForPlayer(nullptr)` puis `InitializeForPlayer(nouveau pawn)`. Les widgets doivent être idempotents. `Bind Event` Blueprint est dédoublonné par le moteur (`AddUnique`) : pas d'`Unbind` nécessaire tant que le compteur ne change pas d'objet (à revoir à l'item 7, `TODO.md`).
+- **Entrées actuelles** (valeurs posées sur `BP_FirstPersonPlayerController`) : `ResourceCounter`, `StaminaBar` et `CauldronProgress` : `ZOrder` 0, ouverts au démarrage ; `ControlsPanel` : `ZOrder` 10, `IA_ToggleControls` (Entrée), `bPausesGame` vrai, fermé au démarrage ; `ServantMenu` : `ZOrder` 11, `IA_ToggleServantMenu` (Tab), `bPausesGame` vrai. L'Entrée met donc le jeu en pause. Les actions maintenues (sprint) reçoivent `Completed` à la première frame de pause (confirmé en PIE).
+- **Tests** : `PlayerUIControllerSpec` (logique des entrées, ouverture, modal, pawn) ; les coutures `CreateUIWidget` et `ApplyModalState` (virtuelles protégées) sont surchargées par `ATestUIPlayerController`. `ResourceDropLifetimeSpec` : durée de vie des drops. Piège : `AddExpectedMessage` au niveau `Error` compte aussi les `Warning` (« Error level or higher »).

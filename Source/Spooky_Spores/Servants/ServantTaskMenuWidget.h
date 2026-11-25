@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Servants/ServantTask.h"
+#include "UI/PlayerUIWidget.h"
 #include "ServantTaskMenuWidget.generated.h"
 
 class AServant;
@@ -16,12 +17,15 @@ class UServantSubsystem;
  * The Blueprint child only does the layout and wires the clicks.
  */
 UCLASS(Abstract)
-class SPOOKY_SPORES_API UServantTaskMenuWidget : public UUserWidget
+class SPOOKY_SPORES_API UServantTaskMenuWidget : public UUserWidget, public IPlayerUIWidget
 {
 	GENERATED_BODY()
 
 // -----------FUNCTIONS-----------
 public:
+	// IPlayerUIWidget: plugs the menu on the world's registry (InitializeMenu is idempotent, so a pawn change is harmless)
+	virtual void InitializeForPlayer_Implementation(APlayerController* Controller, APawn* Pawn) override;
+
 	// Receives the registry (the widget never looks for it). Rebinds if called twice, then requests a refresh.
 	UFUNCTION(BlueprintCallable, Category = "Servant|TaskMenu")
 	void InitializeMenu(UServantSubsystem* InSubsystem);
@@ -64,7 +68,7 @@ private:
 
 // -----------PROPERTIES-----------
 private:
-	// Weak: the widget (outer: GameInstance) must not keep the world's registry alive
+	// Weak: the widget must not keep the world's registry alive
 	TWeakObjectPtr<UServantSubsystem> ServantSubsystem;
 
 	// Weak: a destroyed servant must never be kept alive by the menu

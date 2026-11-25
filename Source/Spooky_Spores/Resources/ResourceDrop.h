@@ -54,6 +54,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Resources|Pickup")
 	float PickupDelay = 0.5f;
 
+	// Seconds before the drop despawns silently (no credit). <= 0 means it never despawns.
+	UPROPERTY(EditAnywhere, Category = "Resources|Lifetime", meta = (ClampMin = "0.0", Units = "s"))
+	float DropLifetime = 300.0f;
+
 private:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Resources", meta = (AllowPrivateAccess = "true"))
 	EResourceType DropType = EResourceType::Seed;

@@ -43,6 +43,12 @@ void AResourceDrop::BeginPlay()
 	{
 		GetWorldTimerManager().SetTimer(PickupTimerHandle, this, &AResourceDrop::EnablePickup, PickupDelay, false);
 	}
+
+	// Engine lifespan timer: cancelled by Destroy/EndPlay, so a collected drop never expires twice
+	if (DropLifetime > 0.0f)
+	{
+		SetLifeSpan(DropLifetime);
+	}
 }
 
 void AResourceDrop::OnMeshOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,

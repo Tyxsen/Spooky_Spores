@@ -8,6 +8,13 @@
 #include "Servants/ServantSubsystem.h"
 #include "Spooky_Spores.h"
 
+void UServantTaskMenuWidget::InitializeForPlayer_Implementation(APlayerController*, APawn*)
+{
+	// The menu only needs the world's registry, not the pawn
+	const UWorld* World = GetWorld();
+	InitializeMenu(World ? World->GetSubsystem<UServantSubsystem>() : nullptr);
+}
+
 void UServantTaskMenuWidget::InitializeMenu(UServantSubsystem* InSubsystem)
 {
 	UnbindFromSubsystem();
