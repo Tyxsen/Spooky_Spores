@@ -17,7 +17,7 @@ class UServantSubsystem;
  * The Blueprint child only does the layout and wires the clicks.
  */
 UCLASS(Abstract)
-class SPOOKY_SPORES_API UServantTaskMenuWidget : public UUserWidget
+class SPOOKY_SPORES_API UServantTaskMenuWidget : public UUserWidget, public IPlayerUIWidget
 {
 	GENERATED_BODY()
 

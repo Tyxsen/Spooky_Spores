@@ -128,11 +128,7 @@ bool ASpooky_SporesPlayerController::ToggleUI(FName Id)
 
 bool ASpooky_SporesPlayerController::IsUIOpen(FName Id) const
 {
-	if (!UIWidgets.Contains(Id))
-	{
-		UE_LOG(LogSpooky_Spores, Warning, TEXT("'%s' has no UI widget with Id '%s'"), *GetNameSafe(this), *Id.ToString());
-		return false;
-	}
+	// Pure node: no log (an unknown Id simply reads as closed)
 	return OpenUIIds.Contains(Id);
 }
 
