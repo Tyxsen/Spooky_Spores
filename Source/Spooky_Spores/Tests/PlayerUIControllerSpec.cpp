@@ -260,8 +260,9 @@ void FPlayerUIControllerSpec::Define()
 	{
 		if (!RequireWorld()) { return; }
 		const FName IdNoClass(TEXT("UI_NoClass"));
-		// The spec asks for UE_LOG(Error) per ignored entry; the text is not specified, so any error is expected, at least once.
-		AddExpectedMessage(TEXT(".*"), ELogVerbosity::Error, EAutomationExpectedMessageFlags::Contains, 0);
+		// The spec asks for one UE_LOG(Error) per ignored entry; the text is not specified, so the pattern is the widest one (any Error)
+		// and the check is on the COUNT: exactly 3 errors for 3 invalid entries. The per-case Its below isolate each case (exactly 1 each).
+		AddExpectedMessage(TEXT(".*"), ELogVerbosity::Error, EAutomationExpectedMessageFlags::Contains, 3);
 
 		TArray<FUIWidgetEntry> Entries;
 		Entries.Add(MakeEntry(IdA, UTestPlayerUIWidget::StaticClass()));
@@ -280,6 +281,33 @@ void FPlayerUIControllerSpec::Define()
 		TestEqual(TEXT("only the two valid entries were created"), Controller->CreatedIds.Num(), 2);
 		TestFalse(TEXT("an ignored entry cannot be opened"), Controller->OpenUI(IdNoClass));
 		TestFalse(TEXT("an ignored entry is not open"), Controller->IsUIOpen(IdNoClass));
+	});
+
+	// One test per invalid case: exactly one Error each (pattern ".*" at Error level = any error message, since the text is not specified;
+	// it captures every Error logged during the test, so a missing log AND an extra error both turn it red).
+	// Mutation: the log is removed for that case only -> 0 errors seen, red; the case also logs a second time -> 2 errors, red.
+	It("Criterion 3 (log): an entry without WidgetClass logs exactly one error", [this]()
+	{
+		if (!RequireWorld()) { return; }
+		AddExpectedMessage(TEXT(".*"), ELogVerbosity::Error, EAutomationExpectedMessageFlags::Contains, 1);
+		SpawnController({ MakeEntry(IdA, UTestPlayerUIWidget::StaticClass()), MakeEntry(FName(TEXT("UI_NoClass")), nullptr) });
+		TestNotNull(TEXT("the valid entry is created"), Controller != nullptr ? Controller->GetUIWidget(IdA) : nullptr);
+	});
+
+	It("Criterion 3 (log): an entry with an empty Id logs exactly one error", [this]()
+	{
+		if (!RequireWorld()) { return; }
+		AddExpectedMessage(TEXT(".*"), ELogVerbosity::Error, EAutomationExpectedMessageFlags::Contains, 1);
+		SpawnController({ MakeEntry(IdA, UTestPlayerUIWidget::StaticClass()), MakeEntry(NAME_None, UTestPlayerUIWidget::StaticClass()) });
+		TestNotNull(TEXT("the valid entry is created"), Controller != nullptr ? Controller->GetUIWidget(IdA) : nullptr);
+	});
+
+	It("Criterion 3 (log): a duplicate Id logs exactly one error", [this]()
+	{
+		if (!RequireWorld()) { return; }
+		AddExpectedMessage(TEXT(".*"), ELogVerbosity::Error, EAutomationExpectedMessageFlags::Contains, 1);
+		SpawnController({ MakeEntry(IdA, UTestPlayerUIWidget::StaticClass()), MakeEntry(IdA, UTestPlainUIWidget::StaticClass()) });
+		TestNotNull(TEXT("the first entry is created"), Controller != nullptr ? Controller->GetUIWidget(IdA) : nullptr);
 	});
 
 	// Mutation: the event is emitted on a no-op (second OpenUI, CloseUI of a closed UI) -> the counts turn red;
@@ -456,7 +484,8 @@ void FPlayerUIControllerSpec::Define()
 		const int32 CallsBeforePossess = Widget->Calls.Num();
 		Controller->Possess(PawnB);
 		TestTrue(TEXT("Possess did give the pawn to the controller (harness check)"), Controller->GetPawn() == PawnB);
-		TestTrue(TEXT("OnPossess notified the widget"), Widget->Calls.Num() > CallsBeforePossess);
+		// No previous pawn here, so OnPossess has nothing to unpossess: exactly one notification (the pawn-change case would give nullptr then the pawn).
+		TestEqual(TEXT("OnPossess notified the widget exactly once"), Widget->Calls.Num(), CallsBeforePossess + 1);
 		TestTrue(TEXT("OnPossess: last call carries the new pawn"), Widget->Calls.Last().Pawn.Get() == PawnB);
 		TestTrue(TEXT("OnPossess: Controller still valid"), Widget->Calls.Last().Controller.Get() == Controller);
 

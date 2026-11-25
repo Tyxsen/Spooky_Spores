@@ -30,6 +30,7 @@
 #include "Engine/EngineTypes.h"
 #include "UObject/UnrealType.h"
 #include "UObject/WeakObjectPtrTemplates.h"
+#include "EngineUtils.h"
 #include "Tests/AutomationCommon.h"
 
 namespace ResourceDropLifetimeSpecPrivate
@@ -219,7 +220,9 @@ void FResourceDropLifetimeSpec::Define()
 
 	// Mutation: the destruction by expiry credits the nearest/first player (refund in EndPlay/Destroyed or in an expiry handler) -> the
 	//           counter changes, red; the expiry is implemented as a forced pickup by the player pawn -> red.
-	It("Criterion 5: an expired drop credits nothing, even with a counter-equipped pawn out of pickup range", [this]()
+	// Honest scope: the test drops have no mesh, hence no body and no overlap, so "out of pickup range" is vacuous here. The test only
+	// guarantees "no credit at expiry" for a player whose pawn carries a counter.
+	It("Criterion 5: an expired drop credits nothing to a counter-equipped player pawn", [this]()
 	{
 		if (!RequireWorld()) { return; }
 		UResourceCounterComponent* Counter = ServantFieldTest::SpawnPlayer(World, true, 3, 2);
