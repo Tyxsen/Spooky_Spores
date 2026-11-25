@@ -260,9 +260,11 @@ void FPlayerUIControllerSpec::Define()
 	{
 		if (!RequireWorld()) { return; }
 		const FName IdNoClass(TEXT("UI_NoClass"));
-		// The spec asks for one UE_LOG(Error) per ignored entry; the text is not specified, so the pattern is the widest one (any Error)
-		// and the check is on the COUNT: exactly 3 errors for 3 invalid entries. The per-case Its below isolate each case (exactly 1 each).
-		AddExpectedMessage(TEXT(".*"), ELogVerbosity::Error, EAutomationExpectedMessageFlags::Contains, 3);
+		// The spec asks for one UE_LOG(Error) per ignored entry. The observed text contains "ignores a UI entry" in all three cases, so the
+		// pattern targets it, with exactly 3 occurrences. A wide ".*" would also count the Warnings emitted by the unknown-Id calls of this
+		// test (OpenUI / GetUIWidget on an ignored entry): "Error level or higher" in the automation framework includes Warnings.
+		// Mutation: the log is removed for the duplicate only, or for the empty Id only -> 2 occurrences, red.
+		AddExpectedMessage(TEXT("ignores a UI entry"), ELogVerbosity::Error, EAutomationExpectedMessageFlags::Contains, 3);
 
 		TArray<FUIWidgetEntry> Entries;
 		Entries.Add(MakeEntry(IdA, UTestPlayerUIWidget::StaticClass()));
