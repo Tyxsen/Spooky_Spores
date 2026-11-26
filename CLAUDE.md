@@ -70,7 +70,7 @@ Chargé à chaque session **et par chaque sous-agent** : uniquement les règles,
 
 ## 6. Contrôles
 
-ZQSD / souris / Espace : déplacement, regard, saut. **E** : saisir / relâcher / interagir (contextuel). **Clic droit** : lancer. **Clic gauche** : sort. **Maj gauche** : sprint. **L** : poser une Necrospore. **Entrée** : panneau de contrôles. **Tab** : menu d'assignation des serviteurs (met le jeu en pause ; provisoire, refonte des touches prévue).
+ZQSD / souris / Espace : déplacement, regard, saut. **E** : saisir / relâcher / interagir (contextuel). **Clic droit** : lancer. **Clic gauche** : sort. **Maj gauche** : sprint. **L** : poser une Necrospore. **Entrée** : panneau de contrôles. **Tab** : menu d'assignation des serviteurs (met le jeu en pause ; provisoire, refonte des touches prévue). **O** : menu des paramètres (FOV aujourd'hui ; met le jeu en pause ; provisoire, refonte des touches prévue).
 - Le clic droit est réservé à la roue des sorts par le 3C : n'ajoute pas de rôle sans en discuter.
 - **`²` (AZERTY) = console Unreal : ne jamais l'assigner.** Échap ferme le viewport en PIE : à éviter.
 - Refonte prévue avec les objets équipables (Input Mapping Contexts d'Enhanced Input).
@@ -115,6 +115,11 @@ Question systématique : **à quel moment cette ligne s'exécute-t-elle ?**
 - Dans un Blueprint, enchaîner une étape après un `For Each Loop` via son `Loop Body` au lieu de `Completed` (ou d'un `Sequence`) la saute quand la liste est vide et la répète par élément sinon.
 - `MoveToLocation` (échec, `AlreadyAtGoal`) et `StopMovement` (`Aborted`) appellent `OnMoveCompleted` de façon synchrone, avant que la fonction n'ait rendu la main : tout état que ce callback lit (`bIsWandering`, réservation, cible) doit être remis à zéro avant l'appel, sinon il replanifie ou résout un déplacement déjà annulé.
 - Un acteur qui réagit à un delegate dont il est lui-même la cause (ex. le serviteur qui récolte un champ et reçoit `OnFieldChanged`) doit ignorer ses propres changements pendant l'action (garde `bIsResolving` / `TGuardValue`), sinon il s'annule lui-même.
+- Un type global du module peut collisionner avec un type du moteur : `FOnSettingChanged` existe déjà (`NumericTypeInterface.h`), d'où `FOnSpookySettingChanged`. Faire un `grep` dans `Engine/Source` avant de nommer un delegate ou un type global.
+- Une `UGameInstanceSubsystem` a `ClassWithin = UGameInstance` : en test, son `Outer` doit être une `UGameInstance`. Une classe `UCLASS(abstract)` (ex. `ASpooky_SporesCharacter`) ne se spawne pas en test : déclarer une sous-classe de test concrète (`CLASS_Abstract` n'est pas hérité).
+- Un nom d'Automation test contenant une virgule, une apostrophe, un `+` ou un point-virgule casse les relances par nom depuis Rider (`-ExecCmds` coupe sur la virgule).
+- `UGameplayStatics::LoadGameFromSlot` sur un `USaveGame` corrompu fait asserter le moteur (`LoadGameFromMemory`) : pour une donnée modifiable à la main, écrire un fichier texte (`Id=Valeur`) et traiter le chargement comme une frontière de confiance.
+- L'outil d'écriture de fichiers transforme parfois l'échappement de saut de ligne d'un littéral C++ en vrai saut de ligne (ligne cassée, ou réglages écrits sur une seule ligne) : utiliser `LINE_TERMINATOR` et relire les octets du fichier produit.
 
 ---
 

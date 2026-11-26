@@ -11,10 +11,13 @@
 #include "Spooky_Spores.h"
 #include "Interaction/GrabComponent.h"
 #include "Interaction/InteractionComponent.h"
+#include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "Movement/StaminaComponent.h"
 #include "Resources/ResourceCounterComponent.h"
 #include "Servants/Servant.h"
+#include "Settings/SettingsCatalog.h"
+#include "Settings/SettingsSubsystem.h"
 #include "Spells/SpellCastingComponent.h"
 
 ASpooky_SporesCharacter::ASpooky_SporesCharacter()
@@ -59,6 +62,37 @@ void ASpooky_SporesCharacter::BeginPlay()
 	
 	if (UStaminaComponent* StaminaComponent = FindComponentByClass<UStaminaComponent>())
 		StaminaComponent->OnSprintStateChanged.AddDynamic(this, &ASpooky_SporesCharacter::HandleSprintStateChanged);
+
+	// Read at every BeginPlay: a respawned pawn picks up the stored value
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		if (USettingsSubsystem* Settings = GameInstance->GetSubsystem<USettingsSubsystem>())
+		{
+			FirstPersonCameraComponent->SetFieldOfView(Settings->GetFloat(SettingsCatalog::FOV));
+			Settings->OnSettingChanged.AddUniqueDynamic(this, &ASpooky_SporesCharacter::HandleSettingChanged);
+		}
+	}
+}
+
+void ASpooky_SporesCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		if (USettingsSubsystem* Settings = GameInstance->GetSubsystem<USettingsSubsystem>())
+		{
+			Settings->OnSettingChanged.RemoveDynamic(this, &ASpooky_SporesCharacter::HandleSettingChanged);
+		}
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
+void ASpooky_SporesCharacter::HandleSettingChanged(FName Id, float Value)
+{
+	if (Id == SettingsCatalog::FOV)
+	{
+		FirstPersonCameraComponent->SetFieldOfView(Value);
+	}
 }
 
 void ASpooky_SporesCharacter::GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const
