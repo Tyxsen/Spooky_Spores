@@ -51,24 +51,29 @@ Le personnage est de taille moyenne (environ 1m80). Il peut se déplacer, courir
 
 Caméra en **première personne**, choisie pour maximiser l'immersion du joueur dans l'univers et le personnage. Positionnée à hauteur d'un humain d'1m80, elle facilite les interactions avec les champs, les établis, et l'environnement en général (le joueur interagit en regardant un objet et en appuyant sur une touche).
 
-- FOV par défaut : **90°**, réglable à tout moment dans les paramètres du jeu
+- FOV par défaut : **90°**, réglable de 60° à 120° dans le menu des paramètres (touche provisoire **O**). Le jeu est en pause quand le menu est ouvert : le nouveau FOV n'est visible qu'à la reprise
 
 ### Controls
 
 | Action | Touche |
 |---|---|
 | Déplacement | Z Q S D |
+| Sauter | Espace |
+| Courir | Maj gauche |
 | Regarder autour de soi | Souris |
+| Panneau de contrôles (met le jeu en pause) | Entrée |
+| Menu des paramètres (met le jeu en pause ; touche provisoire) | O |
 | Menu d'assignation des serviteurs (met le jeu en pause) | Tab |
 | Ouvrir l'inventaire | Touche à définir |
 | Interagir avec l'environnement / les objets | E |
+| Poser une Necrospore (fait apparaître un serviteur) | L |
 | Attaquer (sort sélectionné) | Clic gauche |
 | Lancer un objet actuellement grab | Clic droit |
 | Sélectionner un sort (roue des sorts) | Maintenir clic droit puis relâcher sur le sort voulu |
 | Barre de raccourcis (9 emplacements) | 1 à 9 (par défaut, remappable) |
 | Basculer vue joueur ↔ vue de gestion (top-down) | Touche à définir |
 
-Les réglages (son, contrôles, FOV) sont accessibles et modifiables depuis le menu des paramètres.
+Le menu des paramètres ne règle aujourd'hui que le FOV ; le réglage du son et le remappage des touches y seront ajoutés plus tard.
 
 ### Gestion de la base
 
