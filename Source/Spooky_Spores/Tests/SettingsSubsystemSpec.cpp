@@ -17,6 +17,7 @@
 #include "Settings/SettingsCatalog.h"
 #include "Settings/SettingsSaveGame.h"
 #include "Settings/SettingsSubsystem.h"
+#include "Engine/GameInstance.h"
 #include "Kismet/GameplayStatics.h"
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/UObjectGlobals.h"
@@ -34,6 +35,7 @@ BEGIN_DEFINE_SPEC(FSettingsSubsystemSpec, "SpookySpores.Settings.Subsystem",
 	FString SlotName;
 	FSettingDefinition FovDef;
 	bool bFovDefFound = false;
+	TStrongObjectPtr<UGameInstance> BareGameInstance; // Outer of the subsystems (ClassWithin = UGameInstance), never Init()-ed
 	TArray<TStrongObjectPtr<USettingsSubsystem>> Instances;
 	TStrongObjectPtr<USettingsTestListener> Listener;
 
@@ -49,7 +51,7 @@ END_DEFINE_SPEC(FSettingsSubsystemSpec)
 
 USettingsSubsystem* FSettingsSubsystemSpec::MakeSubsystem(const TArray<FSettingDefinition>& Defs)
 {
-	USettingsSubsystem* Subsystem = NewObject<USettingsSubsystem>(GetTransientPackage());
+	USettingsSubsystem* Subsystem = NewObject<USettingsSubsystem>(BareGameInstance.Get());
 	Instances.Add(TStrongObjectPtr<USettingsSubsystem>(Subsystem));
 	Subsystem->InitializeFromDefinitions(Defs, SlotName);
 	return Subsystem;
@@ -118,6 +120,7 @@ void FSettingsSubsystemSpec::Define()
 		{
 			AddError(TEXT("SettingsCatalog::GetDefinitions() has no definition with Id SettingsCatalog::FOV: the spec requires one."));
 		}
+		BareGameInstance.Reset(SettingsTestPrivate::NewBareGameInstance());
 		Instances.Empty();
 		Listener.Reset();
 	});
@@ -126,6 +129,7 @@ void FSettingsSubsystemSpec::Define()
 	{
 		Listener.Reset();
 		Instances.Empty();
+		BareGameInstance.Reset();
 		UGameplayStatics::DeleteGameInSlot(SlotName, SettingsTestPrivate::UserIndex);
 	});
 

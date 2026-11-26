@@ -64,6 +64,7 @@ BEGIN_DEFINE_SPEC(FSettingsRowSpec, "SpookySpores.Settings.Row",
 	FSettingDefinition FovDef;
 	bool bFovDefFound = false;
 	FSettingDefinition DefB;
+	TStrongObjectPtr<UGameInstance> BareGameInstance; // Outer of the subsystem (ClassWithin = UGameInstance), never Init()-ed
 	TStrongObjectPtr<USettingsSubsystem> Subsystem;
 	TStrongObjectPtr<USettingsTestListener> Listener;
 	TStrongObjectPtr<UTestSettingFloatRow> Row;
@@ -106,7 +107,8 @@ void FSettingsRowSpec::Define()
 		SlotName = SettingsTestPrivate::MakeUniqueSlotName(TEXT("SettingsRow"));
 		bFovDefFound = SettingsTestPrivate::FindFovDefinition(FovDef);
 		DefB = SettingsTestPrivate::MakeDef(IdTestB, 0.f, 1.f, 0.25f);
-		Subsystem.Reset(NewObject<USettingsSubsystem>(GetTransientPackage()));
+		BareGameInstance.Reset(SettingsTestPrivate::NewBareGameInstance());
+		Subsystem.Reset(NewObject<USettingsSubsystem>(BareGameInstance.Get()));
 		Listener.Reset(NewObject<USettingsTestListener>());
 		if (bFovDefFound)
 		{
@@ -120,6 +122,7 @@ void FSettingsRowSpec::Define()
 		Row.Reset();
 		Listener.Reset();
 		Subsystem.Reset();
+		BareGameInstance.Reset();
 		UGameplayStatics::DeleteGameInSlot(SlotName, SettingsTestPrivate::UserIndex);
 	});
 

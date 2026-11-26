@@ -303,6 +303,17 @@ class ATestSettingsCharacter : public ASpooky_SporesCharacter
 	GENERATED_BODY()
 };
 
+namespace SettingsTestPrivate
+{
+	// A bare UGameInstance: never Init()-ed, so its subsystem collection is empty and no real USettingsSubsystem exists (the real "Settings"
+	// slot is never read). It only serves as the Outer of test subsystems: USettingsSubsystem has ClassWithin = UGameInstance, any other
+	// Outer raises an engine ensure (UObjectGlobals.cpp) that also counts as an extra Error in the invalid-definition tests.
+	inline UGameInstance* NewBareGameInstance()
+	{
+		return NewObject<UGameInstance>(GEngine);
+	}
+}
+
 // Owns a UGameInstance with initialized subsystems and plugs it into a test world. The real USettingsSubsystem created by the collection
 // is then re-initialized by the test with InitializeFromDefinitions(Defs, UniqueSlot): the real "Settings" slot is read once at creation
 // (never written: nothing is modified) and never touched afterwards.
