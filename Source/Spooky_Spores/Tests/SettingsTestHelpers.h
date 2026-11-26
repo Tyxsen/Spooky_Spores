@@ -9,6 +9,8 @@
 // - UTestSettingFloatRow is a concrete USettingFloatRowWidget whose bound widgets (ValueSlider, NameText, ValueText) are real UMG objects,
 //   created in Initialize() (call it after NewObject; CreateWidget does it). UUserWidget::InitializeNativeClassData is an empty virtual: it cannot reset them.
 // - UTestSettingsMenu is a concrete USettingsMenuWidget with a real RowsContainer and RowClasses[Float] = UTestSettingFloatRow.
+// - ATestSettingsCharacter is a concrete subclass of ASpooky_SporesCharacter (declared UCLASS(abstract); CLASS_Abstract is not in CLASS_Inherit,
+//   so the subclass is spawnable). It adds nothing: the production BeginPlay / EndPlay run unchanged.
 // - FSettingsTestGameInstance gives a test world a UGameInstance (so Controller->GetGameInstance() works) with its subsystem collection.
 
 #pragma once
@@ -16,6 +18,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Slider.h"
+#include "Core/Character/Spooky_SporesCharacter.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Engine/Engine.h"
@@ -292,6 +295,12 @@ public:
 	TObjectPtr<UVerticalBox> TestRows = nullptr;
 
 	bool bBindingsOk = false;
+};
+
+UCLASS(NotBlueprintable, NotPlaceable, Transient)
+class ATestSettingsCharacter : public ASpooky_SporesCharacter
+{
+	GENERATED_BODY()
 };
 
 // Owns a UGameInstance with initialized subsystems and plugs it into a test world. The real USettingsSubsystem created by the collection

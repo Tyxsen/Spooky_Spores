@@ -470,7 +470,8 @@ BEGIN_DEFINE_SPEC(FSettingsCharacterFovSpec, "SpookySpores.Settings.CharacterFov
 	USettingsSubsystem* Settings = nullptr;
 
 	bool RequireHarness();
-	ASpooky_SporesCharacter* SpawnCharacter(const TCHAR* Name);
+	// ASpooky_SporesCharacter is UCLASS(abstract): the concrete test subclass is spawned instead.
+	ATestSettingsCharacter* SpawnCharacter(const TCHAR* Name);
 	int32 CountBoundCharacters() const;
 
 END_DEFINE_SPEC(FSettingsCharacterFovSpec)
@@ -484,13 +485,13 @@ bool FSettingsCharacterFovSpec::RequireHarness()
 	return bReady;
 }
 
-ASpooky_SporesCharacter* FSettingsCharacterFovSpec::SpawnCharacter(const TCHAR* Name)
+ATestSettingsCharacter* FSettingsCharacterFovSpec::SpawnCharacter(const TCHAR* Name)
 {
 	FActorSpawnParameters Params;
 	Params.Name = FName(Name);
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	// SpawnActor runs BeginPlay before returning: what the Character does at BeginPlay is observable right after.
-	return World->SpawnActor<ASpooky_SporesCharacter>(ASpooky_SporesCharacter::StaticClass(), FTransform(FVector(0.0, 0.0, 5000.0)), Params);
+	return World->SpawnActor<ATestSettingsCharacter>(ATestSettingsCharacter::StaticClass(), FTransform(FVector(0.0, 0.0, 5000.0)), Params);
 }
 
 int32 FSettingsCharacterFovSpec::CountBoundCharacters() const
