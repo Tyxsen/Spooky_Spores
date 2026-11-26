@@ -180,7 +180,7 @@ void FSettingsSubsystemSpec::Define()
 
 	// Mutation: Default is not applied when the file is absent (value 0 or Min) -> red;
 	//           the catalog Default of the FOV is changed away from the 90 of the spec/README -> the literal 90 line turns red.
-	It("Criterion 1: without a file, GetFloat(FOV) is the Default (90)", [this]()
+	It("Criterion 1: without a file GetFloat(FOV) is the Default (90)", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		USettingsSubsystem* Subsystem = MakeCatalogSubsystem();
@@ -191,7 +191,7 @@ void FSettingsSubsystemSpec::Define()
 	});
 
 	// Mutation: the clamp is removed (500 stored as is) -> red; the clamp uses only one bound (-5 stored as is) -> red.
-	It("Criterion 2: SetFloat(FOV, 500) gives Max, SetFloat(FOV, -5) gives Min, both return true", [this]()
+	It("Criterion 2: SetFloat with 500 gives Max and SetFloat with -5 gives Min and both return true", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		USettingsSubsystem* Subsystem = MakeCatalogSubsystem();
@@ -220,7 +220,7 @@ void FSettingsSubsystemSpec::Define()
 
 	// Mutation: an unknown Id is stored (GetFloat returns 75 afterwards) -> red; it returns true, or broadcasts -> red;
 	//           it writes into the known entry -> the FOV line turns red; the unknown Id is written by SaveSettings -> the file line exists, red.
-	It("Criterion 3: SetFloat on an unknown Id returns false, broadcasts nothing and creates no entry", [this]()
+	It("Criterion 3: SetFloat on an unknown Id returns false and broadcasts nothing and creates no entry", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		USettingsSubsystem* Subsystem = MakeCatalogSubsystem();
@@ -241,7 +241,7 @@ void FSettingsSubsystemSpec::Define()
 
 	// Mutation: SetFloat always broadcasts -> the repeated-value lines turn red; the comparison is done on the raw value instead of the bounded one
 	//           (9999 after Max) -> red; the event carries the raw value (500) -> red; the broadcast is skipped on a real change -> red.
-	It("Criterion 4: OnSettingChanged is broadcast once per real change with the bounded value, never when the bounded value is unchanged", [this]()
+	It("Criterion 4: OnSettingChanged is broadcast once per real change with the bounded value and never when it is unchanged", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		USettingsSubsystem* Subsystem = MakeCatalogSubsystem();
@@ -279,7 +279,7 @@ void FSettingsSubsystemSpec::Define()
 
 	// Mutation: ResetToDefault writes the value without going through SetFloat (no broadcast, or broadcast even when already at Default) -> red;
 	//           it resets to Min instead of Default -> red.
-	It("API: ResetToDefault restores the Default through SetFloat (one event), and is silent when already at Default", [this]()
+	It("API: ResetToDefault restores the Default through SetFloat (one event) and is silent when already at Default", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		USettingsSubsystem* Subsystem = MakeCatalogSubsystem();
@@ -308,7 +308,7 @@ void FSettingsSubsystemSpec::Define()
 
 	// Mutation: SaveSettings writes nothing / returns false -> red; the value written is the Default instead of the current one -> red;
 	//           the load ignores the file -> the new instance reads 90, red; the line format is not "Id=Value" -> the ReadSlotValue line turns red.
-	It("Criterion 5: SetFloat + SaveSettings, then a new subsystem on the same slot reads the same value", [this]()
+	It("Criterion 5: SetFloat then SaveSettings then a new subsystem on the same slot reads the same value", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		USettingsSubsystem* First = MakeCatalogSubsystem();
@@ -340,7 +340,7 @@ void FSettingsSubsystemSpec::Define()
 
 	// Mutation: Deinitialize always writes -> the file exists after part A, or the pre-existing file is rewritten (its extra line disappears) in part B, red;
 	//           the modified flag is set before the equality check (SetFloat of the current value marks dirty) -> part C red.
-	It("Edge case: Deinitialize writes nothing when nothing changed (no file created, existing file left byte for byte)", [this]()
+	It("Edge case: Deinitialize writes nothing when nothing changed (no file created and existing file left byte for byte)", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		// A: untouched, no file before -> no file after.
@@ -368,7 +368,7 @@ void FSettingsSubsystemSpec::Define()
 	});
 
 	// Mutation: the load trusts the file (NaN kept as is) -> GetFloat is NaN, red; NaN is clamped (stays NaN or becomes Min) instead of Default -> red.
-	It("Criterion 6: a forged FOV = NaN is read as Default (unknown key ignored, no error)", [this]()
+	It("Criterion 6: a forged FOV = NaN is read as Default (unknown key ignored and no error)", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		ExpectForgedFov(TEXT("nan"), TEXT("nan"), FovDef.Default);
@@ -377,7 +377,7 @@ void FSettingsSubsystemSpec::Define()
 	});
 
 	// Mutation: infinity is clamped to Max (-inf to Min) instead of replaced by Default -> red.
-	It("Criterion 6: a forged FOV = +inf or -inf is read as Default, not as Max or Min", [this]()
+	It("Criterion 6: a forged FOV = inf or -inf is read as Default and not as Max or Min", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		ExpectForgedFov(TEXT("inf"), TEXT("inf"), FovDef.Default);
@@ -390,7 +390,7 @@ void FSettingsSubsystemSpec::Define()
 	});
 
 	// Mutation: the load does not bound (9999 or -5 kept) -> red; out-of-range replaced by Default instead of bounded -> red.
-	It("Criterion 6: a forged FOV out of bounds (9999, -5) is bounded to Max / Min, not replaced by Default", [this]()
+	It("Criterion 6: a forged FOV out of bounds (9999 or -5) is bounded to Max or Min and not replaced by Default", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		ExpectForgedFov(TEXT("9999"), TEXT("9999"), FovDef.Max);
@@ -400,7 +400,7 @@ void FSettingsSubsystemSpec::Define()
 
 	// Mutation: a non-numeric value is parsed with Atof (0 -> clamped to Min) instead of rejected -> reads Min (60) instead of Default (90), red.
 	//           (Needs Min != 0, which holds for the FOV: otherwise the Atof trap would be invisible.)
-	It("Criterion 6: a non-numeric or empty FOV value is read as Default, not as Min (Atof trap)", [this]()
+	It("Criterion 6: a non-numeric or empty FOV value is read as Default and not as Min (Atof trap)", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		TestTrue(TEXT("harness: Min is not 0, so a 0 from Atof would be visible"), !FMath::IsNearlyZero(FovDef.Min) && !FMath::IsNearlyEqual(FovDef.Min, FovDef.Default));
@@ -423,7 +423,7 @@ void FSettingsSubsystemSpec::Define()
 	});
 
 	// Mutation: the key is turned into an FName (the original crash class: FName max length 1023) -> the engine asserts, or the unknown key is adopted -> red.
-	It("Criterion 6: an unknown key of 3000 characters is ignored, the valid FOV line is still read, nothing is written", [this]()
+	It("Criterion 6: an unknown key of 3000 characters is ignored and the valid FOV line is still read", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		const FString LongKey = FString::ChrN(3000, TEXT('K'));
@@ -435,7 +435,7 @@ void FSettingsSubsystemSpec::Define()
 	// Control of the forged-file tests: a valid forged value MUST be read, otherwise every "reads Default" assertion could pass because the file is
 	// never found (wrong path), not because the trust boundary works.
 	// Mutation: the load never reads the file -> 100 not read, red; the exact bounds are moved inward -> red.
-	It("Criterion 6 (control): a forged in-range FOV, and the exact Min and Max, are read back as forged", [this]()
+	It("Criterion 6 (control): a forged in-range FOV and the exact Min and Max are read back as forged", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		ExpectForgedFov(TEXT("in-range 100"), TEXT("100"), 100.f);
@@ -450,13 +450,13 @@ void FSettingsSubsystemSpec::Define()
 	// Corrupt files: no crash (the first version of this test found an engine assert on aberrant bytes), Default, and the subsystem stays usable.
 	// Mutation (all): a corrupt file aborts / crashes the load, or the failure leaves the values at 0 -> red; a later SaveSettings refuses to
 	// overwrite the corrupt file -> the reload line turns red.
-	It("Edge case: aberrant bytes (11 bytes) give the defaults, no crash, and the subsystem stays usable", [this]()
+	It("Edge case: aberrant bytes (11 bytes) give the defaults with no crash and the subsystem stays usable", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		ExpectCorruptFile(TEXT("11 aberrant bytes"), SettingsSubsystemSpecPrivate::ShortGarbage(), FovDef.Default);
 	});
 
-	It("Edge case: a long binary file full of '=' gives the defaults, no crash, and the subsystem stays usable", [this]()
+	It("Edge case: a long binary file full of equal signs gives the defaults with no crash and the subsystem stays usable", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		ExpectCorruptFile(TEXT("4 KB binary with '='"), SettingsSubsystemSpecPrivate::LongBinaryWithEquals(), FovDef.Default);
@@ -478,7 +478,7 @@ void FSettingsSubsystemSpec::Define()
 	// "FOV=1" carries a valid number (1): per contract it is bounded like any value (-> Min), a truncation cannot be told from a real "1".
 	// Mutation: a line without '=' crashes or is taken as a key -> red; an empty value read as 0 (Atof) -> "FOV=" gives Min, red;
 	//           the numeric prefix is rejected or replaced by Default -> the "FOV=1" line turns red.
-	It("Edge case: a file truncated mid-line (\"FO\", \"FOV\", \"FOV=\", \"FOV=1\") does not crash and is read per contract", [this]()
+	It("Edge case: a file truncated mid-line (FO or FOV or FOV= or FOV=1) does not crash and is read per contract", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		const auto ToBytes = [](const FString& Text)
@@ -517,7 +517,7 @@ void FSettingsSubsystemSpec::Define()
 
 	// Mutation: the bound is hardcoded to the FOV (60..120) -> B's value 5 stays 5 or becomes 120, red; the broadcast is filtered on the FOV Id
 	//           -> no B event, red; one shared value instead of a per-Id value -> setting B moves the FOV, red.
-	It("Criterion 7: a second setting (other Id, other bounds) is bounded, broadcast and isolated, without changing the subsystem", [this]()
+	It("Criterion 7: a second setting (other Id and other bounds) is bounded and broadcast and isolated without changing the subsystem", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		USettingsSubsystem* Subsystem = MakeSubsystem({ FovDef, SettingsTestPrivate::MakeDef(IdTestB, 0.f, 1.f, 0.25f) });
@@ -544,7 +544,7 @@ void FSettingsSubsystemSpec::Define()
 
 	// Mutation: the save/load code only handles the FOV key (hardcoded) -> B comes back as its Default, red;
 	//           the NaN replacement uses the FOV Default (90) instead of the Default of the setting being loaded -> B reads 90, red.
-	It("Criterion 7: a second setting survives a round trip and a forged file, independently of the FOV", [this]()
+	It("Criterion 7: a second setting survives a round trip and a forged file independently of the FOV", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		const TArray<FSettingDefinition> Defs = { FovDef, SettingsTestPrivate::MakeDef(IdTestB, 0.f, 1.f, 0.25f) };
@@ -570,7 +570,7 @@ void FSettingsSubsystemSpec::Define()
 
 	// Invalid definitions: one test per rule, each logs exactly one Error (pattern ".*" at Error level: the text is not specified; a missing log AND an
 	// extra error both turn the test red). Mutation (all six): the rule is not checked -> the entry is exposed (Num() == 3) or no Error is logged -> red.
-	It("Criterion 8: Min == Max is ignored with one error, valid neighbours stay usable", [this]()
+	It("Criterion 8: Min == Max is ignored with one error and valid neighbours stay usable", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		AddExpectedMessage(TEXT(".*"), ELogVerbosity::Error, EAutomationExpectedMessageFlags::Contains, 1);
@@ -606,7 +606,7 @@ void FSettingsSubsystemSpec::Define()
 	});
 
 	// Assumption: the first definition with an Id wins (same rule as the UIEntries duplicates of the PlayerController).
-	It("Criterion 8: a duplicate Id is ignored with one error, the first definition stays in force", [this]()
+	It("Criterion 8: a duplicate Id is ignored with one error and the first definition stays in force", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		AddExpectedMessage(TEXT(".*"), ELogVerbosity::Error, EAutomationExpectedMessageFlags::Contains, 1);

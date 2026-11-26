@@ -130,7 +130,7 @@ void FSettingsRowSpec::Define()
 
 	// Mutation: the slider is not synchronized at SetupRow (stays at its widget default 0) -> red; the slider bounds are not taken from the definition
 	//           (the position is computed against a fixed 0..1 or 0..100 range) -> the alpha is wrong, red; NameText not filled -> red.
-	It("Criterion 10: SetupRow shows the definition (name, slider position of the current value, a displayed value)", [this]()
+	It("Criterion 10: SetupRow shows the definition (name and slider position of the current value and a displayed value)", [this]()
 	{
 		if (!RequireHarness()) { return; }
 		UTestSettingFloatRow* FovRow = MakeRow(FovDef);
@@ -152,7 +152,7 @@ void FSettingsRowSpec::Define()
 
 	// Mutation: the slider is not bound to SetFloat (GetFloat unchanged) -> red; the value goes through the subsystem with a wrong mapping (alpha ignored) -> red;
 	//           the row also re-broadcasts when it resynchronizes (loop) -> 2 events instead of 1, red.
-	It("Criterion 10: moving the slider changes GetFloat, with exactly one broadcast (no feedback loop)", [this]()
+	It("Criterion 10: moving the slider changes GetFloat with exactly one broadcast (no feedback loop)", [this]()
 	{
 		if (!RequireHarness()) { return; }
 		UTestSettingFloatRow* FovRow = MakeRow(FovDef);
@@ -170,7 +170,7 @@ void FSettingsRowSpec::Define()
 
 	// Mutation: the row does not listen to OnSettingChanged -> the slider does not move, red; it listens without filtering on its Id ->
 	//           the B change moves the FOV slider, red; it resyncs by calling SetFloat again with a new value (loop) -> extra event, red.
-	It("Criterion 10: an outside SetFloat moves the slider and the displayed value, only for its own Id, without a loop", [this]()
+	It("Criterion 10: an outside SetFloat moves the slider and the displayed value only for its own Id and without a loop", [this]()
 	{
 		if (!RequireHarness()) { return; }
 		UTestSettingFloatRow* FovRow = MakeRow(FovDef);
@@ -208,7 +208,7 @@ void FSettingsRowSpec::Define()
 	});
 
 	// Mutation: the row never saves on release -> no slot, red; it saves on every value change (spec: only at release) -> the slot exists before the release, red.
-	It("Behaviour: the setting is written to disk when the slider is released, not while it moves", [this]()
+	It("Behaviour: the setting is written to disk when the slider is released and not while it moves", [this]()
 	{
 		if (!RequireHarness()) { return; }
 		UTestSettingFloatRow* FovRow = MakeRow(FovDef);
@@ -334,7 +334,7 @@ void FSettingsMenuSpec::Define()
 
 	// Mutation: the rows are appended without clearing RowsContainer -> 4 then 6 rows, red; one row per definition is not honoured (e.g. only the first) -> red;
 	//           the subsystem is looked up in the world instead of the game instance -> no rows (the test subsystem is the game instance's), red.
-	It("Criterion 10: InitializeForPlayer creates one row per valid definition, and a second call leaves the same count", [this]()
+	It("Criterion 10: InitializeForPlayer creates one row per valid definition and a second call leaves the same count", [this]()
 	{
 		if (!RequireHarness()) { return; }
 		TestEqual(TEXT("no row before InitializeForPlayer"), Menu->GetRowCount(), 0);
@@ -362,7 +362,7 @@ void FSettingsMenuSpec::Define()
 
 	// Mutation: a missing RowClass aborts the whole rebuild (return instead of continue) -> the row after it is missing, red;
 	//           it is skipped silently -> the expected Error is not logged, red; a null row is added to the container -> the counts differ, red.
-	It("Criterion 10: a type without RowClass skips only its own row, with one error", [this]()
+	It("Criterion 10: a type without RowClass skips only its own row with one error", [this]()
 	{
 		if (!RequireHarness()) { return; }
 		AddExpectedMessage(TEXT(".*"), ELogVerbosity::Error, EAutomationExpectedMessageFlags::Contains, 1);
@@ -427,7 +427,7 @@ void FSettingsMenuSpec::Define()
 	// Mutation: rows share one handler / are not bound to their own Id (moving B's slider changes the FOV) -> red;
 	//           the rebuilt rows are not wired (only the first build) -> red after the second OpenMenu;
 	//           rows do not read the current value at creation -> the initial alpha line turns red.
-	It("Criterion 10: after a rebuild, each row drives its own setting, and an outside SetFloat moves its slider", [this]()
+	It("Criterion 10: after a rebuild each row drives its own setting and an outside SetFloat moves its slider", [this]()
 	{
 		if (!RequireHarness()) { return; }
 		Settings->SetFloat(SettingsCatalog::FOV, 75.f);
@@ -551,7 +551,7 @@ void FSettingsCharacterFovSpec::Define()
 	// Mutation: the Character does not read the setting at BeginPlay (keeps the class default FOV) -> 90 instead of 75, red;
 	//           it does not listen to OnSettingChanged -> the 105 line stays at 75, red; it does not filter on the Id (B's change writes 0.8 as FOV) -> red;
 	//           it applies the value to the arms' FOV or another component instead of the camera -> red.
-	It("Criterion 9: at BeginPlay the camera FOV is the stored setting, then follows SetFloat(FOV), and ignores other settings", [this]()
+	It("Criterion 9: at BeginPlay the camera FOV is the stored setting then follows SetFloat(FOV) and ignores other settings", [this]()
 	{
 		if (!RequireHarness()) { return; }
 		Settings->SetFloat(SettingsCatalog::FOV, 75.f);
