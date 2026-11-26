@@ -19,7 +19,7 @@ namespace SettingsCatalog
 			FovDefinition.Type = ESettingType::Float;
 			FovDefinition.Min = 60.0f;
 			FovDefinition.Max = 120.0f;
-			FovDefinition.Default = 90.0f;
+			FovDefinition.Default = 100.0f;
 			FovDefinition.Step = 1.0f;
 			Result.Add(FovDefinition);
 
