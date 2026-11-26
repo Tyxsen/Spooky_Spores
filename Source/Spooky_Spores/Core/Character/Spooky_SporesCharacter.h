@@ -89,6 +89,9 @@ protected:
 
 	virtual void BeginPlay() override;
 
+	/** Stops listening to the settings */
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 	/** Called from Input Actions for movement input */
 	void MoveInput(const FInputActionValue& Value);
 
@@ -149,6 +152,12 @@ public:
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
 	
 	virtual void GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const override;
+
+private:
+
+	/** Applies the FOV setting to the camera (the only place that writes the camera FOV) */
+	UFUNCTION()
+	void HandleSettingChanged(FName Id, float Value);
 
 };
 
