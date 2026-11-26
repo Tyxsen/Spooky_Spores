@@ -6,7 +6,8 @@
 // BindWidget / RowClasses properties of the abstract widgets, because a C++ test cannot build a Blueprint widget tree.
 //
 // - USettingsTestListener records OnSettingChanged (a dynamic delegate can only call a UFUNCTION of a UObject).
-// - UTestSettingFloatRow is a concrete USettingFloatRowWidget whose bound widgets (ValueSlider, NameText, ValueText) are real UMG objects.
+// - UTestSettingFloatRow is a concrete USettingFloatRowWidget whose bound widgets (ValueSlider, NameText, ValueText) are real UMG objects,
+//   created in Initialize() (call it after NewObject; CreateWidget does it). UUserWidget::InitializeNativeClassData is an empty virtual: it cannot reset them.
 // - UTestSettingsMenu is a concrete USettingsMenuWidget with a real RowsContainer and RowClasses[Float] = UTestSettingFloatRow.
 // - FSettingsTestGameInstance gives a test world a UGameInstance (so Controller->GetGameInstance() works) with its subsystem collection.
 
@@ -211,15 +212,20 @@ class UTestSettingFloatRow : public USettingFloatRowWidget
 
 // -----------FUNCTIONS-----------
 public:
-	UTestSettingFloatRow(const FObjectInitializer& ObjectInitializer)
-		: Super(ObjectInitializer)
+	// The bound widgets are created at Initialize (after construction, before SetupRow), NOT as default subobjects: a default subobject
+	// copied through a non-instanced TObjectPtr could end up pointing at the CDO's widget instead of the instance's own.
+	virtual bool Initialize() override
 	{
-		TestSlider = ObjectInitializer.CreateDefaultSubobject<USlider>(this, TEXT("TestSlider"));
-		TestNameText = ObjectInitializer.CreateDefaultSubobject<UTextBlock>(this, TEXT("TestNameText"));
-		TestValueText = ObjectInitializer.CreateDefaultSubobject<UTextBlock>(this, TEXT("TestValueText"));
-		bBindingsOk = SettingsTestReflection::SetObjectProperty(this, TEXT("ValueSlider"), TestSlider)
-			&& SettingsTestReflection::SetObjectProperty(this, TEXT("NameText"), TestNameText)
-			&& SettingsTestReflection::SetObjectProperty(this, TEXT("ValueText"), TestValueText);
+		if (!HasAnyFlags(RF_ClassDefaultObject) && TestSlider == nullptr)
+		{
+			TestSlider = NewObject<USlider>(this, TEXT("TestSlider"));
+			TestNameText = NewObject<UTextBlock>(this, TEXT("TestNameText"));
+			TestValueText = NewObject<UTextBlock>(this, TEXT("TestValueText"));
+			bBindingsOk = SettingsTestReflection::SetObjectProperty(this, TEXT("ValueSlider"), TestSlider)
+				&& SettingsTestReflection::SetObjectProperty(this, TEXT("NameText"), TestNameText)
+				&& SettingsTestReflection::SetObjectProperty(this, TEXT("ValueText"), TestValueText);
+		}
+		return Super::Initialize();
 	}
 
 	// What the engine does when the widget leaves the screen (a C++ test has no viewport to remove it from).
@@ -247,12 +253,16 @@ class UTestSettingsMenu : public USettingsMenuWidget
 
 // -----------FUNCTIONS-----------
 public:
-	UTestSettingsMenu(const FObjectInitializer& ObjectInitializer)
-		: Super(ObjectInitializer)
+	// Same reasoning as the row: runtime creation at Initialize. Initialize also creates the WidgetTree that CreateWidget(this, RowClass) requires.
+	virtual bool Initialize() override
 	{
-		TestRows = ObjectInitializer.CreateDefaultSubobject<UVerticalBox>(this, TEXT("TestRows"));
-		bBindingsOk = SettingsTestReflection::SetObjectProperty(this, TEXT("RowsContainer"), TestRows)
-			&& SettingsTestReflection::AddRowClass(this, ESettingType::Float, UTestSettingFloatRow::StaticClass());
+		if (!HasAnyFlags(RF_ClassDefaultObject) && TestRows == nullptr)
+		{
+			TestRows = NewObject<UVerticalBox>(this, TEXT("TestRows"));
+			bBindingsOk = SettingsTestReflection::SetObjectProperty(this, TEXT("RowsContainer"), TestRows)
+				&& SettingsTestReflection::AddRowClass(this, ESettingType::Float, UTestSettingFloatRow::StaticClass());
+		}
+		return Super::Initialize();
 	}
 
 	int32 GetRowCount() const { return TestRows != nullptr ? TestRows->GetChildrenCount() : 0; }

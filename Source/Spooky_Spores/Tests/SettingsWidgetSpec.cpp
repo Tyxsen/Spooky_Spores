@@ -12,8 +12,8 @@
 // to OnSettingChanged in SetupRow and the slider handlers are bound there too; the menu creates its rows with a real CreateWidget that works
 // without a LocalPlayer; the Character reads the subsystem through GetGameInstance(); GetFirstPersonCameraComponent() is public.
 //
-// Not automated: the real WBP_SettingsMenu / WBP_SettingRow_Float layout, the key O and the pause (editor-verifier / human PIE);
-// the unsubscription of rows removed by a rebuild (NativeDestruct only runs when a Slate widget existed, a headless test has none).
+// Not automated: the real WBP_SettingsMenu / WBP_SettingRow_Float layout, the key O and the pause (editor-verifier / human PIE).
+// The unsubscription of rows dropped by a rebuild IS tested: the menu calls ReleaseRow() explicitly (NativeDestruct never runs headless).
 
 #include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
@@ -89,6 +89,8 @@ UTestSettingFloatRow* FSettingsRowSpec::MakeRow(const FSettingDefinition& Def)
 	Row.Reset(NewObject<UTestSettingFloatRow>(GetTransientPackage(), UTestSettingFloatRow::StaticClass(), NAME_None, RF_Transient));
 	if (Row.IsValid())
 	{
+		// Creates the bound widgets (CreateWidget would do it); before SetupRow, as in the game.
+		Row->Initialize();
 		TestTrue(TEXT("harness: the BindWidget properties ValueSlider / NameText / ValueText were found by name"), Row->bBindingsOk);
 		Row->SetupRow(Subsystem.Get(), Def);
 	}
@@ -304,6 +306,12 @@ void FSettingsMenuSpec::Define()
 			FScopedAllowAbstractClassAllocation AllowAbstract;
 			Menu.Reset(NewObject<UTestSettingsMenu>(GameInstance.Instance.Get(), UTestSettingsMenu::StaticClass(), NAME_None, RF_Transient));
 		}
+		if (Menu.IsValid())
+		{
+			// CreateWidget(this, RowClass) requires the menu's WidgetTree, which only Initialize() creates (UserWidget.cpp, CreateWidgetInstance).
+			// Initialize works without a LocalPlayer; the test menu also creates RowsContainer / RowClasses there.
+			Menu->Initialize();
+		}
 		bReady = Menu.IsValid() && Menu->bBindingsOk;
 	});
 
@@ -372,6 +380,44 @@ void FSettingsMenuSpec::Define()
 		if (!TestTrue(TEXT("harness: RowClasses cleared"), SettingsTestReflection::ClearRowClasses(Menu.Get()))) { return; }
 		OpenMenu();
 		TestEqual(TEXT("no row without a RowClass"), Menu->GetRowCount(), 0);
+	});
+
+	// Mutation: ClearRows does not call ReleaseRow (the old rows stay in the delegate: count 1) -> red;
+	//           the new rows are not subscribed -> their count 0, red.
+	It("Criterion 10: a rebuild unsubscribes the dropped rows and subscribes the new ones", [this]()
+	{
+		if (!RequireHarness()) { return; }
+		OpenMenu();
+		TArray<UTestSettingFloatRow*> OldRows;
+		for (int32 Index = 0; Index < Menu->GetRowCount(); ++Index)
+		{
+			OldRows.Add(Menu->GetRowAt(Index));
+		}
+		if (!TestEqual(TEXT("first build: two rows"), OldRows.Num(), 2)) { return; }
+		for (UTestSettingFloatRow* Old : OldRows)
+		{
+			if (!TestNotNull(TEXT("old row valid"), Old)) { return; }
+			TestEqual(TEXT("first-build row is subscribed once"), CountBound(Settings, Old), 1);
+		}
+
+		OpenMenu(); // second build drops the first rows (no GC runs in between: the pointers stay valid)
+		TestEqual(TEXT("second build: two rows"), Menu->GetRowCount(), 2);
+		for (int32 Index = 0; Index < Menu->GetRowCount(); ++Index)
+		{
+			UTestSettingFloatRow* Current = Menu->GetRowAt(Index);
+			TestFalse(TEXT("the second build made new rows"), OldRows.Contains(Current));
+			TestEqual(TEXT("new row is subscribed once"), CountBound(Settings, Current), 1);
+		}
+		for (UTestSettingFloatRow* Old : OldRows)
+		{
+			TestEqual(TEXT("dropped row is no longer subscribed"), CountBound(Settings, Old), 0);
+		}
+
+		// Behavioural proof: a dropped row no longer follows the setting.
+		UTestSettingFloatRow* DroppedFov = OldRows[0]->TestNameText->GetText().ToString() == FovDef.DisplayName.ToString() ? OldRows[0] : OldRows[1];
+		const float AlphaBefore = SettingsTestPrivate::SliderAlpha(DroppedFov->TestSlider);
+		Settings->SetFloat(SettingsCatalog::FOV, 62.f);
+		TestNearlyEqual(TEXT("dropped FOV row's slider did not move"), SettingsTestPrivate::SliderAlpha(DroppedFov->TestSlider), AlphaBefore, 0.0001f);
 	});
 
 	// Mutation: rows share one handler / are not bound to their own Id (moving B's slider changes the FOV) -> red;
