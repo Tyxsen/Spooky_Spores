@@ -5,7 +5,7 @@ Seul le reste à faire figure ici. Le déjà fait est dans `git log` et `documen
 ## Prochaine session
 - **État** : 3b (ennemis : déplacement NavMesh en `Engage` + réservation souple des cibles) terminée, validée en PIE et fusionnée. 2.2c (rôle « attaque/défense » des serviteurs) terminée et validée en PIE par Timéo le 2026-11-24. Item 6 (UI possédée par le PlayerController + despawn des drops) terminé et validé en PIE par Timéo le 2026-11-25. Item 4a (menu de paramètres, FOV seul, extensible) terminé et validé en PIE par Timéo le 2026-11-26.
 - **Prochaine tâche** : item 7 (vrai inventaire), tête de la file. File réordonnée le 2026-11-25 selon les dépendances (6 avant tout nouveau menu, 7 avant 8 et 15, 9 avant la roue de sorts, sauvegarde après stabilisation de l'état).
-- **Rappels** : la dette « Avant toute Release » (section Dette technique) ; points chauds à ne pas modifier en parallèle : `EResourceType`, `*.Build.cs`, `Default*.ini`, `TODO.md`, `CLAUDE.md`, `documentation-technique.md`, `Lvl_Principal.umap` (`CLAUDE.md` section 10).
+- **Rappels** : la dette « Avant toute Release » (section Dette technique) ; points chauds à ne pas modifier en parallèle : `EResourceType`, `*.Build.cs`, `Default*.ini`, `TODO.md`, `CLAUDE.md`, `documentation-technique.md`, `Lvl_Principal.umap` (`CLAUDE.md` section 10) ; plugins d'outillage (EngineWire, pont MCP) : compilés sur une seule machine, **l'autre reste à faire** (procédure : `CLAUDE.md` section 7).
 
 ## En cours
 (rien)

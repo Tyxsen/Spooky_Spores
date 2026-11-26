@@ -88,7 +88,7 @@ ZQSD / souris / Espace : déplacement, regard, saut. **E** : saisir / relâcher 
 - **Fermer l'éditeur Unreal avant tout `switch`/`pull`/`restore` qui touche des `.uasset`** (verrous, dépôt laissé dans un état intermédiaire).
 - Après un `pull` ou un changement de branche qui ajoute/supprime des fichiers C++ : régénérer les fichiers de projet (clic droit sur le `.uproject`). Après un renommage de classe ou une modification de `UFUNCTION`/`UINTERFACE` : éditeur fermé, régénérer, **Rebuild complet** (pas Live Coding).
 - Supprimer des assets **uniquement depuis le Content Browser**, puis *Fix Up Redirectors*.
-- **Plugins d'outillage tiers (EngineWire, pont MCP)** : installés dans le moteur (`Engine\Plugins\Marketplace\`), jamais dans `Plugins/` du projet. Procédure : `RunUAT.bat BuildPlugin`, droits admin, `"Optional": true` dans le `.uproject`. À refaire sur chaque machine (même hotfix) : fait sur une seule, **l'autre reste à faire** (dossier compilé dans `C:\Projects\Unreal Projects\_PluginBuilds\EngineWire`).
+- **Plugins d'outillage tiers (EngineWire, pont MCP)** : installés dans le moteur (`Engine\Plugins\Marketplace\`), jamais dans `Plugins/` du projet. Procédure : `RunUAT.bat BuildPlugin`, droits admin, `"Optional": true` dans le `.uproject`. À refaire sur chaque machine (même hotfix). Le dossier compilé `_PluginBuilds` se trouve à côté des projets : son chemin dépend de la machine.
 
 ---
 
