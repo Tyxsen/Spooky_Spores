@@ -122,8 +122,9 @@ bool USettingsSubsystem::SaveSettings()
 	FString Content;
 	for (const FSettingDefinition& Definition : Definitions)
 	{
-		Content += FString::Printf(TEXT("%s=%s
-"), *Definition.Id.ToString(), *FString::SanitizeFloat(Values.FindChecked(Definition.Id)));
+		Content += FString::Printf(TEXT("%s=%s"),
+			*Definition.Id.ToString(), *FString::SanitizeFloat(Values.FindChecked(Definition.Id)));
+		Content += LINE_TERMINATOR;
 	}
 
 	const FString FilePath = GetSettingsFilePath(SlotName);
