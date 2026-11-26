@@ -65,6 +65,7 @@ void USettingFloatRowWidget::ConfigureRow()
 	// AddUnique: ConfigureRow runs at every SetupRow. The slider lives and dies with the row, no unbind needed.
 	ValueSlider->OnValueChanged.AddUniqueDynamic(this, &USettingFloatRowWidget::HandleSliderValueChanged);
 	ValueSlider->OnMouseCaptureEnd.AddUniqueDynamic(this, &USettingFloatRowWidget::HandleSliderReleased);
+	ValueSlider->OnControllerCaptureEnd.AddUniqueDynamic(this, &USettingFloatRowWidget::HandleSliderReleased);
 
 	NameText->SetText(RowDefinition.DisplayName);
 	ValueSlider->SetMinValue(RowDefinition.Min);

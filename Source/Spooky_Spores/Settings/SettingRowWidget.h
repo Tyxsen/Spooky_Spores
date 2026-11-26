@@ -81,7 +81,7 @@ private:
 	UFUNCTION()
 	void HandleSliderValueChanged(float NewValue);
 
-	// Slider released: persists
+	// Slider released (mouse or controller/keyboard): persists
 	UFUNCTION()
 	void HandleSliderReleased();
 
