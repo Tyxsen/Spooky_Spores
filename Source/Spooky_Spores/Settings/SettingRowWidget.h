@@ -77,6 +77,9 @@ protected:
 
 private:
 
+	// Rounds to the declared Step (counted from Min), bounded to [Min, Max]. Unchanged when Step <= 0.
+	float SnapToStep(float RawValue) const;
+
 	// Live change while dragging: stores the value (no disk write)
 	UFUNCTION()
 	void HandleSliderValueChanged(float NewValue);
