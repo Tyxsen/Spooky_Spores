@@ -7,7 +7,7 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "SettingsSubsystem.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSettingChanged, FName, Id, float, Value);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSpookySettingChanged, FName, Id, float, Value);
 
 /**
  * Stores the player settings (all as floats, bounded by their definition), broadcasts changes and persists them
@@ -61,7 +61,7 @@ public:
 
 	// Fired at every real change (never when the bounded value equals the current one)
 	UPROPERTY(BlueprintAssignable, Category = "Settings")
-	FOnSettingChanged OnSettingChanged;
+	FOnSpookySettingChanged OnSettingChanged;
 
 private:
 
