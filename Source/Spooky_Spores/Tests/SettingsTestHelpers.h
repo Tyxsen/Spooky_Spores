@@ -1,4 +1,4 @@
-// Test-only helpers for the settings Automation Specs (docs/specs/settings-menu.md, removed at merge).
+// Test-only helpers for the settings Automation Specs.
 // UHT does not accept a UCLASS inside #if WITH_DEV_AUTOMATION_TESTS, so the classes below are compiled in every configuration;
 // they are NotBlueprintable / HideDropdown and never used by the game (same approach as PlayerUITestHelpers.h).
 //

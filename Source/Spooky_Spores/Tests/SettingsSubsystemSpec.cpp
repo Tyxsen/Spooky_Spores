@@ -1,5 +1,5 @@
 // Automation Spec for USettingsSubsystem: bounding, broadcast, persistence (text file "Id=Value"), trust boundary on load, extensibility,
-// invalid definitions. Source of truth: docs/specs/settings-menu.md (removed at merge), acceptance criteria 1 to 7 and its edge cases, with the
+// invalid definitions. Source of truth: the settings menu spec (removed at merge), acceptance criteria 1 to 7 and its edge cases, with the
 // updated persistence contract: a text file USettingsSubsystem::GetSettingsFilePath(Slot), one "Id=Value" line per setting (SanitizeFloat),
 // instead of the USaveGame described in the spec.
 //
@@ -179,14 +179,14 @@ void FSettingsSubsystemSpec::Define()
 	});
 
 	// Mutation: Default is not applied when the file is absent (value 0 or Min) -> red;
-	//           the catalog Default of the FOV is changed away from the 90 of the spec/README -> the literal 90 line turns red.
-	It("Criterion 1: without a file GetFloat(FOV) is the Default (90)", [this]()
+	//           the catalog Default of the FOV is changed away from the 100 chosen for the game (the spec said 90) -> the literal 100 lines turn red.
+	It("Criterion 1: without a file GetFloat(FOV) is the Default (100)", [this]()
 	{
 		if (!bFovDefFound) { return; }
 		USettingsSubsystem* Subsystem = MakeCatalogSubsystem();
-		TestNearlyEqual(TEXT("catalog FOV Default is 90 (spec)"), FovDef.Default, 90.f, 0.0001f);
+		TestNearlyEqual(TEXT("catalog FOV Default is 100"), FovDef.Default, 100.f, 0.0001f);
 		TestNearlyEqual(TEXT("first launch: GetFloat(FOV) is the Default"), Subsystem->GetFloat(SettingsCatalog::FOV), FovDef.Default, 0.0001f);
-		TestNearlyEqual(TEXT("first launch: GetFloat(FOV) is 90"), Subsystem->GetFloat(SettingsCatalog::FOV), 90.f, 0.0001f);
+		TestNearlyEqual(TEXT("first launch: GetFloat(FOV) is 100"), Subsystem->GetFloat(SettingsCatalog::FOV), 100.f, 0.0001f);
 		TestFalse(TEXT("first launch: reading creates no file"), SettingsTestPrivate::SlotExists(SlotName));
 	});
 
@@ -307,7 +307,7 @@ void FSettingsSubsystemSpec::Define()
 	});
 
 	// Mutation: SaveSettings writes nothing / returns false -> red; the value written is the Default instead of the current one -> red;
-	//           the load ignores the file -> the new instance reads 90, red; the line format is not "Id=Value" -> the ReadSlotValue line turns red.
+	//           the load ignores the file -> the new instance reads the Default, red; the line format is not "Id=Value" -> the ReadSlotValue line turns red.
 	It("Criterion 5: SetFloat then SaveSettings then a new subsystem on the same slot reads the same value", [this]()
 	{
 		if (!bFovDefFound) { return; }
@@ -326,7 +326,7 @@ void FSettingsSubsystemSpec::Define()
 		TestTrue(TEXT("and it is not the Default (the test can fail)"), !FMath::IsNearlyEqual(Second->GetFloat(SettingsCatalog::FOV), FovDef.Default));
 	});
 
-	// Mutation: Deinitialize does not save (the safety net is missing) -> the new instance reads 90, red.
+	// Mutation: Deinitialize does not save (the safety net is missing) -> the new instance reads the Default, red.
 	It("Criterion 5: SetFloat alone then Deinitialize: the value is read back by a new subsystem", [this]()
 	{
 		if (!bFovDefFound) { return; }
@@ -349,10 +349,10 @@ void FSettingsSubsystemSpec::Define()
 		TestFalse(TEXT("untouched: no file written"), SettingsTestPrivate::SlotExists(SlotName));
 
 		// B: an existing file with a line a rewrite would drop; loaded, nothing changed -> content identical after Deinitialize.
-		const FString Original = FString::Printf(TEXT("%s=100\nTest.Custom=keep-me\n"), *SettingsCatalog::FOV.ToString());
+		const FString Original = FString::Printf(TEXT("%s=80\nTest.Custom=keep-me\n"), *SettingsCatalog::FOV.ToString());
 		if (!TestTrue(TEXT("harness: file forged"), SettingsTestPrivate::ForgeText(SlotName, Original))) { return; }
 		USettingsSubsystem* Loaded = MakeCatalogSubsystem();
-		TestNearlyEqual(TEXT("harness: the forged value was loaded"), Loaded->GetFloat(SettingsCatalog::FOV), 100.f, 0.0001f);
+		TestNearlyEqual(TEXT("harness: the forged value was loaded"), Loaded->GetFloat(SettingsCatalog::FOV), 80.f, 0.0001f);
 		Loaded->Deinitialize();
 		FString After;
 		TestTrue(TEXT("the file still exists"), SettingsTestPrivate::ReadSlotText(SlotName, After));
@@ -398,7 +398,7 @@ void FSettingsSubsystemSpec::Define()
 		ExpectForgedFov(TEXT("-5"), TEXT("-5"), FovDef.Min);
 	});
 
-	// Mutation: a non-numeric value is parsed with Atof (0 -> clamped to Min) instead of rejected -> reads Min (60) instead of Default (90), red.
+	// Mutation: a non-numeric value is parsed with Atof (0 -> clamped to Min) instead of rejected -> reads Min (60) instead of Default (100), red.
 	//           (Needs Min != 0, which holds for the FOV: otherwise the Atof trap would be invisible.)
 	It("Criterion 6: a non-numeric or empty FOV value is read as Default and not as Min (Atof trap)", [this]()
 	{
@@ -427,18 +427,18 @@ void FSettingsSubsystemSpec::Define()
 	{
 		if (!bFovDefFound) { return; }
 		const FString LongKey = FString::ChrN(3000, TEXT('K'));
-		if (!TestTrue(TEXT("harness: forged file written"), SettingsTestPrivate::ForgeLines(SlotName, { LongKey + TEXT("=5"), SettingsCatalog::FOV.ToString() + TEXT("=100") }))) { return; }
+		if (!TestTrue(TEXT("harness: forged file written"), SettingsTestPrivate::ForgeLines(SlotName, { LongKey + TEXT("=5"), SettingsCatalog::FOV.ToString() + TEXT("=80") }))) { return; }
 		USettingsSubsystem* Subsystem = MakeCatalogSubsystem();
-		TestNearlyEqual(TEXT("FOV read next to the huge key"), Subsystem->GetFloat(SettingsCatalog::FOV), 100.f, 0.0001f);
+		TestNearlyEqual(TEXT("FOV read next to the huge key"), Subsystem->GetFloat(SettingsCatalog::FOV), 80.f, 0.0001f);
 	});
 
 	// Control of the forged-file tests: a valid forged value MUST be read, otherwise every "reads Default" assertion could pass because the file is
 	// never found (wrong path), not because the trust boundary works.
-	// Mutation: the load never reads the file -> 100 not read, red; the exact bounds are moved inward -> red.
+	// Mutation: the load never reads the file -> 80 not read, red; the exact bounds are moved inward -> red.
 	It("Criterion 6 (control): a forged in-range FOV and the exact Min and Max are read back as forged", [this]()
 	{
 		if (!bFovDefFound) { return; }
-		ExpectForgedFov(TEXT("in-range 100"), TEXT("100"), 100.f);
+		ExpectForgedFov(TEXT("in-range 80"), TEXT("80"), 80.f);
 		SettingsTestPrivate::DeleteSlot(SlotName);
 		ExpectForgedFov(TEXT("exact Min"), FString::SanitizeFloat(FovDef.Min), FovDef.Min);
 		SettingsTestPrivate::DeleteSlot(SlotName);
@@ -543,7 +543,7 @@ void FSettingsSubsystemSpec::Define()
 	});
 
 	// Mutation: the save/load code only handles the FOV key (hardcoded) -> B comes back as its Default, red;
-	//           the NaN replacement uses the FOV Default (90) instead of the Default of the setting being loaded -> B reads 90, red.
+	//           the NaN replacement uses the FOV Default (100) instead of the Default of the setting being loaded -> B reads 100, red.
 	It("Criterion 7: a second setting survives a round trip and a forged file independently of the FOV", [this]()
 	{
 		if (!bFovDefFound) { return; }
@@ -562,9 +562,9 @@ void FSettingsSubsystemSpec::Define()
 		TestNearlyEqual(TEXT("FOV still the Default"), Second->GetFloat(SettingsCatalog::FOV), FovDef.Default, 0.0001f);
 
 		SettingsTestPrivate::DeleteSlot(SlotName);
-		if (!TestTrue(TEXT("harness: forged file written"), SettingsTestPrivate::ForgeLines(SlotName, { SettingsCatalog::FOV.ToString() + TEXT("=100"), IdTestB.ToString() + TEXT("=nan") }))) { return; }
+		if (!TestTrue(TEXT("harness: forged file written"), SettingsTestPrivate::ForgeLines(SlotName, { SettingsCatalog::FOV.ToString() + TEXT("=80"), IdTestB.ToString() + TEXT("=nan") }))) { return; }
 		USettingsSubsystem* Third = MakeSubsystem(Defs);
-		TestNearlyEqual(TEXT("valid FOV is kept"), Third->GetFloat(SettingsCatalog::FOV), 100.f, 0.0001f);
+		TestNearlyEqual(TEXT("valid FOV is kept"), Third->GetFloat(SettingsCatalog::FOV), 80.f, 0.0001f);
 		TestNearlyEqual(TEXT("NaN on B is replaced by B's own Default, not the FOV's"), Third->GetFloat(IdTestB), 0.25f, 0.0001f);
 	});
 

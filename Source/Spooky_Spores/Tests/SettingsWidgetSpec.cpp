@@ -1,5 +1,5 @@
 // Automation Specs for the settings UI and its first consumer: USettingFloatRowWidget (row), USettingsMenuWidget (menu) and the Character FOV.
-// Source of truth: docs/specs/settings-menu.md (removed at merge), acceptance criteria 9 and 10 and its edge cases. Written from the spec only.
+// Source of truth: the settings menu spec (removed at merge), acceptance criteria 9 and 10 and its edge cases. Written from the spec only.
 //
 // Three specs in this file: "Row" (no world), "Menu" (test world + UGameInstance, see FSettingsTestGameInstance) and "CharacterFov" (same world).
 // The abstract widgets are exercised through the concrete test subclasses of Tests/SettingsTestHelpers.h: real UMG objects (USlider, UTextBlock,
@@ -701,7 +701,7 @@ void FSettingsCharacterFovSpec::Define()
 		RealFileGuard.Verify(*this);
 	});
 
-	// Mutation: the Character does not read the setting at BeginPlay (keeps the class default FOV) -> 90 instead of 75, red;
+	// Mutation: the Character does not read the setting at BeginPlay (keeps the class default FOV) -> not 75, red;
 	//           it does not listen to OnSettingChanged -> the 105 line stays at 75, red; it does not filter on the Id (B's change writes 0.8 as FOV) -> red;
 	//           it applies the value to the arms' FOV or another component instead of the camera -> red.
 	It("Criterion 9: at BeginPlay the camera FOV is the stored setting then follows SetFloat(FOV) and ignores other settings", [this]()
