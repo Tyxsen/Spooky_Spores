@@ -51,7 +51,7 @@ Le personnage est de taille moyenne (environ 1m80). Il peut se déplacer, courir
 
 Caméra en **première personne**, choisie pour maximiser l'immersion du joueur dans l'univers et le personnage. Positionnée à hauteur d'un humain d'1m80, elle facilite les interactions avec les champs, les établis, et l'environnement en général (le joueur interagit en regardant un objet et en appuyant sur une touche).
 
-- FOV par défaut : **90°**, réglable de 60° à 120° dans le menu des paramètres (touche provisoire **O**). Le jeu est en pause quand le menu est ouvert : le nouveau FOV n'est visible qu'à la reprise
+- FOV par défaut : **100°**, réglable de 60° à 120° dans le menu des paramètres (touche provisoire **O**). Le jeu est en pause quand le menu est ouvert : le nouveau FOV n'est visible qu'à la reprise
 
 ### Controls
 

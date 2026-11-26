@@ -41,7 +41,7 @@ Positions des objets saisissables · nœuds récoltés et drops au sol · `bHasT
 **À régler (valeurs et réglages)**
 - [ ] Placeholders du spawner de vagues à régler (instance dans `Lvl_Principal`) : `Count` des 20 entrées de `Waves` (3 chacune aujourd'hui) ; `FirstWaveDelay` 180 s non validé ; `WaveInterval` 180 s à réécrire au game feeling. **`WaveInterval` vaut 10 s sur l'instance du niveau (valeur de test, le défaut C++ est 180)** : à rétablir avant de juger le rythme
 - [ ] Placeholders du combat des serviteurs à régler au game feeling : `AttackDamage` 15, `AttackRange` 100, `AttackInterval` 1.2 s, `MaxHealth` 100 de `BP_Servant` (instance de `UHealthComponent`) ; `CombatWalkSpeed` 400, `CombatNextDelay` 0.5 s, `EnemyScanInterval` 0.5 s, `FailedEnemyCooldown` 5.0 s (`AServantAIController`) ; `RepathInterval` 1.0 s (`AEnemyAIController`, suivi d'une cible mobile). Le rayon d'arrêt `AttackRange * 0.5` (constante `AcceptanceRadiusFactor`) a été jugé bon par Timéo en PIE
-- [ ] Bornes du FOV 60-120 et défaut 90 (`SettingsCatalog`) : placeholders, le GDD n'en fixe pas ; Timéo les a acceptées en spec ; à valider au game feeling
+- [ ] Bornes du FOV 60-120 (`SettingsCatalog`) et défaut 100 : placeholders, le GDD n'en fixe pas ; Timéo les a acceptées en spec ; à valider au game feeling
 
 **Ennemis : à traiter à part (pas un prérequis)**
 - [ ] À traiter à part, pas un prérequis (Timéo : « ce sera à faire dans le prochain point » ; la 2.2c ne l'a pas traité) : `AEnemyAIController::ChooseTarget` rappelle un `TActorIterator<AActor>` à chaque tick tant qu'aucune cible n'est disponible (coût soldats × acteurs ; remède possible : mémoriser l'heure du prochain essai ; à n'optimiser qu'après mesure)
