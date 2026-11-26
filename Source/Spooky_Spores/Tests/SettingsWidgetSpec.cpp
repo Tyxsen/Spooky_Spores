@@ -225,6 +225,159 @@ void FSettingsRowSpec::Define()
 			TestNearlyEqual(TEXT("with the released value"), Stored, FovDef.Min + 0.25f * (FovDef.Max - FovDef.Min), 0.01f);
 		}
 	});
+	// ---- Slider snapping to the declared step (the mouse ignores the slider StepSize: the row snaps before storing) ----
+	// (A SetValue equal to the current slider value broadcasts nothing: the case lists never repeat the value the handle is already on.)
+	// The mouse is simulated by SetValue(raw) on the slider: without a Slate widget it stores the raw value and broadcasts OnValueChanged,
+	// exactly the event chain of a drag. The slider therefore HOLDS the raw value until the row repositions it.
+
+	// Mutation: the row stores the raw value (90.37) -> GetFloat is not 90, red; the text keeps decimals (90.37) -> red;
+	//           the handle is left on the raw value (no reposition) -> alpha differs from the notch, red.
+	It("Behaviour: a raw slider value 90.37 is stored as 90 and shown as 90 and the handle sits on the notch", [this]()
+	{
+		if (!RequireHarness()) { return; }
+		UTestSettingFloatRow* FovRow = MakeRow(FovDef);
+		if (!TestNotNull(TEXT("row created"), FovRow)) { return; }
+
+		FovRow->TestSlider->SetValue(90.37f);
+		TestNearlyEqual(TEXT("stored value is the whole step"), Subsystem->GetFloat(SettingsCatalog::FOV), 90.f, 0.0001f);
+		TestEqual(TEXT("displayed text has no decimals"), FovRow->TestValueText->GetText().ToString(), FString(TEXT("90")));
+		TestNearlyEqual(TEXT("handle repositioned on the notch (normalized position)"), SettingsTestPrivate::SliderAlpha(FovRow->TestSlider),
+		                SettingsTestPrivate::ExpectedAlpha(FovDef, 90.f), 0.0001f);
+	});
+
+	// Mutation: truncation instead of rounding (90.6 -> 90, 119.6 -> 119) -> red; rounding in the wrong direction -> red;
+	//           the clamp is removed or the bounds are exclusive (120 or 60 moved inward) -> the exact-bound cases turn red.
+	It("Behaviour: raw values round to the nearest notch and the bounds are reachable", [this]()
+	{
+		if (!RequireHarness()) { return; }
+		UTestSettingFloatRow* FovRow = MakeRow(FovDef);
+		if (!TestNotNull(TEXT("row created"), FovRow)) { return; }
+		struct FCase { float Raw; float Expected; };
+		const FCase Cases[] = { { 90.6f, 91.f }, { 60.4f, 60.f }, { 119.6f, 120.f }, { 60.f, 60.f }, { 120.f, 120.f }, { 75.49f, 75.f } };
+		for (const FCase& Case : Cases)
+		{
+			FovRow->TestSlider->SetValue(Case.Raw);
+			TestNearlyEqual(*FString::Printf(TEXT("raw %f gives %f"), Case.Raw, Case.Expected), Subsystem->GetFloat(SettingsCatalog::FOV), Case.Expected, 0.0001f);
+		}
+	});
+
+	// Mutation: the handle is repositioned only when the stored value changes (the SetValue after SetFloat is removed) -> the slider stays on 90.2, red;
+	//           the row broadcasts although the snapped value equals the stored one -> the listener count moves, red.
+	It("Behaviour: a raw value that snaps to the stored value broadcasts nothing but still repositions the handle", [this]()
+	{
+		if (!RequireHarness()) { return; }
+		Subsystem->SetFloat(SettingsCatalog::FOV, 90.f);
+		UTestSettingFloatRow* FovRow = MakeRow(FovDef);
+		if (!TestNotNull(TEXT("row created"), FovRow)) { return; }
+		Listener->Ids.Reset();
+		Listener->Values.Reset();
+
+		FovRow->TestSlider->SetValue(90.2f);
+		TestNearlyEqual(TEXT("stored value unchanged"), Subsystem->GetFloat(SettingsCatalog::FOV), 90.f, 0.0001f);
+		TestEqual(TEXT("no broadcast"), Listener->Num(), 0);
+		TestNearlyEqual(TEXT("handle moved back onto the notch"), SettingsTestPrivate::SliderAlpha(FovRow->TestSlider),
+		                SettingsTestPrivate::ExpectedAlpha(FovDef, 90.f), 0.0001f);
+		TestEqual(TEXT("displayed text still 90"), FovRow->TestValueText->GetText().ToString(), FString(TEXT("90")));
+	});
+
+	// Mutation: the row broadcasts the raw value then the snapped one (two events) or loops through its own resync -> Num() != 1, red;
+	//           the event carries 91.3 instead of 91 -> red.
+	It("Behaviour: one real change gives exactly one broadcast carrying the snapped value", [this]()
+	{
+		if (!RequireHarness()) { return; }
+		Subsystem->SetFloat(SettingsCatalog::FOV, 90.f);
+		UTestSettingFloatRow* FovRow = MakeRow(FovDef);
+		if (!TestNotNull(TEXT("row created"), FovRow)) { return; }
+		Listener->Ids.Reset();
+		Listener->Values.Reset();
+
+		FovRow->TestSlider->SetValue(91.3f);
+		if (TestEqual(TEXT("exactly one event"), Listener->Num(), 1))
+		{
+			TestTrue(TEXT("for the FOV"), Listener->Ids[0] == SettingsCatalog::FOV);
+			TestNearlyEqual(TEXT("with the snapped value"), Listener->Values[0], 91.f, 0.0001f);
+		}
+	});
+
+	// Mutation: the row snaps even when Step is 0 (rounds to whole numbers, or divides by zero) -> 0.37 is not kept, red;
+	//           the text is forced to no decimals -> 0 or empty, red.
+	It("Behaviour: a continuous setting (Step 0) keeps the raw value and its decimals", [this]()
+	{
+		if (!RequireHarness()) { return; }
+		const FSettingDefinition Continuous = SettingsTestPrivate::MakeDef(IdTestB, 0.f, 1.f, 0.25f, 0.f);
+		Subsystem->InitializeFromDefinitions({ FovDef, Continuous }, SlotName);
+		UTestSettingFloatRow* RowB = MakeRow(Continuous);
+		if (!TestNotNull(TEXT("row created"), RowB)) { return; }
+
+		RowB->TestSlider->SetValue(0.37f);
+		TestNearlyEqual(TEXT("raw value stored as is"), Subsystem->GetFloat(IdTestB), 0.37f, 0.0001f);
+		const FString Shown = RowB->TestValueText->GetText().ToString();
+		TestFalse(TEXT("text not empty"), Shown.IsEmpty());
+		TestTrue(TEXT("text keeps its decimals (not 0)"), Shown != TEXT("0") && Shown.StartsWith(TEXT("0")) && Shown.Len() > 1);
+	});
+
+	// Mutation: steps counted from 0 instead of Min (Min 2 Step 5: 4.6 -> 5 instead of 7) -> red; fixed step of 1 -> red.
+	It("Behaviour: notches are counted from Min with a non unit step", [this]()
+	{
+		if (!RequireHarness()) { return; }
+		const FSettingDefinition Step5 = SettingsTestPrivate::MakeDef(FName(TEXT("Test.Step5")), 60.f, 120.f, 90.f, 5.f);
+		const FSettingDefinition Offset = SettingsTestPrivate::MakeDef(FName(TEXT("Test.Offset")), 2.f, 12.f, 2.f, 5.f);
+		Subsystem->InitializeFromDefinitions({ FovDef, Step5, Offset }, SlotName);
+
+		UTestSettingFloatRow* RowStep5 = MakeRow(Step5);
+		if (!TestNotNull(TEXT("row Step5 created"), RowStep5)) { return; }
+		RowStep5->TestSlider->SetValue(92.4f);
+		TestNearlyEqual(TEXT("92.4 gives 90"), Subsystem->GetFloat(Step5.Id), 90.f, 0.0001f);
+		RowStep5->TestSlider->SetValue(93.f);
+		TestNearlyEqual(TEXT("93 gives 95"), Subsystem->GetFloat(Step5.Id), 95.f, 0.0001f);
+
+		UTestSettingFloatRow* RowOffset = MakeRow(Offset);
+		if (!TestNotNull(TEXT("row Offset created"), RowOffset)) { return; }
+		RowOffset->TestSlider->SetValue(4.4f);
+		TestNearlyEqual(TEXT("4.4 gives 2 (Min)"), Subsystem->GetFloat(Offset.Id), 2.f, 0.0001f);
+		RowOffset->TestSlider->SetValue(4.6f);
+		TestNearlyEqual(TEXT("4.6 gives 7 (Min plus one step)"), Subsystem->GetFloat(Offset.Id), 7.f, 0.0001f);
+	});
+
+	// Mutation: the clamp is removed -> a value above 10 or below 0 escapes, red;
+	//           the notches are counted from 0 instead of Min or rounded wrongly -> not a multiple of the step from Min, red.
+	// Max reachability is NOT asserted: a step that does not divide the range leaves the behaviour at Max unspecified.
+	It("Behaviour: a step that does not divide the range always gives a value inside the bounds on a notch", [this]()
+	{
+		if (!RequireHarness()) { return; }
+		const FSettingDefinition Odd = SettingsTestPrivate::MakeDef(FName(TEXT("Test.Odd")), 0.f, 10.f, 0.f, 3.f);
+		Subsystem->InitializeFromDefinitions({ FovDef, Odd }, SlotName);
+		UTestSettingFloatRow* RowOdd = MakeRow(Odd);
+		if (!TestNotNull(TEXT("row created"), RowOdd)) { return; }
+
+		const float Raws[] = { -4.f, 0.4f, 1.4f, 1.6f, 4.4f, 5.f, 7.4f, 8.9f, 9.9f, 10.f, 25.f };
+		for (const float Raw : Raws)
+		{
+			RowOdd->TestSlider->SetValue(Raw);
+			const float Stored = Subsystem->GetFloat(Odd.Id);
+			TestTrue(*FString::Printf(TEXT("raw %f: stored %f is inside the bounds"), Raw, Stored), Stored >= 0.f && Stored <= 10.f);
+			TestNearlyEqual(*FString::Printf(TEXT("raw %f: stored %f is a multiple of 3 from Min"), Raw, Stored), Stored, FMath::RoundToFloat(Stored / 3.f) * 3.f, 0.0001f);
+		}
+	});
+
+	// Mutation: the text always uses the default formatting (75.4 shown with decimals) -> red; the text drops the decimals for a fractional step (Step 0.5) -> red.
+	It("Behaviour: the displayed text has no decimals for a whole step and keeps them for a fractional step", [this]()
+	{
+		if (!RequireHarness()) { return; }
+		UTestSettingFloatRow* FovRow = MakeRow(FovDef);
+		if (!TestNotNull(TEXT("row created"), FovRow)) { return; }
+		Subsystem->SetFloat(SettingsCatalog::FOV, 75.4f); // from outside: stored as is, only the display is formatted
+		TestEqual(TEXT("whole step: 75.4 is displayed as 75"), FovRow->TestValueText->GetText().ToString(), FString(TEXT("75")));
+
+		const FSettingDefinition Half = SettingsTestPrivate::MakeDef(FName(TEXT("Test.Half")), 60.f, 120.f, 90.f, 0.5f);
+		Subsystem->InitializeFromDefinitions({ FovDef, Half }, SlotName);
+		UTestSettingFloatRow* RowHalf = MakeRow(Half);
+		if (!TestNotNull(TEXT("row Half created"), RowHalf)) { return; }
+		Subsystem->SetFloat(Half.Id, 75.5f);
+		const FString Shown = RowHalf->TestValueText->GetText().ToString();
+		TestTrue(TEXT("fractional step: 75.5 keeps a decimal (culture neutral check)"), Shown.StartsWith(TEXT("75")) && Shown != TEXT("75") && Shown != TEXT("76"));
+	});
+
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
