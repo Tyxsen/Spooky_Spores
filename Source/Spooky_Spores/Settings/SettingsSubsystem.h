@@ -11,7 +11,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSpookySettingChanged, FName, Id,
 
 /**
  * Stores the player settings (all as floats, bounded by their definition), broadcasts changes and persists them
- * in the "Settings" save slot. Lives as long as the process: survives levels and pawns.
+ * in a text file (Id=Value lines, slot "Settings"). Lives as long as the process: survives levels and pawns.
  * Consumers read GetFloat at startup and listen to OnSettingChanged.
  */
 UCLASS()
@@ -30,6 +30,9 @@ public:
 	// Test seam, called by Initialize with the catalog: resets the state, keeps the valid definitions, loads the slot.
 	void InitializeFromDefinitions(const TArray<FSettingDefinition>& InDefinitions, const FString& InSlotName);
 
+	// Full path of the text file of a slot (Saved/Settings/<SlotName>.txt). Also used by the tests.
+	static FString GetSettingsFilePath(const FString& InSlotName);
+
 	// Current value, 0 (and a warning) for an unknown Id
 	UFUNCTION(BlueprintPure, Category = "Settings")
 	float GetFloat(FName Id) const;
@@ -42,7 +45,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Settings")
 	void ResetToDefault(FName Id);
 
-	// Writes all values to the slot. True if written.
+	// Writes all values to the settings file. True if written.
 	UFUNCTION(BlueprintCallable, Category = "Settings")
 	bool SaveSettings();
 

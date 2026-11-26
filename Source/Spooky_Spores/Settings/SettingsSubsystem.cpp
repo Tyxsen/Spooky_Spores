@@ -2,16 +2,14 @@
 
 #include "Settings/SettingsSubsystem.h"
 
-#include "Kismet/GameplayStatics.h"
-#include "Settings/SettingsSaveGame.h"
+#include "HAL/FileManager.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 #include "Spooky_Spores.h"
 
 namespace
 {
 	const TCHAR* const SettingsSlotName = TEXT("Settings");
-
-	// Single local player: the slot is not per user
-	constexpr int32 SettingsUserIndex = 0;
 }
 
 void USettingsSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -112,19 +110,27 @@ void USettingsSubsystem::ResetToDefault(FName Id)
 	}
 }
 
+FString USettingsSubsystem::GetSettingsFilePath(const FString& InSlotName)
+{
+	// Not in Saved/SaveGames (game saves) nor Saved/Config (engine ini files): a machine preference of its own
+	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Settings"), InSlotName + TEXT(".txt"));
+}
+
 bool USettingsSubsystem::SaveSettings()
 {
-	USettingsSaveGame* SaveGame = Cast<USettingsSaveGame>(UGameplayStatics::CreateSaveGameObject(USettingsSaveGame::StaticClass()));
-	if (!SaveGame)
+	// One "Id=Value" line per setting, in definition order
+	FString Content;
+	for (const FSettingDefinition& Definition : Definitions)
 	{
-		UE_LOG(LogSpooky_Spores, Error, TEXT("SaveSettings: cannot create the save object"));
-		return false;
+		Content += FString::Printf(TEXT("%s=%s
+"), *Definition.Id.ToString(), *FString::SanitizeFloat(Values.FindChecked(Definition.Id)));
 	}
 
-	SaveGame->Values = Values;
-	if (!UGameplayStatics::SaveGameToSlot(SaveGame, SlotName, SettingsUserIndex))
+	const FString FilePath = GetSettingsFilePath(SlotName);
+	IFileManager::Get().MakeDirectory(*FPaths::GetPath(FilePath), true);
+	if (!FFileHelper::SaveStringToFile(Content, *FilePath))
 	{
-		UE_LOG(LogSpooky_Spores, Error, TEXT("SaveSettings: failed to write slot '%s'"), *SlotName);
+		UE_LOG(LogSpooky_Spores, Warning, TEXT("SaveSettings: failed to write '%s'"), *FilePath);
 		return false;
 	}
 
@@ -145,27 +151,44 @@ void USettingsSubsystem::LoadSettings()
 		Values.Add(Definition.Id, Definition.Default);
 	}
 
-	if (!UGameplayStatics::DoesSaveGameExist(SlotName, SettingsUserIndex))
+	const FString FilePath = GetSettingsFilePath(SlotName);
+	if (!FPaths::FileExists(FilePath))
 	{
-		UE_LOG(LogSpooky_Spores, Log, TEXT("No settings slot '%s' (first launch): defaults used"), *SlotName);
+		UE_LOG(LogSpooky_Spores, Log, TEXT("No settings file '%s' (first launch): defaults used"), *FilePath);
 		return;
 	}
 
-	const USettingsSaveGame* SaveGame = Cast<USettingsSaveGame>(UGameplayStatics::LoadGameFromSlot(SlotName, SettingsUserIndex));
-	if (!SaveGame)
+	// LoadFileToString converts any byte sequence without asserting (invalid UTF-8 is replaced)
+	FString Content;
+	if (!FFileHelper::LoadFileToString(Content, *FilePath) || Content.TrimStartAndEnd().IsEmpty())
 	{
-		UE_LOG(LogSpooky_Spores, Warning, TEXT("Settings slot '%s' is unreadable: defaults used"), *SlotName);
+		UE_LOG(LogSpooky_Spores, Warning, TEXT("Settings file '%s' is unreadable or empty: defaults used"), *FilePath);
 		return;
 	}
 
-	// The file can be edited: absent, NaN or infinite falls back to the default, anything else is bounded.
-	// Keys unknown to the definitions are never looked at.
+	// The file can be edited: keys are only compared as strings (never turned into FName), so unknown keys are ignored.
+	// A missing key, a non numeric, NaN or infinite value falls back to the default, anything else is bounded.
+	TMap<FString, FString> FileEntries;
+	TArray<FString> Lines;
+	Content.ParseIntoArrayLines(Lines);
+	for (const FString& Line : Lines)
+	{
+		FString Key;
+		FString Text;
+		if (Line.Split(TEXT("="), &Key, &Text))
+		{
+			FileEntries.Add(Key.TrimStartAndEnd().ToLower(), Text.TrimStartAndEnd());
+		}
+	}
+
 	for (const FSettingDefinition& Definition : Definitions)
 	{
-		const float* Stored = SaveGame->Values.Find(Definition.Id);
-		if (Stored && FMath::IsFinite(*Stored))
+		const FString* Text = FileEntries.Find(Definition.Id.ToString().ToLower());
+		float Parsed = 0.0f;
+		// LexTryParseString reports failure ("abc"), unlike Atof which gives 0
+		if (Text && LexTryParseString(Parsed, **Text) && FMath::IsFinite(Parsed))
 		{
-			Values[Definition.Id] = FMath::Clamp(*Stored, Definition.Min, Definition.Max);
+			Values[Definition.Id] = FMath::Clamp(Parsed, Definition.Min, Definition.Max);
 		}
 	}
 }
