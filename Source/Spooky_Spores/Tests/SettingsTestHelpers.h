@@ -24,11 +24,13 @@
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
-#include "Kismet/GameplayStatics.h"
+#include "HAL/FileManager.h"
+#include "Misc/AutomationTest.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 #include "Settings/SettingRowWidget.h"
 #include "Settings/SettingsCatalog.h"
 #include "Settings/SettingsMenuWidget.h"
-#include "Settings/SettingsSaveGame.h"
 #include "Settings/SettingsSubsystem.h"
 #include "UObject/Object.h"
 #include "UObject/StrongObjectPtr.h"
@@ -38,9 +40,6 @@
 
 namespace SettingsTestPrivate
 {
-	// Save user index: the spec does not state it (spec gap), index 0 is the single-player convention.
-	constexpr int32 UserIndex = 0;
-
 	inline float NaNValue() { return std::numeric_limits<float>::quiet_NaN(); }
 	inline float InfValue() { return std::numeric_limits<float>::infinity(); }
 
@@ -71,21 +70,60 @@ namespace SettingsTestPrivate
 		return false;
 	}
 
-	// Writes a slot the way a hand-edited file would look to the subsystem: through the engine save API, with the SaveGame type of the spec.
-	inline bool ForgeSlot(const FString& SlotName, const TMap<FName, float>& Values)
+	// Persistence is a text file, one "Id=Value" line per setting: USettingsSubsystem::GetSettingsFilePath(Slot) is the contract of the path.
+	inline FString SlotFile(const FString& SlotName) { return USettingsSubsystem::GetSettingsFilePath(SlotName); }
+
+	inline bool SlotExists(const FString& SlotName) { return IFileManager::Get().FileExists(*SlotFile(SlotName)); }
+
+	inline void DeleteSlot(const FString& SlotName) { IFileManager::Get().Delete(*SlotFile(SlotName), false, true, true); }
+
+	// Writes raw bytes as the settings file of the slot (hand-edited or corrupted file).
+	inline bool ForgeBytes(const FString& SlotName, const TArray<uint8>& Bytes)
 	{
-		USettingsSaveGame* Save = Cast<USettingsSaveGame>(UGameplayStatics::CreateSaveGameObject(USettingsSaveGame::StaticClass()));
-		if (Save == nullptr)
+		const FString Path = SlotFile(SlotName);
+		IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path), true);
+		return FFileHelper::SaveArrayToFile(Bytes, *Path);
+	}
+
+	// Writes text as the settings file of the slot, byte for byte (no BOM, no newline added), so truncated or odd content stays exact.
+	inline bool ForgeText(const FString& SlotName, const FString& Text)
+	{
+		FTCHARToUTF8 Utf8(*Text);
+		TArray<uint8> Bytes;
+		Bytes.Append(reinterpret_cast<const uint8*>(Utf8.Get()), Utf8.Length());
+		return ForgeBytes(SlotName, Bytes);
+	}
+
+	inline bool ForgeLines(const FString& SlotName, const TArray<FString>& Lines)
+	{
+		return ForgeText(SlotName, FString::Join(Lines, TEXT("\n")) + TEXT("\n"));
+	}
+
+	inline bool ReadSlotText(const FString& SlotName, FString& OutText)
+	{
+		return FFileHelper::LoadFileToString(OutText, *SlotFile(SlotName));
+	}
+
+	// Value of an "Id=Value" line of the saved file (false if the file or the line is missing, or the value is not a number).
+	inline bool ReadSlotValue(const FString& SlotName, FName Id, float& OutValue)
+	{
+		FString Text;
+		if (!ReadSlotText(SlotName, Text))
 		{
 			return false;
 		}
-		Save->Values = Values;
-		return UGameplayStatics::SaveGameToSlot(Save, SlotName, UserIndex);
-	}
-
-	inline USettingsSaveGame* LoadSlot(const FString& SlotName)
-	{
-		return Cast<USettingsSaveGame>(UGameplayStatics::LoadGameFromSlot(SlotName, UserIndex));
+		TArray<FString> Lines;
+		Text.ParseIntoArrayLines(Lines);
+		for (const FString& Line : Lines)
+		{
+			FString Key;
+			FString Value;
+			if (Line.Split(TEXT("="), &Key, &Value) && Key.TrimStartAndEnd().Equals(Id.ToString(), ESearchCase::IgnoreCase))
+			{
+				return LexTryParseString(OutValue, *Value.TrimStartAndEnd());
+			}
+		}
+		return false;
 	}
 
 	inline FString MakeUniqueSlotName(const TCHAR* Prefix)
@@ -302,6 +340,40 @@ class ATestSettingsCharacter : public ASpooky_SporesCharacter
 {
 	GENERATED_BODY()
 };
+
+namespace SettingsTestPrivate
+{
+	// Non-regression guard: no test may create, change or delete the player's real "Settings" file. Capture in BeforeEach, Verify in AfterEach.
+	struct FRealSettingsFileGuard
+	{
+		bool bExisted = false;
+		FString Content;
+
+		void Capture()
+		{
+			bExisted = SlotExists(TEXT("Settings"));
+			Content.Reset();
+			if (bExisted)
+			{
+				ReadSlotText(TEXT("Settings"), Content);
+			}
+		}
+
+		void Verify(FAutomationTestBase& Test) const
+		{
+			FString NowContent;
+			const bool bExistsNow = SlotExists(TEXT("Settings"));
+			if (bExistsNow)
+			{
+				ReadSlotText(TEXT("Settings"), NowContent);
+			}
+			if (bExistsNow != bExisted || NowContent != Content)
+			{
+				Test.AddError(TEXT("The test touched the real 'Settings' file of the player (created, changed or deleted)."));
+			}
+		}
+	};
+}
 
 namespace SettingsTestPrivate
 {

@@ -33,7 +33,6 @@
 #include "GameFramework/PlayerController.h"
 #include "Engine/World.h"
 #include "Engine/EngineTypes.h"
-#include "Kismet/GameplayStatics.h"
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/UObjectGlobals.h"
 #include "Tests/AutomationCommon.h"
@@ -61,6 +60,7 @@ BEGIN_DEFINE_SPEC(FSettingsRowSpec, "SpookySpores.Settings.Row",
 	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 	FString SlotName;
+	SettingsTestPrivate::FRealSettingsFileGuard RealFileGuard;
 	FSettingDefinition FovDef;
 	bool bFovDefFound = false;
 	FSettingDefinition DefB;
@@ -105,6 +105,7 @@ void FSettingsRowSpec::Define()
 	BeforeEach([this]()
 	{
 		SlotName = SettingsTestPrivate::MakeUniqueSlotName(TEXT("SettingsRow"));
+		RealFileGuard.Capture();
 		bFovDefFound = SettingsTestPrivate::FindFovDefinition(FovDef);
 		DefB = SettingsTestPrivate::MakeDef(IdTestB, 0.f, 1.f, 0.25f);
 		BareGameInstance.Reset(SettingsTestPrivate::NewBareGameInstance());
@@ -123,7 +124,8 @@ void FSettingsRowSpec::Define()
 		Listener.Reset();
 		Subsystem.Reset();
 		BareGameInstance.Reset();
-		UGameplayStatics::DeleteGameInSlot(SlotName, SettingsTestPrivate::UserIndex);
+		SettingsTestPrivate::DeleteSlot(SlotName);
+		RealFileGuard.Verify(*this);
 	});
 
 	// Mutation: the slider is not synchronized at SetupRow (stays at its widget default 0) -> red; the slider bounds are not taken from the definition
@@ -213,18 +215,14 @@ void FSettingsRowSpec::Define()
 		if (!TestNotNull(TEXT("row created"), FovRow)) { return; }
 
 		FovRow->TestSlider->OnValueChanged.Broadcast(SettingsTestPrivate::SliderValueAtAlpha(FovRow->TestSlider, 0.25f));
-		TestFalse(TEXT("moving the slider writes nothing"), UGameplayStatics::DoesSaveGameExist(SlotName, SettingsTestPrivate::UserIndex));
+		TestFalse(TEXT("moving the slider writes no file"), SettingsTestPrivate::SlotExists(SlotName));
 
 		FovRow->TestSlider->OnMouseCaptureEnd.Broadcast();
-		if (TestTrue(TEXT("releasing the slider writes the slot"), UGameplayStatics::DoesSaveGameExist(SlotName, SettingsTestPrivate::UserIndex)))
+		if (TestTrue(TEXT("releasing the slider writes the file"), SettingsTestPrivate::SlotExists(SlotName)))
 		{
-			const USettingsSaveGame* Saved = SettingsTestPrivate::LoadSlot(SlotName);
-			const float* Stored = Saved != nullptr ? Saved->Values.Find(SettingsCatalog::FOV) : nullptr;
-			TestTrue(TEXT("the slot holds the FOV"), Stored != nullptr);
-			if (Stored != nullptr)
-			{
-				TestNearlyEqual(TEXT("with the released value"), *Stored, FovDef.Min + 0.25f * (FovDef.Max - FovDef.Min), 0.01f);
-			}
+			float Stored = 0.f;
+			TestTrue(TEXT("the file holds an FOV line"), SettingsTestPrivate::ReadSlotValue(SlotName, SettingsCatalog::FOV, Stored));
+			TestNearlyEqual(TEXT("with the released value"), Stored, FovDef.Min + 0.25f * (FovDef.Max - FovDef.Min), 0.01f);
 		}
 	});
 }
@@ -240,6 +238,7 @@ BEGIN_DEFINE_SPEC(FSettingsMenuSpec, "SpookySpores.Settings.Menu",
 	UWorld* World = nullptr;
 	FSettingsTestGameInstance GameInstance;
 	FString SlotName;
+	SettingsTestPrivate::FRealSettingsFileGuard RealFileGuard;
 	FSettingDefinition FovDef;
 	FSettingDefinition DefB;
 	bool bReady = false;
@@ -285,6 +284,7 @@ void FSettingsMenuSpec::Define()
 	{
 		bReady = false;
 		SlotName = SettingsTestPrivate::MakeUniqueSlotName(TEXT("SettingsMenu"));
+		RealFileGuard.Capture();
 		DefB = SettingsTestPrivate::MakeDef(IdTestB, 0.f, 1.f, 0.25f);
 		Wrapper = MakeUnique<FTestWorldWrapper>();
 		if (!Wrapper->CreateTestWorld(EWorldType::Game) || !Wrapper->BeginPlayInTestWorld())
@@ -328,7 +328,8 @@ void FSettingsMenuSpec::Define()
 		Wrapper.Reset();
 		World = nullptr;
 		bReady = false;
-		UGameplayStatics::DeleteGameInSlot(SlotName, SettingsTestPrivate::UserIndex);
+		SettingsTestPrivate::DeleteSlot(SlotName);
+		RealFileGuard.Verify(*this);
 	});
 
 	// Mutation: the rows are appended without clearing RowsContainer -> 4 then 6 rows, red; one row per definition is not honoured (e.g. only the first) -> red;
@@ -468,6 +469,7 @@ BEGIN_DEFINE_SPEC(FSettingsCharacterFovSpec, "SpookySpores.Settings.CharacterFov
 	UWorld* World = nullptr;
 	FSettingsTestGameInstance GameInstance;
 	FString SlotName;
+	SettingsTestPrivate::FRealSettingsFileGuard RealFileGuard;
 	FSettingDefinition FovDef;
 	bool bReady = false;
 	USettingsSubsystem* Settings = nullptr;
@@ -515,6 +517,7 @@ void FSettingsCharacterFovSpec::Define()
 	{
 		bReady = false;
 		SlotName = SettingsTestPrivate::MakeUniqueSlotName(TEXT("SettingsCharacter"));
+		RealFileGuard.Capture();
 		Wrapper = MakeUnique<FTestWorldWrapper>();
 		if (!Wrapper->CreateTestWorld(EWorldType::Game) || !Wrapper->BeginPlayInTestWorld())
 		{
@@ -541,7 +544,8 @@ void FSettingsCharacterFovSpec::Define()
 		Wrapper.Reset();
 		World = nullptr;
 		bReady = false;
-		UGameplayStatics::DeleteGameInSlot(SlotName, SettingsTestPrivate::UserIndex);
+		SettingsTestPrivate::DeleteSlot(SlotName);
+		RealFileGuard.Verify(*this);
 	});
 
 	// Mutation: the Character does not read the setting at BeginPlay (keeps the class default FOV) -> 90 instead of 75, red;
